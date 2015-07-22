@@ -1,0 +1,17 @@
+[package]
+name = "hal"
+version = "0.1.0"
+authors = ["Jason Ramapuram <jason.ramapuram@viasat.com>"]
+
+[dependencies]
+docopt = "*"
+rustc-serialize = "*"
+arrayfire = { path ="/Users/jramapuram/projects/arrayfire-rust" }
+
+[lib]
+name = "hal"
+path = "src/lib.rs"
+
+[[example]]
+name = "helloworld"
+path = "examples/helloworld.rs"
