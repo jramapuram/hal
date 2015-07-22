@@ -4,8 +4,8 @@
 use layer;
 use std::collections::LinkedList;
 
-trait Model{
-  fn new(optimizer: String, loss: String) -> Self;
+pub trait Model {
+  fn new(optimizer: &'static str, loss: &'static str) -> Self;
   //fn forward(&self, activation: &Array) -> Array;
   //fn backward(&self, inputs: &Array, gradients: &Array);
   fn info(&self);
@@ -13,12 +13,12 @@ trait Model{
 
 pub struct Sequential {
   layers: LinkedList<Box<layer::Layer>>,
-  optimizer: String,//Optimizer,
-  loss: String,//Loss,
+  optimizer: &'static str,
+  loss: &'static str,
 }
 
 impl Model for Sequential {
-  fn new(optimizer: String, loss: String) -> Sequential {
+  fn new(optimizer: &'static str, loss: &'static str) -> Sequential {
     Sequential {
       layers: LinkedList::new(),
       loss: loss,

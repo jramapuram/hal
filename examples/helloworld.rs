@@ -2,15 +2,15 @@ extern crate hal;
 extern crate docopt;
 
 use docopt::Docopt;
-use hal::{Model, Layer}
+use hal::{Sequential, Model};
 
 static USAGE: &'static str = "
 Usage: 
   hal <input_csv> <output_csv>
 ";
 
-fn create_model() -> Model{
-  Model("L2", "SGD")
+fn create_model() -> Box<Sequential> {
+  Box::new(Sequential::new("L2", "SGD"))
 }
 
 fn main() {
