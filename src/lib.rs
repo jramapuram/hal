@@ -1,8 +1,10 @@
 extern crate arrayfire as af;
 
 pub use layer::{Layer, Params};
-mod layer;
+pub mod layer;
 
-pub use model::{Model, Sequential};
-mod model;
+pub use model::{Model};
+pub mod model;
+
+//pub use optimizer::{Optimizer, SGD};
 //mod optimizer;

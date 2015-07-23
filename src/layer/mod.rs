@@ -1,11 +1,14 @@
+pub use self::dense::Dense;
 mod dense;
-//mod lstm;
+
+// pub use self::lstm::LSTM;
+// mod lstm;
 
 use af::Dim4;
 use af::Array;
 
 pub trait Layer {
-  fn new(input_size: u64, output_size: u64) -> Self;
+  fn new(input_size: u64, output_size: u64) -> Self where Self: Sized;
   fn forward(&self, activation: &Array) -> Array;
   //fn backward(&self, inputs: &Array, gradients: &Array);
   //fn connect<'a, 'b>(&'a self, next: &'b Layer);
