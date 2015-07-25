@@ -1,5 +1,6 @@
 use layer::{Layer};
 use model::Model;
+use af::{Array};
 
 pub struct Sequential {
   layers: Vec<Box<Layer>>,
@@ -22,5 +23,13 @@ impl Model for Sequential {
 
   fn info(&self) {
     println!("loss : {}\noptimizer: {}", self.loss, self.optimizer);
+  }
+
+  fn forward(&self, activation: &Array) -> Array{
+    let mut a = self.layers[0].forward(activation);
+    for i in 1..self.layers.len() {
+      a = self.layers[i].forward(&a);
+    }
+    a
   }
 }
