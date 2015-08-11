@@ -6,5 +6,5 @@ pub mod layer;
 pub use model::{Model};
 pub mod model;
 
-//pub use optimizer::{Optimizer, SGD};
-//mod optimizer;
+pub use optimizer::{Optimizer};
+pub mod optimizer;

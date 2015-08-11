@@ -5,6 +5,7 @@ use layer::{Params, Layer};
 
 pub struct Dense {
   params: Params,
+  diffs: Array,
 }
 
 impl Layer for Dense {
@@ -15,7 +16,8 @@ impl Layer for Dense {
         bias_dims : vec![Dim4::new(&[output_size, 1, 1, 1])],
         weights : vec![af::randn(Dim4::new(&[output_size, input_size, 1, 1]), af::Aftype::F32).unwrap()],
         bias : vec![af::constant(1.0 as f32, Dim4::new(&[output_size, 1, 1, 1])).unwrap()],
-      },
+      }, 
+      diffs: af::constant(0.0 as f32, Dim4::new(&[output_size, 1, 1, 1])).unwrap(),
     }
   }
 
@@ -23,9 +25,13 @@ impl Layer for Dense {
     &af::matmul(&self.params.weights[0], activation, MatProp::NONE, MatProp::NONE).unwrap() + &self.params.bias[0]
   }
 
-  // pub fn backward(&self, inputs: &Array, gradients: &Array) {
-     
-  //}
+  fn backward(&mut self, upper_diffs: &Array, gradients: &Array, train: bool) -> &Array {
+    if train{
+      self.diffs = &af::matmul(&self.params.weights[0], upper_diffs, MatProp::NONE, MatProp::NONE).unwrap() * gradients;
+    }
+
+   &self.diffs
+  }
 
   fn get_weights(&self) -> &Vec<Array> {
     &self.params.weights

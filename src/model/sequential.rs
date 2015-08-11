@@ -32,4 +32,15 @@ impl Model for Sequential {
     }
     a
   }
+
+  fn backward(&self, target: &Array, train: bool){
+    let y = self.layers.last().unwrap().get_activation();
+    let mut diff = target - y;
+    let mut grads = optimizer.grads(y);
+
+    for i in (0..self.layers.len()).rev() {
+      diffs = self.layers[i].backward(&diff, &grads, train);
+      grads = optimizer.grads(self.layers[i].get_activation());
+    }
+  }
 }
