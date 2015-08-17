@@ -4,19 +4,19 @@ use error::HALError;
 
 pub fn mse(x: &Array, y: &Array) -> Array {
   let diff = af::sum(y, af::mul(-1.0, x));
-  af::div(af::sum(af::dot(diff, diff)), 2.0)
+  af::div(af::sum(af::dot(diff, diff)), 2.0).unwrap()
 }
 
 pub fn cross_entropy(x: &Array, y: &Array) -> Array {
-  af::sum(af::mul(y, af::log(x)))
+  af::sum(af::mul(y, af::log(x))).unwrap()
 }
 
 pub fn mse_derivative(x: &Array, y: &Array) -> Array {
-  af::sub(x, y)
+  af::sub(x, y).unwrap()
 }
 
 pub fn cross_entropy_derivative(x: &Array) -> Array {
-  af::sub(x, y)
+  af::sub(x, y).unwrap()
 }
 
 pub fn get_loss(name: &str, x: &Array) -> Array {
