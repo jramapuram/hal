@@ -8,3 +8,5 @@ pub mod model;
 
 pub use optimizer::{Optimizer};
 pub mod optimizer;
+
+pub mod activations;

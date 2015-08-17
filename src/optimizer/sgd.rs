@@ -60,6 +60,7 @@ impl Optimizer, Default for SGD {
   
   fn update(&mut self, layer: &mut Layer, grads: &Array){
     self.learning_rate *= (1.0 / (1.0 + self.decay * self.iterations));
+    
     // COMPLETE THIS
   }
   
