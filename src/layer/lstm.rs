@@ -50,7 +50,7 @@ impl RecurrentLayer for LSTM {
       },
       bf: Bias {
         dims : vec![Dim4::new(&[output_size, 1, 1, 1])],
-        bias : vec![get_initialization(b_init, Dim4::new(&[output_size, 1, 1, 1]))],
+        bias : vec![get_initialization("ones", Dim4::new(&[output_size, 1, 1, 1]))],
       },
       Wc : Weights {
         dims : vec![Dim4::new(&[input_size, output_size, 1, 1])],
@@ -61,9 +61,9 @@ impl RecurrentLayer for LSTM {
         bias : vec![get_initialization(b_init, Dim4::new(&[output_size, 1, 1, 1]))],
       },
       iDiffs: zeros(Dim4::new(&[output_size, 1, 1, 1])),
-      iDiffs: zeros(Dim4::new(&[output_size, 1, 1, 1])),
-      iDiffs: zeros(Dim4::new(&[output_size, 1, 1, 1])),
-      iDiffs: zeros(Dim4::new(&[output_size, 1, 1, 1])),
+      oDiffs: zeros(Dim4::new(&[output_size, 1, 1, 1])),
+      fDiffs: zeros(Dim4::new(&[output_size, 1, 1, 1])),
+      cDiffs: zeros(Dim4::new(&[output_size, 1, 1, 1])),
       inner: inner_activation,
       outer: outer_activation
     }
