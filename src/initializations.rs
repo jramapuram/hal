@@ -1,12 +1,13 @@
-use af::Dim4;
-use af::Array;
+use af;
+use error::HALError;
+use af::{Dim4, Array};
 
 pub fn normal(dims: &Dim4) -> Array {
   af::randn(dims, af::Aftype::F32).unwrap()
 }
 
 pub fn uniform(dims: &Dim4, spread: f32){
-  af::randu(dim, af::Aftype::F32).and_then(|x| x * spread - spread / 2).unwrap()
+  af::randu(dims, af::Aftype::F32).and_then(|x| x * spread - spread / 2).unwrap()
 }
 
 pub fn zeros(dims: &Dim4) -> Array {

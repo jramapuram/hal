@@ -1,15 +1,29 @@
 use layer::{Layer};
 use model::Model;
-use af::{Array};
+use optimizer::{Optimizer, get_optimizer, get_default_optimizer}
+use af::{Array, mul, sub};
+use loss::{get_loss, get_loss_derivative};
+use std::default::Default;
 
 pub struct Sequential {
   layers: Vec<Box<Layer>>,
-  optimizer: &'static str,
+  optimizer: Box<Optimizer>,
   loss: &'static str,
 }
 
+// TODO: implement default trait
+// impl Default for Sequential{
+//   fn default(optimizer: &'static str, loss: &'static str) -> Sequential {
+//     Sequential {
+//       layers: Vec::new(),
+//       loss: loss,
+//       optimizer: get_default_optimizer(optimizer),
+//     }
+//   }  
+// }
+
 impl Model for Sequential {
-  fn new(optimizer: &'static str, loss: &'static str) -> Sequential {
+  fn new(optimizer: Box<Optimizer>, loss: &'static str) -> Sequential {
     Sequential {
       layers: Vec::new(),
       loss: loss,
@@ -22,10 +36,11 @@ impl Model for Sequential {
   }
 
   fn info(&self) {
+    //TODO: convert to log crate
     println!("loss : {}\noptimizer: {}", self.loss, self.optimizer);
   }
 
-  fn forward(&self, activation: &Array) -> Array{
+  fn forward(&self, activation: &Array) -> Array {
     let mut a = self.layers[0].forward(activation);
     for i in 1..self.layers.len() {
       a = self.layers[i].forward(&a);
@@ -33,14 +48,17 @@ impl Model for Sequential {
     a
   }
 
-  fn backward(&self, target: &Array, train: bool){
-    let y = self.layers.last().unwrap().get_activation();
-    let mut diff = target - y;
-    let mut grads = optimizer.grads(y);
+  fn backward(&self, target: &Array, train: bool) {
+    // d_L = d_loss * d(z) where z = activation w/out non-linearity
+    let prediction = self.layers.last().unwrap().get_activation();
+    let d_loss = get_loss_derivative(self.loss, prediction, target);
+    let d_z = get_activation_derivative(self.layers.last().get_input());
+    let mut diffs = self.layers.last().set_diffs(mul(d_loss, d_z));
 
-    for i in (0..self.layers.len()).rev() {
-      diffs = self.layers[i].backward(&diff, &grads, train);
-      grads = optimizer.grads(self.layers[i].get_activation());
+    for i in (0..self.layers.len() - 1).rev() {
+      diffs = self.layers[i].backward(&diffs
+                                      , self.optimizer.grads(self.layers[i].get_activation())
+                                      , train);
     }
   }
 }

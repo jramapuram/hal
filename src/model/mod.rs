@@ -6,11 +6,12 @@ mod sequential;
 
 use af::{Array};
 use layer::Layer;
+use optimizer::Optimizer;
 
 pub trait Model {
-  fn new(optimizer: &'static str, loss: &'static str) -> Self;
+  fn new(optimizer: Box<Optimizer>, loss: &'static str) -> Self;
   fn forward(&self, activation: &Array) -> Array;
-  fn backward(&self, target: &Array);
+  fn backward(&self, target: &Array, train: bool);
   fn add(&mut self, layer: Box<Layer>);
   fn info(&self);
 }
