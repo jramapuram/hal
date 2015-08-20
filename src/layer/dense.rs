@@ -8,11 +8,14 @@ pub struct Dense {
   weights: ArrayVector,
   bias: ArrayVector,
   activation: &'static str,
-  inputs: Vec<(Array, Array)>,
+  inputs: (Array, Array),
 }
 
 impl Layer for Dense {
-  fn new(input_size: u64, output_size: u64, output_activation: &'static str, w_init: &'static str, b_init: &str) -> Dense {
+  fn new(input_size: u64, output_size: u64
+         , output_activation: &'static str
+         , w_init: &'static str, b_init: &str) -> Dense
+  {
     Dense {
       weights : ArrayVector {
         data : vec![initializations::get_initialization(w_init, &Dim4::new(&[output_size, input_size, 1, 1]))],
@@ -21,19 +24,20 @@ impl Layer for Dense {
         data : vec![initializations::get_initialization(b_init, &Dim4::new(&[output_size, 1, 1, 1]))],
       },
       activation: output_activation,
-      inputs: Vec::new(),
+      inputs: (initializations::get_initialization("zeros", &Dim4::new(&[input_size, 1, 1, 1]))    // a_{l-1}
+               , initializations::get_initialization("zeros", &Dim4::new(&[output_size, 1, 1, 1]))),  // Wx+b
     }
   }
 
   fn forward(&mut self, activation: &Array) -> Array {
     // append tuple: (previous_input, Wx + b)
-    self.inputs.push((*activation, af::add(af::matmul(&self.weights.data[0]
-                                                      , activation
-                                                      , MatProp::NONE
-                                                      , MatProp::NONE).unwrap()
-                                          , self.bias.data[0]).unwrap()));
+    self.inputs = (*activation, af::add(af::matmul(&self.weights.data[0]
+                                                   , activation
+                                                   , MatProp::NONE
+                                                   , MatProp::NONE).unwrap()
+                                        , self.bias.data[0]).unwrap());
     //sigma(Wx + b)
-    activations::get_activation(self.activation, &self.inputs.last().unwrap().1)    
+    activations::get_activation(self.activation, &self.inputs.1)    
   }
 
   fn backward(&self, upper_diffs: &Array, gradients: &Array) -> Array {
@@ -45,24 +49,20 @@ impl Layer for Dense {
             , *gradients).unwrap()
   }
 
-  fn reset(&mut self) {
-    self.inputs.clear();
-  }
-
   fn get_weights(&self) -> &Vec<Array> {
     &self.weights.data
   }
 
-  fn set_weights(&mut self, weights: ArrayVector) {
-    self.weights = weights;
+  fn set_weights(&mut self, weights: Array, index: usize) {
+    self.weights.data[index] = weights;
   }
 
   fn get_bias(&self) -> &Vec<Array> {
     &self.bias.data
   }
 
-  fn set_bias(&mut self, bias: ArrayVector) {
-    self.bias = bias;
+  fn set_bias(&mut self, bias: Array, index: usize) {
+    self.bias.data[index] = bias;
   }
 
   fn get_bias_dims(&self) -> Vec<Dim4> {
@@ -81,7 +81,7 @@ impl Layer for Dense {
     dims
   }
 
-  fn get_inputs(&self) -> &Vec<(Array, Array)> {
+  fn get_inputs(&self) -> &(Array, Array) {
     &self.inputs
   }
 

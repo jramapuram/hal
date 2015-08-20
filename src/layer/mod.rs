@@ -18,14 +18,13 @@ pub trait Layer {
   fn forward(&mut self, activation: &Array) -> Array;
   fn backward(&self, inputs: &Array, gradients: &Array) -> Array;
   fn get_weights(&self) -> &Vec<Array>;
-  fn set_weights(&mut self, weights: ArrayVector);
+  fn set_weights(&mut self, weight: Array, index: usize);
   fn get_bias(&self) -> &Vec<Array>;
-  fn set_bias(&mut self, bias: ArrayVector);
+  fn set_bias(&mut self, bias: Array, index: usize);
   fn get_bias_dims(&self) -> Vec<Dim4>;
   fn get_weight_dims(&self) -> Vec<Dim4>;
-  fn get_inputs(&self) -> &Vec<(Array, Array)>;
+  fn get_inputs(&self) -> &(Array, Array);
   fn get_activation_type(&self) -> &'static str;
-  fn reset(&mut self);
 }
 
 pub trait RecurrentLayer : Layer {

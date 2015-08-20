@@ -72,6 +72,6 @@ impl Model for Sequential {
   }
 
   fn backward(&mut self, prediction: &Array, target: &Array) -> (Array, Array) {
-    self.optimizer.update(self.layers, prediction, target, self.loss)
+    self.optimizer.update(&mut self.layers, prediction, target, self.loss)
   }
 }
