@@ -14,7 +14,7 @@ pub trait Model {
          , batch_size: u64, iter: u64
          , verbose: bool) -> (Vec<Array>, Array);
   fn forward(&self, activation: &Array) -> Array;
-  fn backward(&self, prediction: &Array, target: &Array) -> (Vec<Array>, Array);
+  fn backward(&mut self, prediction: &Array, target: &Array) -> (Array, Array);
   fn add(&mut self, layer: Box<Layer>);
   fn info(&self);
 }

@@ -55,22 +55,23 @@ impl Model for Sequential {
          , verbose: bool) -> (Vec<Array>, Array)
   {
     let mut fwd_pass = target.copy().unwrap(); // sizing
-    let mut loss = Vec::<Array>::new();
+    let mut lossvec = Vec::<Array>::new();
     
     for i in (0..iter) {
       //TODO: Minitbatch here
       fwd_pass = self.forward(input);
-      loss.push(self.backward(fwd_pass, target));
+      let (l, _) = self.backward(&fwd_pass, target); 
+      lossvec.push(l);
 
       if(verbose){
         println!("loss:");
-        af::print(loss.last());
+        af::print(&l);
       }
     }
-    (loss, fwd_pass)
+    (lossvec, fwd_pass)
   }
 
-  fn backward(&self, prediction: &Array, target: &Array) -> (Vec<Array>, Array) {
-    self.optimizer.update(self.layers, prediction, target, self.loss);
+  fn backward(&mut self, prediction: &Array, target: &Array) -> (Array, Array) {
+    self.optimizer.update(self.layers, prediction, target, self.loss)
   }
 }
