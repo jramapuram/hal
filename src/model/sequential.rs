@@ -38,7 +38,8 @@ impl Model for Sequential {
 
   fn info(&self) {
     //TODO: convert to log crate
-    println!("loss : {}\noptimizer: {}", self.loss, self.optimizer);
+    //println!("loss : {}\noptimizer: {}", self.loss, self.optimizer);
+    println!("loss : {}", self.loss);
   }
 
   fn forward(&self, activation: &Array) -> Array {
@@ -53,8 +54,8 @@ impl Model for Sequential {
          , batch_size: u64, iter: u64
          , verbose: bool) -> (Vec<Array>, Array)
   {
-    let mut fwd_pass = target.copy(); // sizing
-    let mut loss = Vec::new();
+    let mut fwd_pass = target.copy().unwrap(); // sizing
+    let mut loss = Vec::<Array>::new();
     
     for i in (0..iter) {
       //TODO: Minitbatch here

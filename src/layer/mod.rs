@@ -15,12 +15,12 @@ pub struct ArrayVector {
 pub trait Layer {
   fn new(input_size: u64, output_size: u64,
          output_activation: &'static str, w_init: &'static str, b_init: &str) -> Self where Self: Sized;
-  fn forward(&mut self, activation: Array) -> Array;
+  fn forward(&mut self, activation: &Array) -> Array;
   fn backward(&self, inputs: &Array, gradients: &Array) -> Array;
   fn get_weights(&self) -> &Vec<Array>;
-  fn set_weights(&mut self, weights: &ArrayVector);
+  fn set_weights(&mut self, weights: ArrayVector);
   fn get_bias(&self) -> &Vec<Array>;
-  fn set_bias(&mut self, bias: &ArrayVector);
+  fn set_bias(&mut self, bias: ArrayVector);
   fn get_bias_dims(&self) -> Vec<Dim4>;
   fn get_weight_dims(&self) -> Vec<Dim4>;
   fn get_inputs(&self) -> &Vec<(Array, Array)>;

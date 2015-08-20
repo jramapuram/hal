@@ -25,10 +25,10 @@ impl Layer for Dense {
     }
   }
 
-  fn forward(&mut self, activation: Array) -> Array {
+  fn forward(&mut self, activation: &Array) -> Array {
     // append tuple: (previous_input, Wx + b)
-    self.inputs.push((activation, af::add(af::matmul(&self.weights.data[0]
-                                                      , &activation
+    self.inputs.push((*activation, af::add(af::matmul(&self.weights.data[0]
+                                                      , activation
                                                       , MatProp::NONE
                                                       , MatProp::NONE).unwrap()
                                           , self.bias.data[0]).unwrap()));
@@ -38,11 +38,11 @@ impl Layer for Dense {
 
   fn backward(&self, upper_diffs: &Array, gradients: &Array) -> Array {
     // d_l = (transpose(W) * d_{l+1}) .* dActivation(z) where z = activation w/out non-linearity
-    af::mul(&af::matmul(&self.weights.data[0]
-                        , upper_diffs
-                        , MatProp::CTRANS
-                        , MatProp::NONE).unwrap()
-            , gradients).unwrap()
+    af::mul(af::matmul(&self.weights.data[0]
+                       , upper_diffs
+                       , MatProp::CTRANS
+                       , MatProp::NONE).unwrap()
+            , *gradients).unwrap()
   }
 
   fn reset(&mut self) {
@@ -53,7 +53,7 @@ impl Layer for Dense {
     &self.weights.data
   }
 
-  fn set_weights(&mut self, weights: &ArrayVector) {
+  fn set_weights(&mut self, weights: ArrayVector) {
     self.weights = weights;
   }
 
@@ -61,22 +61,22 @@ impl Layer for Dense {
     &self.bias.data
   }
 
-  fn set_bias(&mut self, bias: &ArrayVector) {
+  fn set_bias(&mut self, bias: ArrayVector) {
     self.bias = bias;
   }
 
   fn get_bias_dims(&self) -> Vec<Dim4> {
     let mut dims = Vec::new();
-    for b in self.bias{
-      dims.push(b.dims)
+    for b in self.bias.data {
+      dims.push(b.dims().unwrap())
     }
     dims
   }
 
   fn get_weight_dims(&self) -> Vec<Dim4> {
     let mut dims = Vec::new();
-    for w in self.weights{
-      dims.push(w.dims)
+    for w in self.weights.data {
+      dims.push(w.dims().unwrap())
     }
     dims
   }
@@ -86,6 +86,6 @@ impl Layer for Dense {
   }
 
   fn get_activation_type(&self) -> &'static str {
-    &self.activations
+    &self.activation
   }
 }
