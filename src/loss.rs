@@ -1,5 +1,5 @@
-use af::Dim4;
-use af::Array;
+use af;
+use af::{Dim4, Array};
 use error::HALError;
 
 pub fn mse(x: &Array, y: &Array) -> Array {
@@ -22,10 +22,10 @@ pub fn cross_entropy_derivative(pred: &Array, target: &Array) -> Array {
   mse_derivative(pred, target)
 }
 
-pub fn get_loss(name: &str, x: &Array) -> Array {
+pub fn get_loss(name: &str, pred: &Array, target: &Array) -> Array {
   match(name){
-    "mse"           => mse(x),
-    "cross_entropy" => cross_entropy(x),
+    "mse"           => mse(pred, target),
+    "cross_entropy" => cross_entropy(pred, target),
     _               => HALError::UNKNOWN,
   }
 }

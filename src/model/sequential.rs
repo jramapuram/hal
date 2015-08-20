@@ -1,9 +1,10 @@
+use af;
+use af::{Array};
+use std::default::Default;
+
 use layer::{Layer};
 use model::Model;
-use optimizer::{Optimizer, get_optimizer, get_default_optimizer}
-use af::{Array, mul, sub};
-use loss::{get_loss, get_loss_derivative};
-use std::default::Default;
+use optimizer::Optimizer;
 
 pub struct Sequential {
   layers: Vec<Box<Layer>>,
@@ -48,17 +49,27 @@ impl Model for Sequential {
     a
   }
 
-  fn backward(&self, target: &Array, train: bool) {
-    // d_L = d_loss * d(z) where z = activation w/out non-linearity
-    let prediction = self.layers.last().unwrap().get_activation();
-    let d_loss = get_loss_derivative(self.loss, prediction, target);
-    let d_z = get_activation_derivative(self.layers.last().get_input());
-    let mut diffs = self.layers.last().set_diffs(mul(d_loss, d_z));
+  fn fit(&self, input: &Array, target: &Array
+         , batch_size: u64, iter: u64
+         , verbose: bool) -> (Vec<Array>, Array)
+  {
+    let mut fwd_pass = target.copy(); // sizing
+    let mut loss = Vec::new();
+    
+    for i in (0..iter) {
+      //TODO: Minitbatch here
+      fwd_pass = self.forward(input);
+      loss.push(self.backward(fwd_pass, target));
 
-    for i in (0..self.layers.len() - 1).rev() {
-      diffs = self.layers[i].backward(&diffs
-                                      , self.optimizer.grads(self.layers[i].get_activation())
-                                      , train);
+      if(verbose){
+        println!("loss:");
+        af::print(loss.last());
+      }
     }
+    (loss, fwd_pass)
+  }
+
+  fn backward(&self, prediction: &Array, target: &Array) -> (Vec<Array>, Array) {
+    self.optimizer.update(self.layers, prediction, target, self.loss);
   }
 }

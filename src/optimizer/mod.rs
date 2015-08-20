@@ -8,9 +8,14 @@ use layer::Layer;
 use error::HALError;
 
 pub trait Optimizer {
-  fn new(&self, params: &HashMap<&str, &str>) -> Self;
-  fn grads(&self, layer: &Layer) -> Array;
-  fn update(&mut self, layer: &mut Layer, grads: &Array);
+  fn new(params: &HashMap<&str, &str>) -> Self where Self: Sized;
+  fn grads(&self, prediction: &Array, target: &Array, input: &Array
+           , loss: &'static str, activation_type: &'static str) -> Array;
+  fn update(&self, layers: &mut Vec<Layer>
+            , prediction: &Array
+            , target: &Array
+            , loss: &'static str) -> (Array, Array);
+  fn update_one(&self, layer: &mut Layer, prev_activation: &Array, diffs: &Array);
   fn info(&self);
 }
 

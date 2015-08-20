@@ -1,3 +1,6 @@
+use af;
+use loss;
+use activations;
 use layer::{Layer};
 use optimizer::Optimizer;
 use af::{Array};
@@ -41,40 +44,49 @@ impl Optimizer for SGD {
     }
   }
   
-  fn grads(&self, prediction: &Array, target: &Array
-           , input: &Array, loss: &'static str) -> Array
+  fn grads(&self, prediction: &Array, target: &Array, input: &Array
+           , loss: &'static str, activation_type: &'static str) -> Array
   {
     // d_L = d_loss * d(z) where z = activation w/out non-linearity
     let d_loss = loss::get_loss_derivative(loss, prediction, target);
-    let d_z = activations::get_activation_derivative(input);
+    let d_z = activations::get_activation_derivative(activation_type, input);
     af::mul(d_loss, d_z)
   }
 
   //TODO: Add nesterov & momentum
-  fn update_one(&self, layer: &mut Layer, diffs: &Array){
+  fn update_one(&self, layer: &mut Layer, prev_activation: &Array, diffs: &Array){
     // W = W - lr * a_{l-1} * d_l
     // b = b - lr * d_l
     layer.set_weights(af::sub(layer.get_weights()
-                              , af::mul(self.learning_rate, af::mul(layer.get_inputs(), diffs))));
+                              , af::mul(self.learning_rate, af::mul(prev_activation, diffs))));
     layer.set_bias(layer.get_bias(), af::mul(self.learning_rate, diffs));
   }
   
-  fn update(&self, layers: &mut Vec<Layer>, target: &Array, loss: &'static str){
+  fn update(&self, layers: &mut Vec<Layer>
+            , prediction: &Array
+            , target: &Array
+            , loss: &'static str) -> (Array, Array)
+  {
     self.iter += 1;
     self.learning_rate *= (1.0 / (1.0 + self.decay * self.iterations));
-    let mut activation = layers.last().forward(layers.last().get_inputs()); // XXX
-    let mut diffs = grads(activation
-                          , target
-                          , layers.last().get_inputs()
-                          , loss);
-    self.update_one(layers.last(), diffs);
-    for i in (0..layers.len() - 1).rev() {
-      // d_l = (W_{l+1}^T * d_{l+1}) .* derivative(inputs)
-      activation = layers[i].forward(layers[i].get_inputs())
-      let grad = activations::get_activation_derivative(activation, layers[i].get_inputs());
+    let (mut prev_activation, mut current_wxb) = layers.last().get_inputs();
+    let mut diffs = self.grads(prediction
+                               , target
+                               , current_wxb
+                               , loss
+                               , layers.last().get_activation_type());
+    self.update_one(layers.last(), prev_activation, diffs);
+
+    // Verify:: Don't backprop to 1st layer
+    for i in (1..layers.len() - 1).rev() {
+      // d_l = (W_{l+1}^T * d_{l+1}) .* derivative(z) where z = activation w/out non-linearity
+      (prev_activation, current_wxb) = layers[i].get_inputs();
+      let grad = activations::get_activation_derivative(layers[i].get_activation_type(),  current_wxb);
       diffs = self.layers[i].backward(&diffs, grad);
       self.update_one(layers[i], diffs);
     }
+
+    (loss::get_loss(loss, prediction, target), prediction)
   }
   
   fn info(&self){
