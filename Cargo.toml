@@ -13,5 +13,5 @@ name = "hal"
 path = "src/lib.rs"
 
 [[example]]
-name = "helloworld"
-path = "examples/helloworld.rs"
+name = "perceptron"
+path = "examples/perceptron.rs"
