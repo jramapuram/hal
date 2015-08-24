@@ -1,7 +1,7 @@
 use af;
 use af::{Array};
 use std::default::Default;
-
+use std::cell::Cell;
 use layer::{Layer};
 use model::Model;
 use optimizer::Optimizer;
@@ -42,7 +42,7 @@ impl Model for Sequential {
     println!("loss : {}", self.loss);
   }
 
-  fn forward(&self, activation: &Array) -> Array {
+  fn forward(&mut self, activation: &Array) -> Array {
     let mut a = self.layers[0].forward(activation);
     for i in 1..self.layers.len() {
       a = self.layers[i].forward(&a);
@@ -50,12 +50,12 @@ impl Model for Sequential {
     a
   }
 
-  fn fit(&self, input: &Array, target: &Array
+  fn fit(&mut self, input: &Array, target: &Array
          , batch_size: u64, iter: u64
-         , verbose: bool) -> (Vec<Array>, Array)
+         , verbose: bool) -> (Vec<f32>, Array)
   {
     let mut fwd_pass = target.copy().unwrap(); // sizing
-    let mut lossvec = Vec::<Array>::new();
+    let mut lossvec = Vec::<f32>::new();
     
     for i in (0..iter) {
       //TODO: Minitbatch here
@@ -64,14 +64,13 @@ impl Model for Sequential {
       lossvec.push(l);
 
       if(verbose){
-        println!("loss:");
-        af::print(&l);
+        println!("loss: {}", l);
       }
     }
     (lossvec, fwd_pass)
   }
 
-  fn backward(&mut self, prediction: &Array, target: &Array) -> (Array, Array) {
+  fn backward(&mut self, prediction: &Array, target: &Array) -> (f32, Array) {
     self.optimizer.update(&mut self.layers, prediction, target, self.loss)
   }
 }

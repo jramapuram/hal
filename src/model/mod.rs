@@ -10,11 +10,11 @@ use optimizer::Optimizer;
 
 pub trait Model {
   fn new(optimizer: Box<Optimizer>, loss: &'static str) -> Self;
-  fn fit(&self, input: &Array, target: &Array
+  fn fit(&mut self, input: &Array, target: &Array
          , batch_size: u64, iter: u64
-         , verbose: bool) -> (Vec<Array>, Array);
-  fn forward(&self, activation: &Array) -> Array;
-  fn backward(&mut self, prediction: &Array, target: &Array) -> (Array, Array);
+         , verbose: bool) -> (Vec<f32>, Array);
+  fn forward(&mut self, activation: &Array) -> Array;
+  fn backward(&mut self, prediction: &Array, target: &Array) -> (f32, Array);
   fn add(&mut self, layer: Box<Layer>);
   fn info(&self);
 }
