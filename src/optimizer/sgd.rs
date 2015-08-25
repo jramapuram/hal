@@ -44,12 +44,12 @@ impl Optimizer for SGD {
     }
   }
   
-  fn grads(&self, prediction: &Array, target: &Array, input: &Array
+  fn grads(&self, prediction: &Array, target: &Array
            , loss: &'static str, activation_type: &'static str) -> Array
   {
     // d_L = d_loss * d(z) where z = activation w/out non-linearity
     let d_loss = loss::get_loss_derivative(loss, prediction, target).unwrap();
-    let d_z = activations::get_activation_derivative(activation_type, input).unwrap();
+    let d_z = activations::get_activation_derivative(activation_type, prediction).unwrap();
     af::mul(&d_loss, &d_z).unwrap()
   }
 
@@ -57,8 +57,8 @@ impl Optimizer for SGD {
   fn update_one(&self, layer: &mut Box<Layer>, prev_activation: &Array, diffs: &Array){
     // W = W - lr * a_{l-1} * d_l
     let weights = layer.get_weights();
-    for i in (0..weights.len()) {
-      let update = af::mul(prev_activation, diffs).unwrap();
+    for i in (0..weights.len()) { // for all weights in this layer
+      let update = af::matmul(diffs, prev_activation, af::MatProp::NONE, af::MatProp::TRANS).unwrap();
       layer.set_weights(&af::sub(&weights[i], &af::mul(&self.learning_rate, &update).unwrap()).unwrap(), i);
     }
     // b = b - lr * d_l
@@ -76,10 +76,9 @@ impl Optimizer for SGD {
     self.iter += 1;
     self.learning_rate *= (1.0 / (1.0 + self.decay * (self.iter as f32)));
     let last_index = layers.len() - 1;
-    let (prev_activation, current_wxb) = layers[last_index].get_inputs();
+    let prev_activation = layers[last_index].get_input();
     let diffs = self.grads(prediction
                            , target
-                           , &current_wxb
                            , loss
                            , layers[last_index].get_activation_type());
     self.update_one(&mut layers[last_index], &prev_activation, &diffs);
@@ -87,8 +86,8 @@ impl Optimizer for SGD {
     // Verify:: Don't backprop to 1st layer
     for i in (1..last_index).rev() {
       // d_l = (W_{l+1}^T * d_{l+1}) .* derivative(z) where z = activation w/out non-linearity
-      let (prev_activation, current_wxb) = layers[i].get_inputs();
-      let grad = activations::get_activation_derivative(layers[i].get_activation_type(), &current_wxb).unwrap();
+      let prev_activation = layers[i].get_input();
+      let grad = activations::get_activation_derivative(layers[i].get_activation_type(), &prev_activation).unwrap();
       let diffs = layers[i].backward(&diffs, &grad);
       self.update_one(&mut layers[i], &prev_activation, &diffs);
     }

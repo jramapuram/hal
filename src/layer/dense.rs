@@ -2,15 +2,15 @@ use af;
 use activations;
 use initializations;
 use af::{Dim4, Array, MatProp};
-use layer::{ArrayVector, Layer};
+use layer::Layer;
 
 use std::cell::Cell;
 
 pub struct Dense {
-  weights: ArrayVector,
-  bias: ArrayVector,
+  weights: Vec<Array>,
+  bias: Vec<Array>,
+  inputs: Array,
   activation: &'static str,
-  inputs: (Array, Array),
 }
 
 impl Layer for Dense {
@@ -19,32 +19,28 @@ impl Layer for Dense {
          , w_init: &'static str, b_init: &str) -> Dense
   {
     Dense {
-      weights : ArrayVector {
-        data : vec![initializations::get_initialization(w_init, Dim4::new(&[output_size, input_size, 1, 1])).unwrap()],
-      },
-      bias: ArrayVector {
-        data : vec![initializations::get_initialization(b_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()],
-      },
+      weights: vec![initializations::get_initialization(w_init, Dim4::new(&[output_size, input_size, 1, 1])).unwrap()], // W
+      bias: vec![initializations::get_initialization(b_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()],             // b
+      inputs: initializations::get_initialization("zeros", Dim4::new(&[input_size, 1, 1, 1])).unwrap(),                 // a_{l-1}
       activation: output_activation,
-      inputs: (initializations::get_initialization("zeros", Dim4::new(&[input_size, 1, 1, 1])).unwrap()       // a_{l-1}
-               , initializations::get_initialization("zeros", Dim4::new(&[output_size, 1, 1, 1])).unwrap()),  // Wx+b
     }
   }
 
   fn forward(&mut self, activation: &Array) -> Array {
-    // append tuple: (previous_input, Wx + b)
-    self.inputs = (activation.clone(), af::add(&af::matmul(&self.weights.data[0]
-                                                   , &activation
-                                                   , MatProp::NONE
-                                                   , MatProp::NONE).unwrap()
-                                        , &self.bias.data[0]).unwrap());
+    // append previous_activation
+    self.inputs = activation.clone();
+    
     //sigma(Wx + b)
-    activations::get_activation(self.activation, &self.inputs.1).unwrap()
+    activations::get_activation(self.activation, &af::add(&af::matmul(&self.weights[0]
+                                                                      , &activation
+                                                                      , MatProp::NONE
+                                                                      , MatProp::NONE).unwrap()
+                                                          , &self.bias[0]).unwrap()).unwrap()
   }
 
   fn backward(&self, upper_diffs: &Array, gradients: &Array) -> Array {
     // d_l = (transpose(W) * d_{l+1}) .* dActivation(z) where z = activation w/out non-linearity
-    let inner = af::matmul(&self.weights.data[0]
+    let inner = af::matmul(&self.weights[0]
                            , upper_diffs
                            , MatProp::CTRANS
                            , MatProp::NONE).unwrap();
@@ -52,24 +48,24 @@ impl Layer for Dense {
   }
 
   fn get_weights(&self) -> Vec<Array> {
-    self.weights.data.clone()
+    self.weights.clone()
   }
 
   fn set_weights(&mut self, weights: &Array, index: usize) {
-    self.weights.data[index] = weights.clone();
+    self.weights[index] = weights.clone();
   }
 
   fn get_bias(&self) -> Vec<Array> {
-    self.bias.data.clone()
+    self.bias.clone()
   }
 
   fn set_bias(&mut self, bias: &Array, index: usize) {
-    self.bias.data[index] = bias.clone();
+    self.bias[index] = bias.clone();
   }
 
   fn get_bias_dims(&self) -> Vec<Dim4> {
     let mut dims = Vec::new();
-    for b in &self.bias.data {
+    for b in &self.bias {
       dims.push(b.dims().unwrap().clone())
     }
     dims
@@ -77,13 +73,13 @@ impl Layer for Dense {
 
   fn get_weight_dims(&self) -> Vec<Dim4> {
     let mut dims = Vec::new();
-    for w in &self.weights.data {
+    for w in &self.weights {
       dims.push(w.dims().unwrap().clone())
     }
     dims
   }
 
-  fn get_inputs(&self) -> (Array, Array) {
+  fn get_input(&self) -> Array {
     self.inputs.clone()
   }
 

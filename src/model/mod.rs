@@ -10,7 +10,7 @@ use optimizer::Optimizer;
 
 pub trait Model {
   fn new(optimizer: Box<Optimizer>, loss: &'static str) -> Self;
-  fn fit(&mut self, input: &Array, target: &Array
+  fn fit(&mut self, input: &Vec<Array>, target: &Vec<Array>
          , batch_size: u64, iter: u64
          , verbose: bool) -> (Vec<f32>, Array);
   fn forward(&mut self, activation: &Array) -> Array;

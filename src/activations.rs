@@ -21,17 +21,20 @@ pub fn softmax(x: &Array) -> Array {
 }
 
 pub fn tanh_derivative(x: &Array) -> Array {
-  af::sub(&1.0, &af::mul(x, x).unwrap()).unwrap()
+  // 1 - x*x
+  af::sub(&(1.0 as f32), &af::mul(x, x).unwrap()).unwrap()
 }
 
 pub fn sigmoid_derivative(x: &Array) -> Array {
-  af::mul(x, &af::sub(&1.0, x).unwrap()).unwrap()
+  // x * (1 - x)
+  af::mul(x, &af::sub(&(1.0 as f32), x).unwrap()).unwrap()
 }
 
 pub fn softmax_derivative(x: &Array) -> Array {
   //TODO: Verify
   sigmoid_derivative(x)
 }
+
 
 pub fn get_activation(name: &str, x: &Array) -> Result<Array, HALError> {
   match(name){

@@ -1,7 +1,8 @@
 use af;
 use af::{Array};
 use std::default::Default;
-use std::cell::Cell;
+
+use initializations;
 use layer::{Layer};
 use model::Model;
 use optimizer::Optimizer;
@@ -50,21 +51,25 @@ impl Model for Sequential {
     a
   }
 
-  fn fit(&mut self, input: &Array, target: &Array
+  fn fit(&mut self, input: &Vec<Array>, target: &Vec<Array>
          , batch_size: u64, iter: u64
          , verbose: bool) -> (Vec<f32>, Array)
   {
-    let mut fwd_pass = target.copy().unwrap(); // sizing
+    println!("train samples: {}", input.len());
+    let mut fwd_pass = initializations::zeros(target[0].dims().unwrap());
     let mut lossvec = Vec::<f32>::new();
     
     for i in (0..iter) {
+      println!("iter: {}", i);
       //TODO: Minitbatch here
-      fwd_pass = self.forward(input);
-      let (l, _) = self.backward(&fwd_pass, target); 
-      lossvec.push(l);
+      for row in (0..input.len()) {
+        fwd_pass = self.forward(&input[row]);
+        let (l, _) = self.backward(&fwd_pass, &target[row]); 
+        lossvec.push(l);
 
-      if(verbose){
-        println!("loss: {}", l);
+        if(verbose){
+          println!("loss: {}", l);
+        }
       }
     }
     (lossvec, fwd_pass)

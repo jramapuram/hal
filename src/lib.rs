@@ -1,6 +1,6 @@
 extern crate arrayfire as af;
 
-pub use layer::{Layer, ArrayVector};
+pub use layer::{Layer};
 pub mod layer;
 
 pub use model::{Model};

@@ -7,11 +7,6 @@ mod dense;
 use af::Dim4;
 use af::Array;
 
-#[derive(Clone)]
-pub struct ArrayVector {
-  data: Vec<Array>,
-}
-
 pub trait Layer {
   fn new(input_size: u64, output_size: u64,
          output_activation: &'static str, w_init: &'static str, b_init: &str) -> Self where Self: Sized;
@@ -23,7 +18,7 @@ pub trait Layer {
   fn set_bias(&mut self, bias: &Array, index: usize);
   fn get_bias_dims(&self) -> Vec<Dim4>;
   fn get_weight_dims(&self) -> Vec<Dim4>;
-  fn get_inputs(&self) -> (Array, Array);
+  fn get_input(&self) -> Array;
   fn get_activation_type(&self) -> &'static str;
 }
 
