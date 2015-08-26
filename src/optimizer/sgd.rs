@@ -21,7 +21,7 @@ impl Default for SGD {
   fn default() -> SGD { //docs say Self
     SGD {
       name: "SGD",
-      learning_rate: 0.01,
+      learning_rate: 0.001,
       momemtum: 0.0,
       decay: 0.0,
       nesterov: false,
