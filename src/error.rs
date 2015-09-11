@@ -15,17 +15,17 @@ pub enum HALError {
 }
 
 impl Display for HALError {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), FmtError> {
-        write!(f, "{}", self.description())
-    }
+  fn fmt(&self, f: &mut Formatter) -> Result<(), FmtError> {
+    write!(f, "{}", self.description())
+  }
 }
 
 impl Error for HALError {
-    fn description(&self) -> &str {
-        match *self {
-            HALError::SUCCESS => "Function returned successfully",
-            HALError::UNKNOWN => "Unkown Error",
-        }
+  fn description(&self) -> &str {
+    match *self {
+      HALError::SUCCESS => "Function returned successfully",
+      HALError::UNKNOWN => "Unkown Error",
     }
+  }
 }
   

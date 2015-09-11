@@ -11,11 +11,12 @@ pub trait Optimizer {
   fn new(params: &HashMap<&str, &str>) -> Self where Self: Sized;
   fn grads(&self, prediction: &Array, target: &Array
            , loss: &'static str, activation_type: &'static str) -> Array;
-  fn update(&mut self, layers: &mut Vec<Box<Layer>>
-            , prediction: &Array
-            , target: &Array
-            , loss: &'static str) -> (f32, Array);
-  fn update_one(&self, layer: &mut Box<Layer>, prev_activation: &Array, diffs: &Array);
+  fn optimize(&mut self, layers: &mut Vec<Box<Layer>>
+              , prediction: &Array
+              , target: &Array
+              , loss: &'static str) -> f32;
+  fn update_delta(&self, layer: &mut Box<Layer>, prev_activation: &Array, diffs: &Array);
+  fn update_parameters(&self, layers: &mut Vec<Box<Layer>>);
   fn info(&self);
 }
 

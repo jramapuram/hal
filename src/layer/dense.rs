@@ -1,14 +1,15 @@
 use af;
+use af::{Dim4, Array, MatProp};
+
+use utils;
 use activations;
 use initializations;
-use af::{Dim4, Array, MatProp};
 use layer::Layer;
-
-use std::cell::Cell;
 
 pub struct Dense {
   weights: Vec<Array>,
   bias: Vec<Array>,
+  delta: (Array, Array),
   inputs: Array,
   activation: &'static str,
 }
@@ -19,9 +20,11 @@ impl Layer for Dense {
          , w_init: &'static str, b_init: &str) -> Dense
   {
     Dense {
-      weights: vec![initializations::get_initialization(w_init, Dim4::new(&[output_size, input_size, 1, 1])).unwrap()], // W
-      bias: vec![initializations::get_initialization(b_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()],             // b
-      inputs: initializations::get_initialization("zeros", Dim4::new(&[input_size, 1, 1, 1])).unwrap(),                 // a_{l-1}
+      weights: vec![initializations::get_initialization(w_init, Dim4::new(&[output_size, input_size, 1, 1])).unwrap()],  // W
+      bias: vec![initializations::get_initialization(b_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()],              // b
+      inputs: initializations::get_initialization("zeros", Dim4::new(&[input_size, 1, 1, 1])).unwrap(),                  // a_{l-1}
+      delta: (initializations::get_initialization("zeros", Dim4::new(&[output_size, input_size, 1, 1])).unwrap()         // delW
+              , initializations::get_initialization("zeros", Dim4::new(&[output_size, 1, 1, 1])).unwrap()),              // delb
       activation: output_activation,
     }
   }
@@ -45,6 +48,15 @@ impl Layer for Dense {
                            , MatProp::CTRANS
                            , MatProp::NONE).unwrap();
     af::mul(&inner, gradients).unwrap()
+  }
+
+  fn update(&mut self, delta: (Array, Array), train: bool) {
+    self.delta.0 = af::add(&self.delta.0, &delta.0).unwrap();
+    self.delta.1 = af::add(&self.delta.1, &delta.1).unwrap();
+  }
+
+  fn get_delta(&self) -> (Array, Array) {
+    (self.delta.0.clone(), self.delta.1.clone())
   }
 
   fn get_weights(&self) -> Vec<Array> {
@@ -81,6 +93,16 @@ impl Layer for Dense {
 
   fn get_input(&self) -> Array {
     self.inputs.clone()
+  }
+
+  fn output_size(&self) -> u64 {
+    let weight_dims = self.get_weight_dims();
+    weight_dims[weight_dims.len() - 1][1]    
+  }
+
+  fn input_size(&self) -> u64 {
+    let weight_dims = self.get_weight_dims();
+    weight_dims[0][0]
   }
 
   fn get_activation_type(&self) -> &'static str {
