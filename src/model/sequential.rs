@@ -81,26 +81,24 @@ impl Model for Sequential {
         println!("iter: {}", i);
       }
  
-      //for row in (0..input.len().step_by(batch_size)) {
-
       // over every batch
       for (i, t) in Zip::new((input.as_vec().chunks(batch_size as usize)
                               , target.as_vec().chunks(batch_size as usize)))
-        //utils::batch(input.as_vec(), batch_size), utils::batch(target.as_vec(), batch_size)))
       {
         let batch_input = utils::raw_to_array(i, batch_size as usize, input.ncols());
         let batch_target = utils::raw_to_array(t, batch_size as usize, target.ncols());
-        for row_num in 0..batch_size { //over every row in batch
-          forward_pass = self.forward(&af::row(&batch_input, row_num).unwrap());
-          let l = self.backward(&forward_pass, &af::row(&batch_target, row_num).unwrap()); 
-          lossvec.push(l);
 
-          if verbose {
-            println!("loss: {}", l);
-          }
+        for row_num in 0..batch_size { //over every row in batch
+          forward_pass = self.forward(&af::transpose(&af::row(&batch_input, row_num).unwrap(), false).unwrap());
+          let l = self.backward(&forward_pass, &af::transpose(&af::row(&batch_target, row_num).unwrap(), false).unwrap());
+          lossvec.push(l);
         }
       }
-
+      
+      if verbose {
+        let last = lossvec.len();
+        println!("loss: {}", lossvec[last - 1]);
+      }
       self.optimizer.update_parameters(&mut self.layers);
     }
 

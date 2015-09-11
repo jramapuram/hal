@@ -54,7 +54,7 @@ fn main() {
   let mut target = data.clone();
   
   // iterate our model in Verbose mode (printing loss)
-  let (loss, prediction) = model.fit(&mut data, &mut target, batch_size, iter, true, false);
+  let (loss, prediction) = model.fit(&mut data, &mut target, batch_size, iter, true, true);
 
   // plot our loss
   plot_vec(loss, "Loss vs. Iterations", 512, 512);
