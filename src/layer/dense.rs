@@ -1,15 +1,16 @@
 use af;
 use af::{Dim4, Array, MatProp};
 
-use utils;
 use activations;
 use initializations;
 use layer::Layer;
 
+#[allow(non_snake_case)]
 pub struct Dense {
   weights: Vec<Array>,
   bias: Vec<Array>,
-  delta: (Array, Array),
+  delta_W: Array,
+  delta_b: Array,
   inputs: Array,
   activation: &'static str,
 }
@@ -21,10 +22,10 @@ impl Layer for Dense {
   {
     Dense {
       weights: vec![initializations::get_initialization(w_init, Dim4::new(&[output_size, input_size, 1, 1])).unwrap()],  // W
-      bias: vec![initializations::get_initialization(b_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()],              // b
-      inputs: initializations::get_initialization("zeros", Dim4::new(&[input_size, 1, 1, 1])).unwrap(),                  // a_{l-1}
-      delta: (initializations::get_initialization("zeros", Dim4::new(&[output_size, input_size, 1, 1])).unwrap()         // delW
-              , initializations::get_initialization("zeros", Dim4::new(&[output_size, 1, 1, 1])).unwrap()),              // delb
+      bias:    vec![initializations::get_initialization(b_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()],           // b
+      inputs:  initializations::get_initialization("zeros", Dim4::new(&[input_size, 1, 1, 1])).unwrap(),                 // a_{l-1}
+      delta_W: initializations::get_initialization("zeros", Dim4::new(&[output_size, input_size, 1, 1])).unwrap(),       // delW
+      delta_b: initializations::get_initialization("zeros", Dim4::new(&[output_size, 1, 1, 1])).unwrap(),                // delb
       activation: output_activation,
     }
   }
@@ -50,13 +51,15 @@ impl Layer for Dense {
     af::mul(&inner, gradients).unwrap()
   }
 
-  fn update(&mut self, delta: (Array, Array), train: bool) {
-    self.delta.0 = af::add(&self.delta.0, &delta.0).unwrap();
-    self.delta.1 = af::add(&self.delta.1, &delta.1).unwrap();
+  #[allow(non_snake_case)]  
+  fn update(&mut self, delta_W: &Array, delta_b: &Array) {
+    self.delta_W = af::add(&self.delta_W, delta_W).unwrap();
+    self.delta_b = af::add(&self.delta_b, delta_b).unwrap();
   }
 
+  #[allow(non_snake_case)]
   fn get_delta(&self) -> (Array, Array) {
-    (self.delta.0.clone(), self.delta.1.clone())
+    (self.delta_W.clone(), self.delta_b.clone())
   }
 
   fn get_weights(&self) -> Vec<Array> {

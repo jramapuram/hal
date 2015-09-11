@@ -1,11 +1,11 @@
-extern crate rand;
-
 use af;
-use af::{Dim4, Array, Aftype};
-use na::DMat;
+use rand;
 use rand::Rng;
+use af::{Dim4, Array, Aftype};
+use na::{DMat, Shape};
+use itertools::Zip;
 
-use error::HALError;
+//use error::HALError;
 
 // Convert a vector of elements to a vector of Array
 pub fn vec_to_array<T>(vec_values: Vec<T>, rows: usize, cols: usize) -> Array {
@@ -15,7 +15,7 @@ pub fn vec_to_array<T>(vec_values: Vec<T>, rows: usize, cols: usize) -> Array {
 // Convert a generic vector to an Array
 pub fn raw_to_array<T>(raw_values: &[T], rows: usize, cols: usize) -> Array {
   let dims = Dim4::new(&[rows as u64, cols as u64, 1, 1]);
-  &Array::new(dims, &raw_values, Aftype::F32).unwrap()
+  Array::new(dims, &raw_values, Aftype::F32).unwrap()
 }
 
 // Convert a dmat of elements to an array
@@ -24,14 +24,15 @@ pub fn dmat_to_array<T>(dmat_values: &DMat<T>) -> Array {
 }
 
 // Convert a GPU array to a dmat
-pub fn array_to_dmat<T>(arr: &Array) -> DMat<T>{
-  let mut retval = DMat::<T>::new_zeros(arr.dims[0], arr.dims[1]);
-  af::host(retval.as_mut_vec()).unwrap();
+pub fn array_to_dmat(arr: &Array) -> DMat<f32>{
+  let mut retval = DMat::<f32>::new_zeros(arr.dims().unwrap()[0] as usize
+                                          , arr.dims().unwrap()[1] as usize);
+  arr.host(retval.as_mut_vec()); //TODO: error handle
   retval
 }
 
 // Helper to swap rows (row major order) in a generic type [non GPU]
-fn swap_rowR<T>(matrix: &mut [T], row_src: usize, row_dest: usize, cols: usize){
+pub fn swap_row<T>(matrix: &mut [T], row_src: usize, row_dest: usize, cols: usize){
   assert!(matrix.len() % cols == 0);
   if row_src != row_dest {
     for c in 0..cols {
@@ -41,7 +42,7 @@ fn swap_rowR<T>(matrix: &mut [T], row_src: usize, row_dest: usize, cols: usize){
 }
 
 // Helper to swap rows (col major order) in a generic type [non GPU]
-fn swap_rowC<T>(matrix: &mut [T], row_src: usize, row_dest: usize, cols: usize){
+pub fn swap_col<T>(matrix: &mut [T], row_src: usize, row_dest: usize, cols: usize){
   assert!(matrix.len() % cols == 0);
   let row_count = matrix.len()/cols;
   if row_src != row_dest {
@@ -52,7 +53,7 @@ fn swap_rowC<T>(matrix: &mut [T], row_src: usize, row_dest: usize, cols: usize){
 }
 
 // Randomly shuffle a set of 2d matrices [or vectors] using knuth shuffle
-fn shuffle<T>(v: &mut[&mut [T]], cols: [usize], row_major: bool) {
+pub fn shuffle<T>(v: &mut[&mut [T]], cols: &[usize], row_major: bool) {
   assert!(v.len() > 0 && cols.len() > 0);
 
   let total_length = v[0].len();
@@ -65,21 +66,21 @@ fn shuffle<T>(v: &mut[&mut [T]], cols: [usize], row_major: bool) {
     for (mat, col) in Zip::new((v.iter_mut(), cols.iter())) { //swap all matrices similarly
       assert!(mat.len() % col == 0);
       match row_major{
-        true  => swap_rowR(mat, rnd_row, row_count - row - 1, col),
-        false => swap_rowC(mat, rnd_row, row_count - row - 1, col),
+        true  => swap_row(mat, rnd_row, row_count - row - 1, col.clone()),
+        false => swap_col(mat, rnd_row, row_count - row - 1, col.clone()),
       };
     }
   }
 }
 
 // A helper to return a batching iterator
-fn batch<T>(v: &[T], batch_size: usize){
-  v[..].chunks(batch_size)
-}
+// fn batch<T>(v: &[T], batch_size: u64) -> impl Iterator<Item = T> {
+//   Box::new(v[..].chunks(batch_size))
+// }
 
 // Normalize an array based on mean & num_std_dev deviations of the variance
-fn normalize(src: &Array, num_std_dev: f32) -> Array {
-  let mean = arr.mean_all().0;
-  let var = arr.var_all.0;
-  af::div(af::sub(&arr, mean).unwrap(), af::mul(num_std_dev, var))
+pub fn normalize(src: &Array, num_std_dev: f32) -> Array {
+  let mean = af::mean_all(src).unwrap().0;
+  let var = af::var_all(src, false).unwrap().0;
+  af::div(&af::sub(src, &mean).unwrap(), &af::mul(&num_std_dev, &var).unwrap()).unwrap()
 }

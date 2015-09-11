@@ -7,7 +7,7 @@ use hal::optimizer::{Optimizer, SGD};
 use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::layer::{Dense};
-use hal::plot::Plot;
+use hal::plot::plot_vec;
 
 fn build_optimizer(name: &'static str) -> Result<Box<Optimizer>, HALError> {
   match name{
@@ -35,7 +35,7 @@ fn main() {
   let hidden_dims = 128;
   let output_dims = 256;
   let num_train_samples = 1024;
-  let iter = 20;
+  let iter = 5;
   let batch_size = 128;
   let optimizer_type = "SGD";
 
@@ -50,11 +50,12 @@ fn main() {
   model.info();
 
   // Test with learning to predict sin wave
-  let data = generate_sin_wave(input_dims, num_train_samples);
+  let mut data = generate_sin_wave(input_dims as usize, num_train_samples);
+  let mut target = data.clone();
   
   // iterate our model in Verbose mode (printing loss)
-  let (loss, prediction) = model.fit(&data, &data, batch_size, iter, true, false);
+  let (loss, prediction) = model.fit(&mut data, &mut target, batch_size, iter, true, false);
 
   // plot our loss
-  Plot(loss, "Loss vs. Iterations", 512, 512);
+  plot_vec(loss, "Loss vs. Iterations", 512, 512);
 }

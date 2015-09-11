@@ -1,5 +1,6 @@
 extern crate arrayfire as af;
 extern crate nalgebra as na;
+extern crate itertools;
 extern crate rand;
 
 pub use layer::{Layer};

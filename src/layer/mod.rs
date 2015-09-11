@@ -12,7 +12,7 @@ pub trait Layer {
          output_activation: &'static str, w_init: &'static str, b_init: &str) -> Self where Self: Sized;
   fn forward(&mut self, activation: &Array) -> Array;
   fn backward(&self, inputs: &Array, gradients: &Array) -> Array;
-  fn update(&mut self, delta: (Array, Array), train: bool);
+  fn update(&mut self, delta_W: &Array, delta_b: &Array);
   fn get_delta(&self) -> (Array, Array);
   fn get_weights(&self) -> Vec<Array>;
   fn set_weights(&mut self, weight: &Array, index: usize);

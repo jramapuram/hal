@@ -1,8 +1,8 @@
 use af;
-use af::{Array};
-use na::DMat;
-use std::default::Default;
-use std::iter::Zip;
+use af::{Array, Dim4};
+use na::{DMat, Shape};
+//use std::default::Default;
+use itertools::Zip;
 
 use utils;
 use initializations;
@@ -56,41 +56,46 @@ impl Model for Sequential {
 
   fn fit(&mut self, input: &mut DMat<f32>, target: &mut DMat<f32>
          , batch_size: u64, iter: u64
-         , shuffle: bool, verbose: bool) -> (DMat<f32>, Array)
+         , shuffle: bool, verbose: bool) -> (Vec<f32>, DMat<f32>)
   {
-    println!("train samples: {} | target samples: {} | batch size: {}"
-             , input.len(), target.len(), batch_size);
+    println!("train samples: {:?} | target samples: {:?} | batch size: {}"
+             , input.shape(), target.shape(), batch_size);
     //let output_dims = self.layers[self.layers.len() - 1].output_size();
 
     // create the container to hold the forward pass & loss results
-    let dims = Dim4::new(&[1, input.shape().1, 1, 1]);
+    let dims = Dim4::new(&[1, input.ncols() as u64, 1, 1]);
     let mut forward_pass = initializations::zeros(dims);
     let mut lossvec = Vec::<f32>::new();
 
     // randomly shuffle the data
     assert!(target.nrows() == input.nrows());
-    assert!(filtered_input.nrows() >= batch_size
-            && filtered_input.nrows() % batch_size == 0);
+    assert!(input.nrows() as u64 >= batch_size
+            && input.nrows() as u64 % batch_size == 0);
     if shuffle {
-      utils::shuffle(&mut[input.as_mut_vec(), target.as_mut_vec()]);
+      let col_vec = [input.ncols(), target.ncols()];
+      utils::shuffle(&mut[input.as_mut_vec(), target.as_mut_vec()], &col_vec, false);
     }
     
-    for i in (0..iter) {
+    for i in (0..iter) { // over number of iterations
       if verbose {
         println!("iter: {}", i);
       }
  
       //for row in (0..input.len().step_by(batch_size)) {
-      for (i, t) in Zip::new((utils::batch(input, batch_size), utils::batch(target, batch_size)))
+
+      // over every batch
+      for (i, t) in Zip::new((input.as_vec().chunks(batch_size as usize)
+                              , target.as_vec().chunks(batch_size as usize)))
+        //utils::batch(input.as_vec(), batch_size), utils::batch(target.as_vec(), batch_size)))
       {
-        let batch_input = utils::raw_to_array(i);
-        let batch_target = utils::raw_to_array(t);
-        for row_num in 0..batch_input.dims()[0] {
-          forward_pass = self.forward(&af::row(batch_input, row_num).unwrap());
-          let (l, _) = self.backward(&forward_pass, &af::row(batch_target, row_num).unwrap()); 
+        let batch_input = utils::raw_to_array(i, batch_size as usize, input.ncols());
+        let batch_target = utils::raw_to_array(t, batch_size as usize, target.ncols());
+        for row_num in 0..batch_size { //over every row in batch
+          forward_pass = self.forward(&af::row(&batch_input, row_num).unwrap());
+          let l = self.backward(&forward_pass, &af::row(&batch_target, row_num).unwrap()); 
           lossvec.push(l);
 
-          if verbose{
+          if verbose {
             println!("loss: {}", l);
           }
         }
@@ -98,8 +103,9 @@ impl Model for Sequential {
 
       self.optimizer.update_parameters(&mut self.layers);
     }
-    
-    (lossvec, utils::array_to_dmat(forward_pass))
+
+    //let retval: DMat<f32> = 
+    (lossvec, utils::array_to_dmat(&forward_pass))
   }
 
   fn backward(&mut self, prediction: &Array, target: &Array) -> f32 {

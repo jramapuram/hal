@@ -19,7 +19,7 @@ pub fn ones(dims: Dim4) -> Array {
 }
 
 pub fn get_initialization(name: &str, dims: Dim4) -> Result<Array, HALError> {
-  match(name){
+  match name {
     "normal"  => Ok(normal(dims)),
     "uniform" => Ok(uniform(dims, 0.05)),
     "zeros"   => Ok(zeros(dims)),
