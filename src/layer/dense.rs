@@ -33,7 +33,7 @@ impl Layer for Dense {
   fn forward(&mut self, activation: &Array) -> Array {
     // append previous_activation
     self.inputs = activation.clone();
-    
+
     //sigma(Wx + b)
     activations::get_activation(self.activation, &af::add(&af::matmul(&self.weights[0]
                                                                       , &activation

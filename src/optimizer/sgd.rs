@@ -55,18 +55,23 @@ impl Optimizer for SGD {
 
   fn update_parameters(&self, layers: &mut Vec<Box<Layer>>)
   {
-    for i in (1..layers.len()) {
-      let (delta_w, delta_b) = layers[i].get_delta();
+    for layer_num in (0..layers.len()) {
+      let (delta_w, delta_b) = layers[layer_num].get_delta();
 
       // W = W - lr * d_w
-      let weights = layers[i].get_weights();
-      for i in (0..weights.len()) {
-        layers[i].set_weights(&af::sub(&weights[i], &af::mul(&self.learning_rate, &delta_w).unwrap()).unwrap(), i);
+      let weights = layers[layer_num].get_weights();
+      for weight_num in (0..weights.len()) {
+        layers[layer_num].set_weights(&af::sub(&weights[weight_num]
+                                                , &af::mul(&self.learning_rate, &delta_w).unwrap()).unwrap()
+                                       , weight_num);
       }
+      
       // b = b - lr * d_l
-      let biases = layers[i].get_bias();
-      for i in (0..biases.len()) {
-        layers[i].set_bias(&af::sub(&biases[i], &af::mul(&self.learning_rate, &delta_b).unwrap()).unwrap(), i);
+      let biases = layers[layer_num].get_bias();
+      for bias_num in (0..biases.len()) {
+        layers[layer_num].set_bias(&af::sub(&biases[bias_num]
+                                           , &af::mul(&self.learning_rate, &delta_b).unwrap()).unwrap()
+                                  , bias_num);
       }
     }
   }

@@ -80,7 +80,7 @@ pub fn shuffle<T>(v: &mut[&mut [T]], cols: &[usize], row_major: bool) {
 
 // Normalize an array based on mean & num_std_dev deviations of the variance
 pub fn normalize(src: &Array, num_std_dev: f32) -> Array {
-  let mean = af::mean_all(src).unwrap().0;
-  let var = af::var_all(src, false).unwrap().0;
+  let mean = af::mean_all(src).unwrap().0 as f32;
+  let var = af::var_all(src, false).unwrap().0 as f32;
   af::div(&af::sub(src, &mean).unwrap(), &af::mul(&num_std_dev, &var).unwrap()).unwrap()
 }

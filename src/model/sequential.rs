@@ -85,21 +85,22 @@ impl Model for Sequential {
       for (i, t) in Zip::new((input.as_vec().chunks(batch_size as usize)
                               , target.as_vec().chunks(batch_size as usize)))
       {
-        let batch_input = utils::raw_to_array(i, batch_size as usize, input.ncols());
-        let batch_target = utils::raw_to_array(t, batch_size as usize, target.ncols());
+        let batch_input = utils::normalize(&utils::raw_to_array(i, batch_size as usize, input.ncols()), 3.0f32);
+        let batch_target = utils::normalize(&utils::raw_to_array(t, batch_size as usize, target.ncols()), 3.0f32);
 
         for row_num in 0..batch_size { //over every row in batch
           forward_pass = self.forward(&af::transpose(&af::row(&batch_input, row_num).unwrap(), false).unwrap());
           let l = self.backward(&forward_pass, &af::transpose(&af::row(&batch_target, row_num).unwrap(), false).unwrap());
           lossvec.push(l);
         }
+
+        //TODO: Go here or below batch?
+        if verbose {
+          let last = lossvec.len();
+          println!("loss: {}", lossvec[last - 1]);
+        }
+        self.optimizer.update_parameters(&mut self.layers);
       }
-      
-      if verbose {
-        let last = lossvec.len();
-        println!("loss: {}", lossvec[last - 1]);
-      }
-      self.optimizer.update_parameters(&mut self.layers);
     }
 
     //let retval: DMat<f32> = 
