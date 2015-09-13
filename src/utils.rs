@@ -1,9 +1,13 @@
 use af;
+use std;
+use csv;
 use rand;
 use rand::Rng;
+use std::path::Path;
 use af::{Dim4, Array, Aftype};
 use na::{DMat, Shape};
 use itertools::Zip;
+use rustc_serialize::Encodable;
 
 //use error::HALError;
 
@@ -74,6 +78,42 @@ pub fn shuffle<T>(v: &mut[&mut [T]], cols: &[usize], row_major: bool) {
       };
     }
   }
+}
+
+// Helper to write a vector to a csv file
+pub fn write_csv<T>(filename: &'static str, v: &Vec<T>)
+  where T: Encodable
+{
+  let wtr = csv::Writer::from_file(Path::new(filename));
+  match wtr {
+    Ok(mut writer) => {
+      for record in v {
+        let result = writer.encode(record);
+        assert!(result.is_ok());
+      }
+    },
+    Err(e)    => panic!("error writing to csv file {} : {}", filename, e),
+  };
+}
+
+// Helper to read a csv file to a vector
+pub fn read_csv<T>(filename: &'static str) -> Vec<T>
+  where T: std::str::FromStr, <T as std::str::FromStr>::Err: std::fmt::Debug
+{
+  let mut retval: Vec<T> = Vec::new();
+  let rdr = csv::Reader::from_file(Path::new(filename));
+  match rdr {
+    Ok(mut reader) => {
+      for row in reader.records() {
+        let row = row.unwrap();
+        for value in row {
+          retval.push(value.parse::<T>().unwrap());
+        }
+      }
+    },
+    Err(e)     => panic!("error reader from csv file {} : {}", filename, e),
+  }
+  retval
 }
 
 // A helper to return a batching iterator

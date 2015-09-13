@@ -12,11 +12,12 @@ use error::HALError;
 
 pub trait Optimizer {
   fn new(params: &HashMap<&str, &str>) -> Self where Self: Sized;
+  fn setup(&mut self, layers: &Vec<Box<Layer>>);
   fn optimize(&mut self, layers: &mut Vec<Box<Layer>>
               , prediction: &Array
               , target: &Array
               , loss: &'static str) -> f32;
-  fn update_parameters(&self, layers: &mut Vec<Box<Layer>>, batch_size: u64);
+  fn update_parameters(&mut self, layers: &mut Vec<Box<Layer>>, batch_size: u64);
   fn info(&self);
 }
 

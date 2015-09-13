@@ -2,6 +2,8 @@ extern crate arrayfire as af;
 extern crate nalgebra as na;
 extern crate itertools;
 extern crate rand;
+extern crate csv;
+extern crate rustc_serialize;
 
 pub use layer::{Layer};
 pub mod layer;

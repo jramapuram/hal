@@ -1,11 +1,13 @@
 use af;
-use loss;
-use activations;
-use layer::{Layer};
-use optimizer::{Optimizer, update_delta, grads};
 use af::{Array};
 use std::collections::HashMap;
 use std::default::Default;
+
+use loss;
+use initializations;
+use activations;
+use layer::{Layer};
+use optimizer::{Optimizer, update_delta, grads};
 
 pub struct SGD {
   name: &'static str,
@@ -15,6 +17,8 @@ pub struct SGD {
   nesterov: bool,
   clip_grad: u64,
   iter: u64,
+  velocity_W: Vec<Array>,
+  velocity_b: Vec<Array>,
 }
 
 impl Default for SGD {
@@ -22,11 +26,13 @@ impl Default for SGD {
     SGD {
       name: "SGD",
       learning_rate: 0.001,
-      momemtum: 0.0,
+      momemtum: 0.5,
       decay: 0.0,
       nesterov: false,
       clip_grad: 0,
       iter: 0,
+      velocity_W: Vec::new(),
+      velocity_b: Vec::new(),
     }
   }
 }
@@ -41,29 +47,53 @@ impl Optimizer for SGD {
       nesterov: params.get("nesterov").unwrap().parse::<bool>().unwrap(),
       clip_grad: params.get("clip_grad").unwrap().parse::<u64>().unwrap(),
       iter: 0,
+      velocity_W: Vec::new(),
+      velocity_b: Vec::new(),
     }
   }
-  
-  fn update_parameters(&self, layers: &mut Vec<Box<Layer>>, batch_size: u64)
+
+  fn setup(&mut self, layers: &Vec<Box<Layer>>){
+    for layer in layers {
+      for wdim in layer.get_weight_dims() {
+        self.velocity_W.push(initializations::zeros(wdim));
+      }
+      for bdim in layer.get_bias_dims() {
+        self.velocity_b.push(initializations::zeros(bdim));
+      }
+    }
+  }
+
+  fn update_parameters(&mut self, layers: &mut Vec<Box<Layer>>, batch_size: u64)
   {
     let alpha = self.learning_rate / batch_size as f32;
-    for layer_num in (0..layers.len()) {
+    let mut velocity_index = [0, 0];
+    for layer_num in 0..layers.len() {
       let (delta_w, delta_b) = layers[layer_num].get_delta();
 
-      // W = W - lr * d_w
+      // v = momemtum * v + learning_rate * d_w
+      // W = W - v
       let weights = layers[layer_num].get_weights();
       for weight_num in (0..weights.len()) {
-        layers[layer_num].set_weights(&af::sub(&weights[weight_num]
-                                               , &af::mul(&alpha, &delta_w).unwrap()).unwrap()
+        self.velocity_W[velocity_index[0]] = af::mul(&self.momemtum, &self.velocity_W[velocity_index[0]]).unwrap();
+        self.velocity_W[velocity_index[0]] = af::sub(&self.velocity_W[velocity_index[0]]
+                                                  , &af::mul(&alpha, &delta_w).unwrap()).unwrap();
+        layers[layer_num].set_weights(&af::add(&weights[weight_num]
+                                               , &self.velocity_W[velocity_index[0]]).unwrap()
                                       , weight_num);
+        velocity_index[0] += 1;
       }
 
-      // b = b - lr * d_l
+      // v = momemtum * v + learning_rate * d_b
+      // b = b - v
       let biases = layers[layer_num].get_bias();
       for bias_num in (0..biases.len()) {
+        self.velocity_b[velocity_index[1]] = af::mul(&self.momemtum, &self.velocity_b[velocity_index[1]]).unwrap();
+        self.velocity_b[velocity_index[1]] = af::sub(&self.velocity_b[velocity_index[1]]
+                                                    , &af::mul(&alpha, &delta_b).unwrap()).unwrap();
         layers[layer_num].set_bias(&af::sub(&biases[bias_num]
-                                            , &af::mul(&alpha, &delta_b).unwrap()).unwrap()
+                                            , &self.velocity_b[velocity_index[1]]).unwrap()
                                    , bias_num);
+        velocity_index[1] += 1;
       }
     }
   }

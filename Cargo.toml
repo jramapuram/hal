@@ -6,6 +6,7 @@ authors = ["Jason Ramapuram <jason.ramapuram@viasat.com>"]
 [dependencies]
 rustc-serialize = "*"
 rand = "*"
+csv = "*"
 nalgebra = "*"
 itertools = "*"
 arrayfire = { path ="/Users/jramapuram/projects/arrayfire-rust" }

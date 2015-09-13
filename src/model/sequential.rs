@@ -60,7 +60,8 @@ impl Model for Sequential {
   {
     println!("train samples: {:?} | target samples: {:?} | batch size: {}"
              , input.shape(), target.shape(), batch_size);
-    
+    self.optimizer.setup(&self.layers);
+      
     // create the container to hold the forward pass & loss results
     let mut forward_pass = initializations::zeros(Dim4::new(&[1, input.ncols() as u64, 1, 1]));
     let mut lossvec = Vec::<f32>::new();
@@ -76,7 +77,7 @@ impl Model for Sequential {
     
     for i in (0..iter) { // over number of iterations
       if verbose {
-        println!("iter: {}", i);
+        print!("\n[iter: {}] ", i);
       }
 
       // over every batch
@@ -102,13 +103,14 @@ impl Model for Sequential {
 
         if verbose {
           let last = lossvec.len();
-          println!("loss: {}", lossvec[last - 1]);
+          print!("{} ", lossvec[last - 1]);
         }
+
         self.optimizer.update_parameters(&mut self.layers, batch_size);
       }
     }
 
-    //let retval: DMat<f32> = 
+    utils::write_csv::<f32>("output.csv", &lossvec);
     (lossvec, utils::array_to_dmat(&forward_pass))
   }
 
