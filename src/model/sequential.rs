@@ -14,6 +14,7 @@ pub struct Sequential {
   layers: Vec<Box<Layer>>,
   optimizer: Box<Optimizer>,
   loss: &'static str,
+  device: i32,
 }
 
 // TODO: implement default trait
@@ -33,6 +34,7 @@ impl Model for Sequential {
       layers: Vec::new(),
       loss: loss,
       optimizer: optimizer,
+      device: -1,
     }
   }
 
@@ -44,6 +46,13 @@ impl Model for Sequential {
     //TODO: convert to log crate
     //println!("loss : {}\noptimizer: {}", self.loss, self.optimizer);
     println!("loss : {}", self.loss);
+  }
+
+  //TODO: Models in parallel on different GPU's 
+  fn set_device(&mut self, device_id: i32){
+    self.device = device_id;
+    af::set_device(device_id);
+    af::info();
   }
 
   fn forward(&mut self, activation: &Array) -> Array {
@@ -58,13 +67,14 @@ impl Model for Sequential {
          , batch_size: u64, iter: u64
          , shuffle: bool, verbose: bool) -> (Vec<f32>, DMat<f32>)
   {
-    println!("train samples: {:?} | target samples: {:?} | batch size: {}"
+    println!("\ntrain samples: {:?} | target samples: {:?} | batch size: {}"
              , input.shape(), target.shape(), batch_size);
     self.optimizer.setup(&self.layers);
       
     // create the container to hold the forward pass & loss results
     let mut forward_pass = initializations::zeros(Dim4::new(&[1, input.ncols() as u64, 1, 1]));
     let mut lossvec = Vec::<f32>::new();
+    let mut loss: f32 = 0.0f32;
 
     // randomly shuffle the data
     assert!(target.nrows() == input.nrows());
@@ -81,32 +91,31 @@ impl Model for Sequential {
       }
 
       // over every batch
-      let ncols = input.ncols();
-      for (i, t) in Zip::new((input.transpose().as_vec().chunks(ncols * batch_size as usize)
-                              , target.transpose().as_vec().chunks(ncols * batch_size as usize)))
+      let incols = input.ncols();
+      let tncols = target.ncols();
+      for (i, t) in Zip::new((input.transpose().as_vec().chunks(incols * batch_size as usize)
+                              , target.transpose().as_vec().chunks(tncols * batch_size as usize)))
       {
-        let batch_input = utils::normalize(&utils::raw_to_array(i, batch_size as usize
-                                                                , input.ncols(), false)
-                                           , 3.0f32);
-        let batch_target = utils::normalize(&utils::raw_to_array(t, batch_size as usize
-                                                                 , target.ncols(), false)
-                                            , 3.0f32);
+        // column major order is preferred for BLAS
+        let batch_input = utils::normalize(&utils::raw_to_array(i, incols,  batch_size as usize), 3.0f32);
+        let batch_target = utils::normalize(&utils::raw_to_array(t, tncols, batch_size as usize), 3.0f32);
+        
+        // println!("batched [input: {:?} | target: {:?}]"
+        //          , batch_input.dims().unwrap()
+        //          , batch_target.dims().unwrap());
 
         for row_num in 0..batch_size { //over every row in batch
-          //af::print(&af::transpose(&af::row(&batch_input, row_num).unwrap(), false).unwrap());
-          forward_pass = self.forward(&af::transpose(&af::row(&batch_input, row_num).unwrap()
-                                                     , false).unwrap());
-          let l = self.backward(&forward_pass, &af::transpose(&af::row(&batch_target, row_num).unwrap()
-                                                              , false).unwrap());
-          lossvec.push(l);
-        }
-
-        if verbose {
-          let last = lossvec.len();
-          print!("{} ", lossvec[last - 1]);
+          // af::print(&af::col(&batch_input, row_num).unwrap());
+          forward_pass = self.forward(&af::col(&batch_input, row_num).unwrap());
+          loss = self.backward(&forward_pass, &af::col(&batch_target, row_num).unwrap());
         }
 
         self.optimizer.update_parameters(&mut self.layers, batch_size);
+      }
+
+      lossvec.push(loss);
+      if verbose {
+        print!("{} ", loss);
       }
     }
 

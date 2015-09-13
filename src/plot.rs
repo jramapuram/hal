@@ -36,6 +36,6 @@ pub fn plot_dmat<T>(raw_values: &DMat<T>, title: &'static str, window_x: u16, wi
 pub fn plot_vec<T>(raw_values: Vec<T>, title: &'static str, window_x: u16, window_y: u16) {
   // copy from float vector to Array
   let num_rows = raw_values.len();
-  let values = utils::vec_to_array(raw_values, num_rows, 1, true);
+  let values = utils::vec_to_array(raw_values, num_rows, 1);
   plot_array(&values, title, window_x, window_y);
 }

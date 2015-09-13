@@ -26,7 +26,7 @@ impl Default for SGD {
     SGD {
       name: "SGD",
       learning_rate: 0.001,
-      momemtum: 0.5,
+      momemtum: 0.9,
       decay: 0.0,
       nesterov: false,
       clip_grad: 0,

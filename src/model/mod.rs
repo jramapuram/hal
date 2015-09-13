@@ -17,5 +17,6 @@ pub trait Model {
   fn forward(&mut self, activation: &Array) -> Array;
   fn backward(&mut self, prediction: &Array, target: &Array) -> f32;
   fn add(&mut self, layer: Box<Layer>);
+  fn set_device(&mut self, device_id: i32);
   fn info(&self);
 }

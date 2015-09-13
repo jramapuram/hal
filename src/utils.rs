@@ -12,22 +12,19 @@ use rustc_serialize::Encodable;
 //use error::HALError;
 
 // Convert a vector of elements to a vector of Array
-pub fn vec_to_array<T>(vec_values: Vec<T>, rows: usize, cols: usize, row_major: bool) -> Array {
-  raw_to_array(vec_values.as_ref(), rows, cols, row_major)
+pub fn vec_to_array<T>(vec_values: Vec<T>, rows: usize, cols: usize) -> Array {
+  raw_to_array(vec_values.as_ref(), rows, cols)
 }
 
 // Convert a generic vector to an Array
-pub fn raw_to_array<T>(raw_values: &[T], rows: usize, cols: usize, row_major: bool) -> Array {
+pub fn raw_to_array<T>(raw_values: &[T], rows: usize, cols: usize) -> Array {
   let dims = Dim4::new(&[rows as u64, cols as u64, 1, 1]);
-  match row_major {
-    true  => Array::new(dims, &raw_values, Aftype::F32).unwrap(),
-    false => af::transpose(&Array::new(dims, &raw_values, Aftype::F32).unwrap(), false).unwrap(),
-  }
+  Array::new(dims, &raw_values, Aftype::F32).unwrap()
 }
 
 // Convert a dmat of elements to an array
 pub fn dmat_to_array<T>(dmat_values: &DMat<T>) -> Array {
-  raw_to_array(dmat_values.as_vec(), dmat_values.shape().0, dmat_values.shape().1, false)
+  raw_to_array(dmat_values.as_vec(), dmat_values.shape().0, dmat_values.shape().1)
 }
 
 // Convert a GPU array to a dmat

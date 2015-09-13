@@ -2,7 +2,6 @@ extern crate hal;
 extern crate nalgebra as na;
 
 use na::DMat;
-use na::RowSlice;
 use hal::{Model, Layer};
 use hal::optimizer::{Optimizer, SGD};
 use hal::error::HALError;
@@ -32,20 +31,23 @@ fn generate_sin_wave(input_dims: usize, num_rows: usize) -> DMat<f32> {
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 256;
-  let hidden_dims = 128;
-  let output_dims = 256;
-  let num_train_samples = 1024;
-  let iter = 1024;
-  let batch_size = 256;
+  let input_dims = 128;
+  let hidden_dims = 64;
+  let output_dims = 128;
+  let num_train_samples = 4096;
+  let iter = 200;
+  let batch_size = 128;
   let optimizer_type = "SGD";
 
   // Now, let's build a model with an optimizer and a loss function
   let mut model = Box::new(Sequential::new(build_optimizer(optimizer_type).unwrap(), "mse"));
 
+  // Set which GPU we want to run this model on
+  model.set_device(0);
+
   // Let's add a few layers why don't we? 
-  model.add(Box::new(Dense::new(input_dims, hidden_dims, "tanh", "normal", "ones")));
-  model.add(Box::new(Dense::new(hidden_dims, output_dims, "tanh", "normal", "ones")));
+  model.add(Box::new(Dense::new(input_dims, hidden_dims, "tanh", "uniform", "normal")));
+  model.add(Box::new(Dense::new(hidden_dims, output_dims, "tanh", "uniform", "normal")));
 
   // Get some nice information about our model
   model.info();
