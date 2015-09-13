@@ -36,7 +36,7 @@ fn main() {
   let hidden_dims = 128;
   let output_dims = 256;
   let num_train_samples = 1024;
-  let iter = 5;
+  let iter = 1024;
   let batch_size = 256;
   let optimizer_type = "SGD";
 
