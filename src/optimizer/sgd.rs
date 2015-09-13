@@ -53,8 +53,9 @@ impl Optimizer for SGD {
     af::mul(&d_loss, &d_z).unwrap()
   }
 
-  fn update_parameters(&self, layers: &mut Vec<Box<Layer>>)
+  fn update_parameters(&self, layers: &mut Vec<Box<Layer>>, batch_size: u64)
   {
+    let alpha = self.learning_rate / batch_size as f32;
     for layer_num in (0..layers.len()) {
       let (delta_w, delta_b) = layers[layer_num].get_delta();
 
@@ -62,16 +63,16 @@ impl Optimizer for SGD {
       let weights = layers[layer_num].get_weights();
       for weight_num in (0..weights.len()) {
         layers[layer_num].set_weights(&af::sub(&weights[weight_num]
-                                                , &af::mul(&self.learning_rate, &delta_w).unwrap()).unwrap()
-                                       , weight_num);
+                                               , &af::mul(&alpha, &delta_w).unwrap()).unwrap()
+                                      , weight_num);
       }
       
       // b = b - lr * d_l
       let biases = layers[layer_num].get_bias();
       for bias_num in (0..biases.len()) {
         layers[layer_num].set_bias(&af::sub(&biases[bias_num]
-                                           , &af::mul(&self.learning_rate, &delta_b).unwrap()).unwrap()
-                                  , bias_num);
+                                            , &af::mul(&alpha, &delta_b).unwrap()).unwrap()
+                                   , bias_num);
       }
     }
   }

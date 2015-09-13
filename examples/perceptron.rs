@@ -2,6 +2,7 @@ extern crate hal;
 extern crate nalgebra as na;
 
 use na::DMat;
+use na::RowSlice;
 use hal::{Model, Layer};
 use hal::optimizer::{Optimizer, SGD};
 use hal::error::HALError;
@@ -36,7 +37,7 @@ fn main() {
   let output_dims = 256;
   let num_train_samples = 1024;
   let iter = 5;
-  let batch_size = 128;
+  let batch_size = 256;
   let optimizer_type = "SGD";
 
   // Now, let's build a model with an optimizer and a loss function
@@ -52,6 +53,8 @@ fn main() {
   // Test with learning to predict sin wave
   let mut data = generate_sin_wave(input_dims as usize, num_train_samples);
   let mut target = data.clone();
+  //let cols = data.ncols();
+  //println!("input row 0 : {:?}", data.row_slice(0, 0, cols-1));
   
   // iterate our model in Verbose mode (printing loss)
   let (loss, prediction) = model.fit(&mut data, &mut target, batch_size, iter, true, true);

@@ -1,14 +1,12 @@
 use af;
-use af::{Dim4};
+use af::{Array, Dim4};
 use na::DMat;
 
 use utils;
 //use error::HALError;
 
-pub fn plot_dmat<T>(raw_values: &DMat<T>, title: &'static str, window_x: u16, window_y: u16) {
-  // copy from DMat to Array
-  assert!(raw_values.ncols() == 1);
-  let values = utils::dmat_to_array(raw_values);
+pub fn plot_array(values: &Array, title: &'static str, window_x: u16, window_y: u16) {
+  assert!(values.dims().unwrap()[1] == 1);
 
   // create a window
   let title_str = String::from(title).clone(); // if we don't clone we get a bug
@@ -22,31 +20,22 @@ pub fn plot_dmat<T>(raw_values: &DMat<T>, title: &'static str, window_x: u16, wi
   
   // display till closed
   loop {
-    wnd.draw_plot(&af::range(Dim4::new(&[(raw_values.nrows() * raw_values.ncols()) as u64, 1, 1, 1])
+    wnd.draw_plot(&af::range(values.dims().unwrap().clone()
                              , 0, af::Aftype::F32).unwrap(), &values, None);
     if wnd.is_closed().unwrap() == true { break; }
   }
 }
 
+pub fn plot_dmat<T>(raw_values: &DMat<T>, title: &'static str, window_x: u16, window_y: u16) {
+  // copy from DMat to Array
+  assert!(raw_values.ncols() == 1);
+  let values = utils::dmat_to_array(raw_values);
+  plot_array(&values, title, window_x, window_y);
+}
+
 pub fn plot_vec<T>(raw_values: Vec<T>, title: &'static str, window_x: u16, window_y: u16) {
   // copy from float vector to Array
   let num_rows = raw_values.len();
-  let values = utils::vec_to_array(raw_values, num_rows, 1);
-
-  // create a window
-  let title_str = String::from(title).clone(); // if we don't clone we get a bug
-  let wnd = match af::Window::new(window_x as i32, window_y as i32, title_str) {
-    Ok(v)  => v,
-    Err(e) => panic!("Window creation failed: {}", e), //XXX: handle better
-  };
-
-  // af::print(&af::min(&values, 0).unwrap());
-  // af::print(&af::max(&values, 0).unwrap());
-
-  // display till closed
-  loop {
-    wnd.draw_plot(&af::range(Dim4::new(&[num_rows as u64, 1, 1, 1])
-                             , 0, af::Aftype::F32).unwrap(), &values, None);
-    if wnd.is_closed().unwrap() == true { break; }
-  }
+  let values = utils::vec_to_array(raw_values, num_rows, 1, true);
+  plot_array(&values, title, window_x, window_y);
 }

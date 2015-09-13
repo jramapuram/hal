@@ -1,6 +1,6 @@
 use af;
 use af::{Array, Dim4};
-use na::{DMat, Shape};
+use na::{DMat, Shape, Transpose};
 //use std::default::Default;
 use itertools::Zip;
 
@@ -60,11 +60,9 @@ impl Model for Sequential {
   {
     println!("train samples: {:?} | target samples: {:?} | batch size: {}"
              , input.shape(), target.shape(), batch_size);
-    //let output_dims = self.layers[self.layers.len() - 1].output_size();
-
+    
     // create the container to hold the forward pass & loss results
-    let dims = Dim4::new(&[1, input.ncols() as u64, 1, 1]);
-    let mut forward_pass = initializations::zeros(dims);
+    let mut forward_pass = initializations::zeros(Dim4::new(&[1, input.ncols() as u64, 1, 1]));
     let mut lossvec = Vec::<f32>::new();
 
     // randomly shuffle the data
@@ -80,26 +78,33 @@ impl Model for Sequential {
       if verbose {
         println!("iter: {}", i);
       }
- 
+
       // over every batch
-      for (i, t) in Zip::new((input.as_vec().chunks(batch_size as usize)
-                              , target.as_vec().chunks(batch_size as usize)))
+      let ncols = input.ncols();
+      for (i, t) in Zip::new((input.transpose().as_vec().chunks(ncols * batch_size as usize)
+                              , target.transpose().as_vec().chunks(ncols * batch_size as usize)))
       {
-        let batch_input = utils::normalize(&utils::raw_to_array(i, batch_size as usize, input.ncols()), 3.0f32);
-        let batch_target = utils::normalize(&utils::raw_to_array(t, batch_size as usize, target.ncols()), 3.0f32);
+        let batch_input = utils::normalize(&utils::raw_to_array(i, batch_size as usize
+                                                                , input.ncols(), false)
+                                           , 3.0f32);
+        let batch_target = utils::normalize(&utils::raw_to_array(t, batch_size as usize
+                                                                 , target.ncols(), false)
+                                            , 3.0f32);
 
         for row_num in 0..batch_size { //over every row in batch
-          forward_pass = self.forward(&af::transpose(&af::row(&batch_input, row_num).unwrap(), false).unwrap());
-          let l = self.backward(&forward_pass, &af::transpose(&af::row(&batch_target, row_num).unwrap(), false).unwrap());
+          //af::print(&af::transpose(&af::row(&batch_input, row_num).unwrap(), false).unwrap());
+          forward_pass = self.forward(&af::transpose(&af::row(&batch_input, row_num).unwrap()
+                                                     , false).unwrap());
+          let l = self.backward(&forward_pass, &af::transpose(&af::row(&batch_target, row_num).unwrap()
+                                                              , false).unwrap());
           lossvec.push(l);
         }
 
-        //TODO: Go here or below batch?
         if verbose {
           let last = lossvec.len();
           println!("loss: {}", lossvec[last - 1]);
         }
-        self.optimizer.update_parameters(&mut self.layers);
+        self.optimizer.update_parameters(&mut self.layers, batch_size);
       }
     }
 

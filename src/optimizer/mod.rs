@@ -16,7 +16,7 @@ pub trait Optimizer {
               , target: &Array
               , loss: &'static str) -> f32;
   fn update_delta(&self, layer: &mut Box<Layer>, prev_activation: &Array, diffs: &Array);
-  fn update_parameters(&self, layers: &mut Vec<Box<Layer>>);
+  fn update_parameters(&self, layers: &mut Vec<Box<Layer>>, batch_size: u64);
   fn info(&self);
 }
 
