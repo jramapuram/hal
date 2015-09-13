@@ -4,8 +4,10 @@ version = "0.1.0"
 authors = ["Jason Ramapuram <jason.ramapuram@viasat.com>"]
 
 [dependencies]
-docopt = "*"
 rustc-serialize = "*"
+rand = "*"
+nalgebra = "*"
+itertools = "*"
 arrayfire = { path ="/Users/jramapuram/projects/arrayfire-rust" }
 
 [lib]

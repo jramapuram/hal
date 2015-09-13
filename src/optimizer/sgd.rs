@@ -53,46 +53,61 @@ impl Optimizer for SGD {
     af::mul(&d_loss, &d_z).unwrap()
   }
 
-  //TODO: Add nesterov & momentum
-  fn update_one(&self, layer: &mut Box<Layer>, prev_activation: &Array, diffs: &Array){
-    // W = W - lr * a_{l-1} * d_l
-    let weights = layer.get_weights();
-    for i in (0..weights.len()) { // for all weights in this layer
-      let update = af::matmul(diffs, prev_activation, af::MatProp::NONE, af::MatProp::TRANS).unwrap();
-      layer.set_weights(&af::sub(&weights[i], &af::mul(&self.learning_rate, &update).unwrap()).unwrap(), i);
-    }
-    // b = b - lr * d_l
-    let mut biases = layer.get_bias();
-    for i in (0..biases.len()) {
-      layer.set_bias(&af::sub(&biases[i], &af::mul(&self.learning_rate, diffs).unwrap()).unwrap(), i);
+  fn update_parameters(&self, layers: &mut Vec<Box<Layer>>, batch_size: u64)
+  {
+    let alpha = self.learning_rate / batch_size as f32;
+    for layer_num in (0..layers.len()) {
+      let (delta_w, delta_b) = layers[layer_num].get_delta();
+
+      // W = W - lr * d_w
+      let weights = layers[layer_num].get_weights();
+      for weight_num in (0..weights.len()) {
+        layers[layer_num].set_weights(&af::sub(&weights[weight_num]
+                                               , &af::mul(&alpha, &delta_w).unwrap()).unwrap()
+                                      , weight_num);
+      }
+      
+      // b = b - lr * d_l
+      let biases = layers[layer_num].get_bias();
+      for bias_num in (0..biases.len()) {
+        layers[layer_num].set_bias(&af::sub(&biases[bias_num]
+                                            , &af::mul(&alpha, &delta_b).unwrap()).unwrap()
+                                   , bias_num);
+      }
     }
   }
+
+  //TODO: Add nesterov & momentum
+  fn update_delta(&self, layer: &mut Box<Layer>, prev_activation: &Array, diffs: &Array)
+  {
+    // delta = lr * a_{l-1} * d_l
+    layer.update(&af::matmul(diffs, prev_activation, af::MatProp::NONE, af::MatProp::TRANS).unwrap(), diffs);
+  }
   
-  fn update(&mut self, layers: &mut Vec<Box<Layer>>
-            , prediction: &Array
-            , target: &Array
-            , loss: &'static str) -> (f32, Array)
+  fn optimize(&mut self, layers: &mut Vec<Box<Layer>>
+              , prediction: &Array
+              , target: &Array
+              , loss: &'static str) -> f32
   {
     self.iter += 1;
-    self.learning_rate *= (1.0 / (1.0 + self.decay * (self.iter as f32)));
+    self.learning_rate *= 1.0 / (1.0 + self.decay * (self.iter as f32));
     let last_index = layers.len() - 1;
     let prev_activation = layers[last_index].get_input();
     let diffs = self.grads(prediction
                            , target
                            , loss
                            , layers[last_index].get_activation_type());
-    self.update_one(&mut layers[last_index], &prev_activation, &diffs);
+    self.update_delta(&mut layers[last_index], &prev_activation, &diffs);
 
-    // Verify:: Don't backprop to 1st layer
     for i in (1..last_index).rev() {
       // d_l = (W_{l+1}^T * d_{l+1}) .* derivative(z) where z = activation w/out non-linearity
       let prev_activation = layers[i].get_input();
       let grad = activations::get_activation_derivative(layers[i].get_activation_type(), &prev_activation).unwrap();
       let diffs = layers[i].backward(&diffs, &grad);
-      self.update_one(&mut layers[i], &prev_activation, &diffs);
+      self.update_delta(&mut layers[i], &prev_activation, &diffs);
     }
 
-    (loss::get_loss(loss, prediction, target).unwrap(), prediction.clone())
+    loss::get_loss(loss, prediction, target).unwrap()
   }
   
   fn info(&self){

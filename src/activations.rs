@@ -1,5 +1,5 @@
 use af;
-use af::{Dim4, Array};
+use af::Array;
 use error::HALError;
 
 pub fn tanh(x: &Array) -> Array {
@@ -37,7 +37,7 @@ pub fn softmax_derivative(x: &Array) -> Array {
 
 
 pub fn get_activation(name: &str, x: &Array) -> Result<Array, HALError> {
-  match(name){
+  match name {
     "softmax" => Ok(softmax(x)),
     "sigmoid" => Ok(sigmoid(x)),
     "tanh"    => Ok(tanh(x)),
@@ -46,7 +46,7 @@ pub fn get_activation(name: &str, x: &Array) -> Result<Array, HALError> {
 }
 
 pub fn get_activation_derivative(name: &str, x: &Array) -> Result<Array, HALError> {
-  match(name){
+  match name {
     "softmax" => Ok(softmax_derivative(x)),
     "sigmoid" => Ok(sigmoid_derivative(x)),
     "tanh"    => Ok(tanh_derivative(x)),
