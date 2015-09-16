@@ -27,7 +27,7 @@ For other OS's please install all the required [arrayfire dependencies](https://
   cargo build
   cargo run --example perceptron
   ```
-### Example Ubuntu 14.10 `build.conf`
+#### Example CUDA Ubuntu 14.10 `build.conf`
 ```json
 {
     "use_backend": "cuda",
@@ -65,3 +65,40 @@ For other OS's please install all the required [arrayfire dependencies](https://
     "sdk_lib_dir": "lib64"
 }
 ```
+#### Example CUDA OS X  `build.conf`
+```json
+
+    "use_backend": "cuda",
+
+    "use_lib": false,
+    "lib_dir": "/usr/local/lib",
+    "inc_dir": "/usr/local/include",
+
+    "build_type": "Release",
+    "build_threads": "4",
+    "build_cuda": "ON",
+    "build_opencl": "OFF",
+    "build_cpu": "OFF",
+    "build_examples": "OFF",
+    "build_test": "OFF",
+    "build_graphics": "ON",
+
+    "glew_static": "OFF",
+    "freeimage_type": "DYNAMIC",
+    "cpu_fft_type": "FFTW",
+    "cpu_blas_type": "LAPACKE",
+    "cpu_lapack_type": "LAPACKE",
+
+    "freeimage_dir": "",
+    "fftw_dir": "",
+    "acml_dir": "",
+    "mkl_dir": "",
+    "lapacke_dir": "",
+    "glew_dir": "",
+    "glfw_dir": "",
+    "boost_dir": "",
+
+    "cuda_sdk": "/usr/local/cuda",
+    "opencl_sdk": "/usr",
+    "sdk_lib_dir": "lib"
+}
