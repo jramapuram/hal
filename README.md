@@ -3,7 +3,7 @@ Rust based Cross-GPU Machine Learning
 
 ## Installation
 The following will be for Ubuntu 14.10+.
-For other OS's please install all the required [arrayfire dependencies](https://github.com/arrayfire/arrayfire/wiki/Build-Instructions-for-Linux)
+For other OS's please install all the required dependencies[[linux](https://github.com/arrayfire/arrayfire/wiki/Build-Instructions-for-Linux) /[osx](https://github.com/arrayfire/arrayfire/wiki/Build-Instructions-for-OSX)]
 
   1. Install Rust if you haven't already:
    
