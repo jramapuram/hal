@@ -3,15 +3,14 @@ use af::{Dim4, Array, MatProp};
 
 use activations;
 use initializations;
-use layer::Layer;
+use layer::{Layer, Input};
 
 #[allow(non_snake_case)]
 pub struct Dense {
   weights: Vec<Array>,
   bias: Vec<Array>,
-  delta_W: Array,
-  delta_b: Array,
-  inputs: Array,
+  delta: Array,
+  inputs: Input,
   activation: &'static str,
 }
 
@@ -21,45 +20,41 @@ impl Layer for Dense {
          , w_init: &'static str, b_init: &str) -> Dense
   {
     Dense {
-      weights: vec![initializations::get_initialization(w_init, Dim4::new(&[output_size, input_size, 1, 1])).unwrap()],  // W
-      bias:    vec![initializations::get_initialization(b_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()],           // b
-      inputs:  initializations::get_initialization("zeros", Dim4::new(&[input_size, 1, 1, 1])).unwrap(),                 // a_{l-1}
-      delta_W: initializations::get_initialization("zeros", Dim4::new(&[output_size, input_size, 1, 1])).unwrap(),       // delW
-      delta_b: initializations::get_initialization("zeros", Dim4::new(&[output_size, 1, 1, 1])).unwrap(),                // delb
+      weights: vec![initializations::get_initialization(w_init, Dim4::new(&[output_size, input_size, 1, 1])).unwrap()],                                // W
+      bias:    vec![initializations::get_initialization(b_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()],                                         // b
+      inputs:  Input{data: initializations::get_initialization("zeros", Dim4::new(&[input_size, 1, 1, 1])).unwrap(), activation: output_activation},   // z_{l-1} | activ{z_{l-1}}
+      delta: initializations::get_initialization("zeros", Dim4::new(&[output_size, 1, 1, 1])).unwrap(),                                                // delta
       activation: output_activation,
     }
   }
 
-  fn forward(&mut self, activation: &Array) -> Array {
-    // append previous_activation
-    self.inputs = activation.clone();
+  fn forward(&mut self, input: &Input) -> Input {
+    // keep previous_activation
+    self.inputs = input.clone();
 
-    //sigma(Wx + b)
-    activations::get_activation(self.activation, &af::add(&af::matmul(&self.weights[0]
-                                                                      , &activation
-                                                                      , MatProp::NONE
-                                                                      , MatProp::NONE).unwrap()
-                                                          , &self.bias[0]).unwrap()).unwrap()
+    // apply the activation to the previous layer [Optimization: Memory saving]
+    let activated_input = activations::get_activation(input.activation, &input.data).unwrap();
+
+    // sigma(Wx + b)
+    let mul = af::matmul(&self.weights[0]
+                         , &activated_input
+                         , MatProp::NONE
+                         , MatProp::NONE).unwrap();
+    Input {data: af::add(&mul, &self.bias[0], true).unwrap(), activation: self.activation}
   }
 
-  fn backward(&self, upper_diffs: &Array, gradients: &Array) -> Array {
-    // d_l = (transpose(W) * d_{l+1}) .* dActivation(z) where z = activation w/out non-linearity
-    let inner = af::matmul(&self.weights[0]
-                           , upper_diffs
-                           , MatProp::CTRANS
-                           , MatProp::NONE).unwrap();
-    af::mul(&inner, gradients).unwrap()
+  fn backward(&mut self, delta: &Array) -> Array {
+    // d_l = (transpose(W) * d_{l}) .* dActivation(z-1) where z = activation w/out non-linearity
+    self.delta = delta.clone();
+    let activation_prev = activations::get_activation(self.inputs.activation, &self.inputs.data).unwrap();
+    let d_activation_prev = activations::get_activation_derivative(self.inputs.activation, &activation_prev).unwrap();
+    let delta_prev = af::mul(&af::matmul(&self.weights[0], delta, af::MatProp::TRANS, af::MatProp::NONE).unwrap()
+                             , &d_activation_prev, false).unwrap();
+    delta_prev
   }
 
-  #[allow(non_snake_case)]  
-  fn update(&mut self, delta_W: &Array, delta_b: &Array) {
-    self.delta_W = af::add(&self.delta_W, delta_W).unwrap();
-    self.delta_b = af::add(&self.delta_b, delta_b).unwrap();
-  }
-
-  #[allow(non_snake_case)]
-  fn get_delta(&self) -> (Array, Array) {
-    (self.delta_W.clone(), self.delta_b.clone())
+  fn get_delta(&self) -> Array {
+    self.delta.clone()
   }
 
   fn get_weights(&self) -> Vec<Array> {
@@ -94,7 +89,7 @@ impl Layer for Dense {
     dims
   }
 
-  fn get_input(&self) -> Array {
+  fn get_input(&self) -> Input {
     self.inputs.clone()
   }
 

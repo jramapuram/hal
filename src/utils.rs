@@ -5,7 +5,7 @@ use rand;
 use rand::Rng;
 use std::path::Path;
 use af::{Dim4, Array, Aftype};
-use na::{DMat, Shape};
+use na::{DMat, DVec, Shape};
 use itertools::Zip;
 use rustc_serialize::Encodable;
 
@@ -27,11 +27,19 @@ pub fn dmat_to_array<T>(dmat_values: &DMat<T>) -> Array {
   raw_to_array(dmat_values.as_vec(), dmat_values.shape().0, dmat_values.shape().1)
 }
 
+// Convert a dvec of elements to an array
+pub fn dvec_to_array<T>(dvec_values: &DVec<T>) -> Array {
+  raw_to_array(dvec_values.at.as_ref(), dvec_values.len(), 1)
+}
+
 // Convert a GPU array to a dmat
 pub fn array_to_dmat(arr: &Array) -> DMat<f32>{
   let mut retval = DMat::<f32>::new_zeros(arr.dims().unwrap()[0] as usize
                                           , arr.dims().unwrap()[1] as usize);
-  arr.host(retval.as_mut_vec()); //TODO: error handle
+  match arr.host(retval.as_mut_vec()) {
+    Ok(_)  => {},
+    Err(e) => panic!("error pulling data from gpu to cpu: {:?}", e),
+  };
   retval
 }
 
@@ -113,14 +121,18 @@ pub fn read_csv<T>(filename: &'static str) -> Vec<T>
   retval
 }
 
-// A helper to return a batching iterator
-// fn batch<T>(v: &[T], batch_size: u64) -> impl Iterator<Item = T> {
-//   Box::new(v[..].chunks(batch_size))
-// }
-
 // Normalize an array based on mean & num_std_dev deviations of the variance
 pub fn normalize(src: &Array, num_std_dev: f32) -> Array {
   let mean = af::mean_all(src).unwrap().0 as f32;
   let var = af::var_all(src, false).unwrap().0 as f32;
-  af::div(&af::sub(src, &mean).unwrap(), &af::mul(&num_std_dev, &var).unwrap()).unwrap()
+  af::div(&af::sub(src, &mean, false).unwrap(), &af::mul(&num_std_dev, &var, false).unwrap(), false).unwrap()
+}
+
+pub fn scale(src: &Array, low: f32, high: f32) -> Array {
+  let min = af::min_all(&src).unwrap().0 as f32;
+  let max = af::max_all(&src).unwrap().0 as f32;
+
+  af::add(&af::div(&af::mul(&(high - low), &af::sub(src, &min, false).unwrap(), false).unwrap()
+                   , &(max - min), false).unwrap()
+          , &low, false).unwrap()
 }
