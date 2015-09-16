@@ -1,4 +1,4 @@
-# hal_rust
+# HAL : Hyper Adaptive Learning
 Rust based Cross-GPU Machine Learning
 
 ## Installation
