@@ -9,9 +9,8 @@ pub fn plot_array(values: &Array, title: &'static str, window_x: u16, window_y: 
   assert!(values.dims().unwrap()[1] == 1);
 
   // create a window
-  //let title_str = String::from(title).clone(); // if we don't clone we get a bug
-  let title_str = String::from("Plot").clone(); //above is causing issues on 3.0.2
-  let wnd = match af::Window::new(window_x as i32, window_y as i32, title_str) {
+  let title_str = String::from(title);
+  let wnd = match af::Window::new(window_x as i32, window_y as i32, title_str.clone()) {
     Ok(v)  => v,
     Err(e) => panic!("Window creation failed: {}", e), //XXX: handle better
   };
