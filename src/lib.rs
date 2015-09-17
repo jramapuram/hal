@@ -3,6 +3,8 @@ extern crate nalgebra as na;
 extern crate itertools;
 extern crate rand;
 extern crate csv;
+extern crate num;
+extern crate statistical;
 extern crate rustc_serialize;
 
 pub use layer::{Layer};

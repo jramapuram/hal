@@ -4,6 +4,9 @@ use csv;
 use rand;
 use rand::Rng;
 use std::path::Path;
+use std::ops::Sub;
+use num::traits::Float;
+use statistical::{standard_deviation, mean};
 use af::{Dim4, Array, Aftype};
 use na::{DMat, DVec, Shape};
 use itertools::Zip;
@@ -56,7 +59,7 @@ pub fn swap_row<T>(matrix: &mut [T], row_src: usize, row_dest: usize, cols: usiz
 // Helper to swap rows (col major order) in a generic type [non GPU]
 pub fn swap_col<T>(matrix: &mut [T], row_src: usize, row_dest: usize, cols: usize){
   assert!(matrix.len() % cols == 0);
-  let row_count = matrix.len()/cols;
+  let row_count = matrix.len() / cols;
   if row_src != row_dest {
     for c in 0..cols {
       matrix.swap(c * row_count + row_src, c * row_count + row_dest);
@@ -121,11 +124,31 @@ pub fn read_csv<T>(filename: &'static str) -> Vec<T>
   retval
 }
 
+// Generic Normalizer
+pub fn normalize<T: Float + Sub>(src: &[T], num_std_dev: T) -> Vec<T> {
+  let mean = mean(src);
+  let std_dev = standard_deviation(src, Some(mean));
+  src.iter().map(|&x| (x - mean) / (num_std_dev * std_dev)).collect()
+}
+
 // Normalize an array based on mean & num_std_dev deviations of the variance
-pub fn normalize(src: &Array, num_std_dev: f32) -> Array {
+pub fn normalize_array(src: &Array, num_std_dev: f32) -> Array {
   let mean = af::mean_all(src).unwrap().0 as f32;
-  let var = af::var_all(src, false).unwrap().0 as f32;
-  af::div(&af::sub(src, &mean, false).unwrap(), &af::mul(&num_std_dev, &var, false).unwrap(), false).unwrap()
+  let var = num_std_dev * af::var_all(src, false).unwrap().0 as f32;
+  if var > 0.00000001 || var < 0.00000001 {
+    af::div(&af::sub(src, &mean, false).unwrap(), &var, false).unwrap()
+  }else{
+    af::sub(src, &mean, false).unwrap()
+  }
+}
+
+// Normalize a dmat array based on mean & num_std_dev deviations
+pub fn normalize_dmat<T: Float>(src: &DMat<T>, num_std_dev: T) -> DMat<T> {
+  let cols = src.ncols();
+  let rows = src.nrows();
+  let mut dmat_vec = src.clone().to_vec();
+  dmat_vec = normalize(&dmat_vec[..], num_std_dev);
+  DMat::from_col_vec(rows, cols, &dmat_vec[..])
 }
 
 pub fn scale(src: &Array, low: f32, high: f32) -> Array {

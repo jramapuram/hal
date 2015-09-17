@@ -7,8 +7,10 @@ authors = ["Jason Ramapuram <jason.ramapuram@gmail.com>"]
 rustc-serialize = "*"
 rand = "*"
 csv = "*"
+num= "*"
 nalgebra = "*"
 itertools = "*"
+statistical = "*"
 arrayfire = { path ="arrayfire-rust" }
 
 [lib]

@@ -94,6 +94,10 @@ impl Model for Sequential {
       utils::shuffle(&mut[input.as_mut_vec(), target.as_mut_vec()], &col_vec, false);
     }
 
+    // normalize the data by mean and 3 std deviations
+    *input = utils::normalize_dmat(input, 3.0f32);
+    *target = utils::normalize_dmat(target, 3.0f32);
+
     // over every batch
     let incols = input.ncols();
     let tncols = target.ncols();
@@ -107,11 +111,8 @@ impl Model for Sequential {
       }
 
       // column major order is preferred for BLAS
-      // let batch_input  = utils::scale(&utils::normalize(&utils::raw_to_array(i, incols,  batch_size as usize), 3.0f32), -0.9f32, 0.9f32);
-      // let batch_target = utils::scale(&utils::normalize(&utils::raw_to_array(t, tncols, batch_size as usize), 3.0f32), -0.9f32, 0.9f32);
-      // println!("max is {} | min is {}", af::max_all(&batch_input).unwrap().0, af::min_all(&batch_input).unwrap().0);
-      let batch_input  = utils::normalize(&utils::raw_to_array(i, incols,  batch_size as usize), 3.0f32);
-      let batch_target = utils::normalize(&utils::raw_to_array(t, tncols, batch_size as usize), 3.0f32);
+      let batch_input  = utils::raw_to_array(i, incols,  batch_size as usize);
+      let batch_target = utils::raw_to_array(t, tncols, batch_size as usize);
 
       // DEBUG: 
       // println!("batched [input: {:?} | target: {:?}]"
