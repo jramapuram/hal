@@ -22,5 +22,5 @@ This project is for those that miss strongly typed compiled languages (where for
 See [here](docs/installation.md)
 
 # Credits
-  - Thanks to the [arrayfire](http://arrayfire.com/) team for working with me to get the (rust bindings)[https://github.com/arrayfire/arrayfire-rust] up.
+  - Thanks to the [arrayfire](http://arrayfire.com/) team for working with me to get the [rust bindings](https://github.com/arrayfire/arrayfire-rust) up.
   - [Keras](https://github.com/fchollet/keras) for inspiration as a lot of functions are similar to their implementation (minus the theano nonsense).
