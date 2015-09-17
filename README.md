@@ -8,24 +8,24 @@ For other OS's please install all the required dependencies[[linux](https://gith
   1. Install Rust if you haven't already [currently only tested on rustc 1.3+] :
    
   ```bash
-  curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- --channel=beta
+  $ curl -sSf https://static.rust-lang.org/rustup.sh | sh
   ```
   2. Install the dependencies:
   
   ```bash
-  sudo apt-get install -y build-essential git subversion cmake libfreeimage-dev libatlas3gf-base libatlas-dev libfftw3-dev liblapacke-dev libboost1.55-all-dev libglew-dev libglewmx-dev libglfw3-dev
+  $ sudo apt-get install -y build-essential git subversion cmake libfreeimage-dev libatlas3gf-base libatlas-dev libfftw3-dev liblapacke-dev libboost1.55-all-dev libglew-dev libglewmx-dev libglfw3-dev
   ```
   3. Clone the repo with the **submodules**:
 
   ```bash
-  git clone --recursive https://github.com/jramapuram/hal_rust
+  $ git clone --recursive https://github.com/jramapuram/hal_rust
   ```
   4. Modify `build.conf` (located at `arrayfire-rust/build.conf`) to suit your compute device backend (eg: CUDA or openCL, etc).
   5. Build & run example:
   
   ```bash
-  cargo build
-  cargo run --example perceptron
+  $ cargo build
+  $ cargo run --example perceptron
   ```
 #### Example CUDA Ubuntu 14.10 `build.conf`
 ```json
@@ -67,7 +67,7 @@ For other OS's please install all the required dependencies[[linux](https://gith
 ```
 #### Example CUDA OS X  `build.conf`
 ```json
-
+{
     "use_backend": "cuda",
 
     "use_lib": false,
