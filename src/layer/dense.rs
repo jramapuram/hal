@@ -5,7 +5,6 @@ use activations;
 use initializations;
 use layer::{Layer, Input};
 
-#[allow(non_snake_case)]
 pub struct Dense {
   weights: Vec<Array>,
   bias: Vec<Array>,
