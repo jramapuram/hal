@@ -14,8 +14,8 @@ pub struct Dense {
   activation: &'static str,
 }
 
-impl Layer for Dense {
-  fn new(input_size: u64, output_size: u64
+impl Dense {
+  pub fn new(input_size: u64, output_size: u64
          , output_activation: &'static str
          , w_init: &'static str, b_init: &str) -> Dense
   {
@@ -27,6 +27,9 @@ impl Layer for Dense {
       activation: output_activation,
     }
   }
+}
+
+impl Layer for Dense {
 
   fn forward(&mut self, input: &Input) -> Input {
     // keep previous_activation
