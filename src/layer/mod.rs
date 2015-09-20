@@ -11,7 +11,7 @@ use af::Array;
 pub struct
   Input {
   pub data: Vec<Array>,
-  pub activation: Vec<str>,
+  pub activation: Vec<&'static str>,
 }
 
 pub trait Layer {

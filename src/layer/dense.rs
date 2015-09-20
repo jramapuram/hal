@@ -36,14 +36,14 @@ impl Layer for Dense {
     self.inputs = inputs.clone();
 
     // apply the activation to the previous layer [Optimization: Memory saving]
-    let activated_input = activations::get_activation(inputs.activation[0], &input.data).unwrap();
+    let activated_input = activations::get_activation(inputs.activation[0], &inputs.data[0]).unwrap();
 
     // sigma(Wx + b)
     let mul = af::matmul(&self.weights[0]
                          , &activated_input
                          , MatProp::NONE
                          , MatProp::NONE).unwrap();
-    Input { data: af::add(&mul, &self.bias[0], true).unwrap(), activation: vec![self.activation] }
+    Input { data: vec![af::add(&mul, &self.bias[0], true).unwrap()], activation: vec![self.activation] }
   }
 
   fn backward(&mut self, delta: &Array) -> Array {

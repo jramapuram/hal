@@ -64,11 +64,11 @@ impl Model for Sequential {
   }
 
   fn forward(&mut self, activation: &Array) -> Array {
-    let mut activate = Input {data: activation.clone(), activation: "ones"};
+    let mut activate = Input {data: vec![activation.clone()], activation: vec!["ones"]};
     for i in 0..self.layers.len() {
       activate = self.layers[i].forward(&activate);
     }
-    activate.data //NOTE: This is non-activated output
+    activate.data.last().unwrap().clone() //NOTE: This is non-activated output
   }
 
   fn fit(&mut self, input: &mut DMat<f32>, target: &mut DMat<f32>

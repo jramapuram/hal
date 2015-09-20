@@ -36,7 +36,7 @@ impl Default for SGD {
   }
 }
 
-impl Optimizer for SGD { 
+impl Optimizer for SGD {
   fn new(params: &HashMap<&str, &str>) -> SGD {
     SGD{
       name: "SGD",
@@ -68,19 +68,19 @@ impl Optimizer for SGD {
     self.learning_rate *= 1.0 / (1.0 + self.decay * (self.iter as f32));
     let alpha = self.learning_rate / batch_size as f32;
     let mut velocity_index = [0, 0];
-    
+
     for layer_num in 0..layers.len() {
       // v = momemtum * v + learning_rate * d_w
       // W = W - v
       let weights = layers[layer_num].get_weights();
       for weight_num in (0..weights.len()) {
-        //DEBUG: 
+        //DEBUG:
         // println!("weight size: {:?} | delta dims: {:?} | input dims: {:?}"
         //          , weights[weight_num].dims().unwrap()
         //          , layers[layer_num].get_delta().dims().unwrap()
         //          , layers[layer_num].get_input().data.dims().unwrap());
         let w_update = af::matmul(&layers[layer_num].get_delta()
-                                  , &layers[layer_num].get_input().data
+                                  , &layers[layer_num].get_input().data.last().unwrap()
                                   , af::MatProp::NONE, af::MatProp::TRANS).unwrap();
         self.velocity_W[velocity_index[0]] = af::mul(&self.momemtum, &self.velocity_W[velocity_index[0]], false).unwrap();
         self.velocity_W[velocity_index[0]] = af::sub(&self.velocity_W[velocity_index[0]]
