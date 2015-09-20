@@ -26,7 +26,7 @@ impl Default for Sequential{
       loss: "mse",
       device: 0,
     }
-  }  
+  }
 }
 
 impl Model for Sequential {
@@ -49,7 +49,7 @@ impl Model for Sequential {
       Ok(_)   => {},
       Err(e)  => panic!("could not get info: {:?}", e),
     };
-    
+
     println!("");
     self.optimizer.info();
     println!("loss:           {}\nnum_layers:     {}", self.loss, self.layers.len());
@@ -82,7 +82,7 @@ impl Model for Sequential {
     assert!(input.nrows() as u64 >= batch_size
             && input.nrows() as u64 % batch_size == 0);
     self.optimizer.setup(&self.layers);
-      
+
     // create the container to hold the forward pass & loss results
     let mut forward_pass = initializations::zeros(Dim4::new(&[1, input.ncols() as u64, 1, 1]));
     let mut lossvec = Vec::<f32>::new();
@@ -114,7 +114,7 @@ impl Model for Sequential {
       let batch_input  = utils::raw_to_array(i, incols,  batch_size as usize);
       let batch_target = utils::raw_to_array(t, tncols, batch_size as usize);
 
-      // DEBUG: 
+      // DEBUG:
       // println!("batched [input: {:?} | target: {:?}]"
       //          , batch_input.dims().unwrap()
       //          , batch_target.dims().unwrap());
@@ -122,7 +122,7 @@ impl Model for Sequential {
       forward_pass = self.forward(&batch_input);
       loss = self.backward(&forward_pass, &batch_target);
       self.optimizer.update(&mut self.layers, batch_size);
-      
+
       lossvec.push(loss);
       if verbose {
         print!("{} ", loss);
@@ -143,7 +143,7 @@ impl Model for Sequential {
     for i in (0..last_index + 1).rev() {
       delta = self.layers[i].backward(&delta);
     }
-    
+
     loss::get_loss(self.loss, prediction, target).unwrap()
   }
 }

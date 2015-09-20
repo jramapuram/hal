@@ -46,6 +46,15 @@ pub fn array_to_dmat(arr: &Array) -> DMat<f32>{
   retval
 }
 
+// slice a plane from a 3-dimensional tensor
+pub fn slice_plane(input: &Array, plane_num: u8) -> Array {
+  let dims = input.dims().unwrap();
+  assert!(dims.ndims() == 3);
+  af::index(input, &[af::Seq::default()
+                     , af::Seq::default()
+                     , af::Seq::new(plane_num as f64, plane_num as f64, 1.0)]).unwrap()
+}
+
 // Helper to swap rows (row major order) in a generic type [non GPU]
 pub fn swap_row<T>(matrix: &mut [T], row_src: usize, row_dest: usize, cols: usize){
   assert!(matrix.len() % cols == 0);

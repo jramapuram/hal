@@ -8,9 +8,10 @@ use af::Dim4;
 use af::Array;
 
 #[derive(Clone)]
-pub struct Input {
-  pub data: Array,
-  pub activation: &'static str,
+pub struct
+  Input {
+  pub data: Vec<Array>,
+  pub activation: Vec<str>,
 }
 
 pub trait Layer {
