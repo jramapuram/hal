@@ -6,6 +6,7 @@ use itertools::Zip;
 
 use utils;
 use loss;
+use activations;
 use initializations;
 use layer::{Layer, Input};
 use model::Model;
@@ -66,9 +67,10 @@ impl Model for Sequential {
   fn forward(&mut self, activation: &Array) -> Array {
     let mut activate = Input {data: vec![activation.clone()], activation: vec!["ones"]};
     for i in 0..self.layers.len() {
-      activate = self.layers[i].forward(&activate);
+      activate = self.layers[i].forward(&activate); //NOTE: This is non-activated output
     }
-    activate.data.last().unwrap().clone() //NOTE: This is non-activated output
+    activations::get_activation(activate.activation.last().unwrap()
+                                , activate.data.last().unwrap()).unwrap()
   }
 
   fn fit(&mut self, input: &mut DMat<f32>, target: &mut DMat<f32>

@@ -105,7 +105,7 @@ impl Layer for LSTM {
   fn backward(&mut self, delta: &Array) -> Array {
     // d_l = (transpose(W) * d_{l}) .* dActivation(z-1) where z = activation w/out non-linearity
     self.delta = delta.clone();
-    let activation_prev = activations::get_activation(self.inputs.activation[0], &self.inputs.data[0]).unwrap();
+    let activation_prev = activations::get_activation(self.inputs.activation[0], &self.inputs.data[DataIndex::Input]).unwrap();
     let d_activation_prev = activations::get_activation_derivative(self.inputs.activation[0], &activation_prev).unwrap();
     let delta_prev = af::mul(&af::matmul(&self.weights[0], delta, af::MatProp::TRANS, af::MatProp::NONE).unwrap()
                              , &d_activation_prev, false).unwrap();
