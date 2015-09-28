@@ -14,6 +14,7 @@ pub enum LSTMIndex {
 }
 
 pub enum ActivationIndex {
+  Input,
   Inner,
   Outer,
 }
@@ -56,6 +57,10 @@ impl LSTM {
   }
 }
 
+impl RTRL for LSTM {
+  pub fn rtrl(error: &Array, dctm1: &Array, )
+}
+
 impl Layer for LSTM {
 
   pub fn forward(&mut self, inputs:& Input) {
@@ -63,11 +68,12 @@ impl Layer for LSTM {
     self.inputs = inputs.clone();
 
     // apply the activation to the previous layer [Optimization: Memory saving]
-    let activated_input = activations::get_activation(inputs.activation[DataIndex::Input], &inputs.data[DataIndex::Input]).unwrap();
+    let activated_input = activations::get_activation(inputs.activation[ActivationIndex::Inner]
+                                                      , &inputs.data[DataIndex::Input]).unwrap();
 
     // extract the sub-block of each gate [i_tm1, f_tm1, o_tm1, ct_tm1, c_tm2]
     let block_size = inputs.data[DataIndex::Recurrence].dims().unwrap()[0];
-    assert!(block_size as f32 % 5.0f32 == 0);
+    assert!(block_size as f32 % 5.0f32 == 0); // there are 5 data pieces we need
     let chunk_size = block_size / 5;
     let i_f_o_tm1 = activations::get_activation(inputs.activation[ActivationIndex::Inner]
                                                 , &af::rows(&inputs.data[DataIndex::Recurrence], 0, 3 * chunk_size).unwrap).unwrap();
@@ -95,15 +101,22 @@ impl Layer for LSTM {
                               , &self.bias[LSTMIndex::Forget]
                               , &self.bias[LSTMIndex::Output]
                               , &self.bias[LSTMIndex::CellTilda]];
+    // [i_f_o_ct] = W*x + U*h_tm1 + b
     let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), &activated_input).unwrap()
                                , &af::matmul(&af::join_many(0, recurrents_ref).unwrap(), &h_tm1).unwrap(), false).unwrap()
                       , &af::join_many(0, bias_ref).unwrap(), true).unwrap();
 
-    Input { data: af::join_many(0, vec![&i_f_o_tm1, &ct_tm1, &c_tm1]).unwrap(), activation: vec![self.inner_activation, self.outer_activation] }
+    if self.return_sequences {
+      Input { data: af::join_many(0, vec![&z_t, &c_tm1]).unwrap()
+              , activation: vec![self.inner_activation, self.outer_activation] }
+    }else { //TODO: Fix this
+      Input { data: af::join_many(0, vec![&i_f_o_tm1, &ct_tm1, &c_tm1]).unwrap()
+              , activation: vec![self.inner_activation, self.outer_activation] }
+    }
   }
 
   fn backward(&mut self, delta: &Array) -> Array {
-    // d_l = (transpose(W) * d_{l}) .* dActivation(z-1) where z = activation w/out non-linearity
+    // d_yo = (transpose(W) * d_{l}) .* dActivation(z-1) where z = activation w/out non-linearity
     self.delta = delta.clone();
     let activation_prev = activations::get_activation(self.inputs.activation[0], &self.inputs.data[DataIndex::Input]).unwrap();
     let d_activation_prev = activations::get_activation_derivative(self.inputs.activation[0], &activation_prev).unwrap();

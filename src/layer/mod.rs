@@ -30,11 +30,12 @@ pub trait Layer {
   fn output_size(&self) -> u64;
 }
 
-  // fn new(input_size: u64, output_size: u64,
-  //        output_activation: &'static str, w_init: &'static str, b_init: &str) -> Self where Self: Sized;
-
-pub trait RecurrentLayer : Layer {
+pub trait RecurrentLayer: Layer {
   fn new(input_size: u64, output_size: u64
          , inner_activation: &str, outer_activation: &str
          , w_init: &str, b_init: &str) -> Self where Self: Sized;
+}
+
+pub trait RTRL{
+fn rtrl()
 }
