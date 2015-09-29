@@ -15,7 +15,7 @@ pub struct SGD {
   pub decay: f32,
   pub nesterov: bool,
   pub clip_grad: u64,
-  iter: u64,
+  pub iter: u64,
   velocity_W: Vec<Array>,
   velocity_b: Vec<Array>,
 }

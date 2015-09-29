@@ -58,7 +58,20 @@ impl LSTM {
 }
 
 impl RTRL for LSTM {
-  pub fn rtrl(error: &Array, dctm1: &Array, )
+  pub fn rtrl(&mut self, error: &Array, d_tm1: &Array, z_t: &Array){
+    // chunk out our blocks
+    assert!(block_size as f32 % 5.0f32 == 0); // there are 5 data pieces we need
+    let chunk_size = block_size / 5;
+    let i_f_o_t = activations::get_activation(self.inner_activation,
+                                              , &af::rows(z_t, 0, 3*chunk_size).unwrap).unwrap();
+    let ct_t = activations::get_activation(self.outer_activation,
+                                           , &af::rows(z_t, 3*chunk_size, 4*chunk_size).unwrap).unwrap();
+    let c_tm1 = af::rows(z_t, 4*chunk_size, 5*chunk_size).unwrap();
+
+    // calculate dc_t/dTheta * f_t as it is needed for everything
+    let d_all = af::mul(d_tm1, af::rows(i_f_o_t, chunk_size, 2*chunk_size).unwrap()).unwrap();
+
+  }
 }
 
 impl Layer for LSTM {
@@ -105,19 +118,19 @@ impl Layer for LSTM {
     let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), &activated_input).unwrap()
                                , &af::matmul(&af::join_many(0, recurrents_ref).unwrap(), &h_tm1).unwrap(), false).unwrap()
                       , &af::join_many(0, bias_ref).unwrap(), true).unwrap();
-
+    rtrl(&d_tm1, &z_t, )
     if self.return_sequences {
       Input { data: af::join_many(0, vec![&z_t, &c_tm1]).unwrap()
               , activation: vec![self.inner_activation, self.outer_activation] }
     }else { //TODO: Fix this
       Input { data: af::join_many(0, vec![&i_f_o_tm1, &ct_tm1, &c_tm1]).unwrap()
               , activation: vec![self.inner_activation, self.outer_activation] }
-    }
+   }
   }
 
   fn backward(&mut self, delta: &Array) -> Array {
-    // d_yo = (transpose(W) * d_{l}) .* dActivation(z-1) where z = activation w/out non-linearity
     self.delta = delta.clone();
+
     let activation_prev = activations::get_activation(self.inputs.activation[0], &self.inputs.data[DataIndex::Input]).unwrap();
     let d_activation_prev = activations::get_activation_derivative(self.inputs.activation[0], &activation_prev).unwrap();
     let delta_prev = af::mul(&af::matmul(&self.weights[0], delta, af::MatProp::TRANS, af::MatProp::NONE).unwrap()
