@@ -45,7 +45,7 @@ fn main() {
   // Set which GPU we want to run this model on
   model.set_device(0);
 
-  // Let's add a few layers why don't we? 
+  // Let's add a few layers why don't we?
   model.add(Box::new(Dense::new(input_dims, hidden_dims, "tanh", "glorot_uniform", "zeros")));
   model.add(Box::new(Dense::new(hidden_dims, output_dims, "tanh", "glorot_uniform", "zeros")));
 
@@ -55,7 +55,7 @@ fn main() {
   // Test with learning to predict sin wave
   let mut data = generate_sin_wave(input_dims as usize, num_train_samples);
   let mut target = data.clone();
-  
+
   // iterate our model in Verbose mode (printing loss)
   let (loss, prediction) = model.fit(&mut data, &mut target, batch_size, true, true);
 

@@ -28,4 +28,3 @@ impl Error for HALError {
     }
   }
 }
-  

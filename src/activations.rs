@@ -61,5 +61,5 @@ pub fn get_activation_derivative(name: &str, x: &Array) -> Result<Array, HALErro
     "tanh"    => Ok(tanh_derivative(x)),
     "ones"    => Ok(ones(x)),
     _         => Err(HALError::UNKNOWN),
-  }  
+  }
 }

@@ -58,19 +58,38 @@ impl LSTM {
 }
 
 impl RTRL for LSTM {
-  pub fn rtrl(&mut self, error: &Array, d_tm1: &Array, z_t: &Array){
-    // chunk out our blocks
-    assert!(block_size as f32 % 5.0f32 == 0); // there are 5 data pieces we need
-    let chunk_size = block_size / 5;
-    let i_f_o_t = activations::get_activation(self.inner_activation,
-                                              , &af::rows(z_t, 0, 3*chunk_size).unwrap).unwrap();
+  /* Error: cell error (stored on a per cell basis, so it becomes a matrix here)
+     Derivative[d_tm1] format:
+      - [dC/dWi; dC/dUi; dC/dbi; dC/dWf; dC/dUf; dC/dbf; dC/dWct; dC/dUct; dC/dbt;] */
+  pub fn rtrl(&mut self, error: &Array, d_tm1: &Vec<Array>, z_t: &Array, inputs: &Input){
+    // chunk out i,f,o,ct,c_tm1
+    let activation_block_size = z_t.dims().unwrap()[0];
+    assert!(activation_block_size as f32 % 5.0f32 == 0); // there are 5 data pieces we need
+    let activation_chunk_size = block_size / 5;
+    let ifo_t = activations::get_activation(self.inner_activation,
+                                              , &af::rows(z_t, 0, 3*activation_chunk_size).unwrap).unwrap();
     let ct_t = activations::get_activation(self.outer_activation,
-                                           , &af::rows(z_t, 3*chunk_size, 4*chunk_size).unwrap).unwrap();
-    let c_tm1 = af::rows(z_t, 4*chunk_size, 5*chunk_size).unwrap();
+                                           , &af::rows(z_t, 3*activation_chunk_size, 4*activation_chunk_size).unwrap).unwrap();
+    let c_tm1 = af::rows(z_t, 4*activation_chunk_size, 5*activation_chunk_size).unwrap();
 
-    // calculate dc_t/dTheta * f_t as it is needed for everything
-    let d_all = af::mul(d_tm1, af::rows(i_f_o_t, chunk_size, 2*chunk_size).unwrap()).unwrap();
+    // calculate dC_{t-1}/dTheta * f_t as it is needed for everything
+    let mut dct_lhs = Vec::with_capacity(9); // there are 9 derivatives
+    for i in 0..9 {
+      dct_lhs.push(af::mul(&d_tm1[i], af::rows(ifo_t
+                                               , activation_chunk_size // begin of f_t
+                                               , 2*activation_chunk_size).unwrap()).unwrap());
+    }
 
+    // cell calculations
+    // dCt/dWct = (dC_{t-1}/dWct * f_t) + inner_activation(Ct) * x_t * i_t
+    // dCt/dUct = (dC_{t-1}/dUct * f_t) + inner_activation(Ct) * x_t * h_{t-1}
+    // dCt/dbct = (dC_{t-1}/dcct * f_t) + inner_activation(Ct)
+    let dct_lhs = af::mul(&d_tm1[0], &af::rows(ifo_t, chunk_size, 2*chunk_size).unwrap()).unwrap();
+    let dct_rhs = af::mul(&activations::get_activation(self.outer_activation, &ct_t).unwrap()
+                           , &af::rows(&ifo_t, 0, chunk_size).unwrap()).unwrap();
+    let dc_dwct = af::add(&dct_lhs, &af::mul(&dct_rhs, inputs.data[DataIndex::Input]).unwrap).unwrap();
+    let dc_duct = af::add(&dct_lhs, &af::mul(&dct_rhs, inputs.data[DataIndex::Recurrence]).unwrap).unwrap();
+    let dc_dbct = af::add(&dct_lhs, &dct_rhs);
   }
 }
 
@@ -88,15 +107,15 @@ impl Layer for LSTM {
     let block_size = inputs.data[DataIndex::Recurrence].dims().unwrap()[0];
     assert!(block_size as f32 % 5.0f32 == 0); // there are 5 data pieces we need
     let chunk_size = block_size / 5;
-    let i_f_o_tm1 = activations::get_activation(inputs.activation[ActivationIndex::Inner]
+    let ifo_tm1 = activations::get_activation(inputs.activation[ActivationIndex::Inner]
                                                 , &af::rows(&inputs.data[DataIndex::Recurrence], 0, 3 * chunk_size).unwrap).unwrap();
     let ct_tm1 = activations::get_activation(inputs.activation[ActivationIndex::Outer]
                                              , &af::rows(&inputs.data[DataIndex::Recurrence], 3 * chunk_size, 4 * chunk_size).unwrap).unwrap();
     let c_tm2 = af::rows(&inputs.data[DataIndex::Recurrence], 4 * chunk_size, 5 * chunk_size).unwrap();
 
     // calculate c_tm1 & h_tm1
-    let c_tm1 = af::add(&af::mul(&af::rows(&i_f_o_tm1, 0, chunk_size).unwrap(), &ct_tm1, false).unwrap()
-                        , &af::mul(&af::rows(&i_f_o_tm1, chunk_size, 2 * chunk_size).unwrap(), &c_tm2, false).unwrap()
+    let c_tm1 = af::add(&af::mul(&af::rows(&ifo_tm1, 0, chunk_size).unwrap(), &ct_tm1, false).unwrap()
+                        , &af::mul(&af::rows(&ifo_tm1, chunk_size, 2 * chunk_size).unwrap(), &c_tm2, false).unwrap()
                         , false).unwrap();
     let h_tm1 = af::mul(&o_tm1, activations::get_activation(inputs.activation[ActivationIndex::Outer]
                                                             , &c_tm1), false).unwrap();
@@ -114,7 +133,7 @@ impl Layer for LSTM {
                               , &self.bias[LSTMIndex::Forget]
                               , &self.bias[LSTMIndex::Output]
                               , &self.bias[LSTMIndex::CellTilda]];
-    // [i_f_o_ct] = W*x + U*h_tm1 + b
+    // [ifo_ct] = W*x + U*h_tm1 + b
     let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), &activated_input).unwrap()
                                , &af::matmul(&af::join_many(0, recurrents_ref).unwrap(), &h_tm1).unwrap(), false).unwrap()
                       , &af::join_many(0, bias_ref).unwrap(), true).unwrap();
@@ -123,7 +142,7 @@ impl Layer for LSTM {
       Input { data: af::join_many(0, vec![&z_t, &c_tm1]).unwrap()
               , activation: vec![self.inner_activation, self.outer_activation] }
     }else { //TODO: Fix this
-      Input { data: af::join_many(0, vec![&i_f_o_tm1, &ct_tm1, &c_tm1]).unwrap()
+      Input { data: af::join_many(0, vec![&ifo_tm1, &ct_tm1, &c_tm1]).unwrap()
               , activation: vec![self.inner_activation, self.outer_activation] }
    }
   }
