@@ -26,7 +26,7 @@ pub enum DataIndex {
 
 pub struct LSTM {
   weights: Vec<Array>,
-  recurrent_weights: Vec<Array>
+  recurrent_weights: Vec<Array>,
   bias: Vec<Array>,
   inner_activation: &'static str,
   outer_activation: &'static str,
@@ -45,51 +45,94 @@ impl LSTM {
              , forget_bias_init: &'static str
              , return_sequences: bool) -> LSTM
   {
-    weights: vec![initializations::get_initialization(w_init, Dim4::new(&[output_size, input_size, 1, 1])).unwrap()],
-    recurrent_weights: vec![initializations::get_initialization(w_inner_init, Dim4::new(&[output_size, output_size, 1, 1])).unwrap(); 4],
-    bias: vec![initializations::get_initialization(b_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()
-               , initializations::get_initialization(bias_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()
-               , initializations::get_initialization(bias_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()
-               , initializations::get_initialization(forget_bias_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()],
-    inner_activation: inner_activation,
-    outer_activation: outer_activation,
-    return_sequences: return_sequences,
+    LSTM{
+      weights: vec![initializations::get_initialization(w_init, Dim4::new(&[output_size, input_size, 1, 1])).unwrap()],
+      recurrent_weights: vec![initializations::get_initialization(w_inner_init, Dim4::new(&[output_size, output_size, 1, 1])).unwrap(); 4],
+      bias: vec![initializations::get_initialization(b_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()
+                 , initializations::get_initialization(bias_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()
+                 , initializations::get_initialization(bias_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()
+                 , initializations::get_initialization(forget_bias_init, Dim4::new(&[output_size, 1, 1, 1])).unwrap()],
+      inner_activation: inner_activation,
+      outer_activation: outer_activation,
+      return_sequences: return_sequences,
+    }
   }
 }
 
 impl RTRL for LSTM {
-  /* Error: cell error (stored on a per cell basis, so it becomes a matrix here)
-     Derivative[d_tm1] format:
-      - [dC/dWi; dC/dUi; dC/dbi; dC/dWf; dC/dUf; dC/dbf; dC/dWct; dC/dUct; dC/dbt;] */
-  pub fn rtrl(&mut self, error: &Array, d_tm1: &Vec<Array>, z_t: &Array, inputs: &Input){
-    // chunk out i,f,o,ct,c_tm1
-    let activation_block_size = z_t.dims().unwrap()[0];
-    assert!(activation_block_size as f32 % 5.0f32 == 0); // there are 5 data pieces we need
-    let activation_chunk_size = block_size / 5;
-    let ifo_t = activations::get_activation(self.inner_activation,
-                                              , &af::rows(z_t, 0, 3*activation_chunk_size).unwrap).unwrap();
+  pub fn rtrl(&self, dW_tm1: &mut Array  // previous W derivatives for [I, F, Ct]
+              , dU_tm1: &mut Array       // previous U derivatives for [I, F, Ct]
+              , db_tm1: &mut Array       // previous b derivatives for [I, F, Ct]
+              , z_t: &Array              // current time activation
+              , inputs: &Input)          // x_t & h_{t-1}
+  {
+    let block_size = z_t.dims().unwrap()[0];
+    assert!(block_size as f32 % 5.0f32 == 0); // there are 5 data pieces we need
+    let chunk_size = block_size / 5;
+    // chunk out i, f, ct, c_tm1
+    let if_t = activations::get_activation(self.inner_activation,
+                                            , &af::rows(z_t, 0, 2*chunk_size).unwrap).unwrap();
     let ct_t = activations::get_activation(self.outer_activation,
-                                           , &af::rows(z_t, 3*activation_chunk_size, 4*activation_chunk_size).unwrap).unwrap();
-    let c_tm1 = af::rows(z_t, 4*activation_chunk_size, 5*activation_chunk_size).unwrap();
+                                           , &af::rows(z_t, 3*chunk_size, 4*chunk_size).unwrap).unwrap();
+    let c_tm1 = af::rows(z_t, 4*chunk_size, 5*chunk_size).unwrap();
 
-    // calculate dC_{t-1}/dTheta * f_t as it is needed for everything
-    let mut dct_lhs = Vec::with_capacity(9); // there are 9 derivatives
-    for i in 0..9 {
-      dct_lhs.push(af::mul(&d_tm1[i], af::rows(ifo_t
-                                               , activation_chunk_size // begin of f_t
-                                               , 2*activation_chunk_size).unwrap()).unwrap());
-    }
+    // diff(z_i), diff(z_f), diff(z_ct)
+    let dz = vec![&activations::get_activation_derivative(self.inner_activation, &af::rows(z_t, 0, chunk_size).unwrap()).unwrap() //d(z)
+                  , &activations::get_activation_derivative(self.inner_activation, &af::rows(z_t, chunk_size, 2*chunk_size).unwrap()).unwrap()
+                  , &activations::get_activation_derivative(self.outer_activation, &af::rows(z_t, 3*chunk_size, 4*chunk_size).unwrap()).unwrap()];
+    let ct_ctm1_i = vec![&ct_t, &c_tm1, &af::rows(if_t, 0, chunk_size).unwrap()];
 
-    // cell calculations
-    // dCt/dWct = (dC_{t-1}/dWct * f_t) + inner_activation(Ct) * x_t * i_t
-    // dCt/dUct = (dC_{t-1}/dUct * f_t) + inner_activation(Ct) * x_t * h_{t-1}
-    // dCt/dbct = (dC_{t-1}/dcct * f_t) + inner_activation(Ct)
-    let dct_lhs = af::mul(&d_tm1[0], &af::rows(ifo_t, chunk_size, 2*chunk_size).unwrap()).unwrap();
-    let dct_rhs = af::mul(&activations::get_activation(self.outer_activation, &ct_t).unwrap()
-                           , &af::rows(&ifo_t, 0, chunk_size).unwrap()).unwrap();
-    let dc_dwct = af::add(&dct_lhs, &af::mul(&dct_rhs, inputs.data[DataIndex::Input]).unwrap).unwrap();
-    let dc_duct = af::add(&dct_lhs, &af::mul(&dct_rhs, inputs.data[DataIndex::Recurrence]).unwrap).unwrap();
-    let dc_dbct = af::add(&dct_lhs, &dct_rhs);
+    // [Ct_t; C_{t-1}; i_t] * dz
+    let dzprod = af::mul(&af::join_many(0, ct_ctm1_i).unwrap()
+                         , af::join_many(0, dzvec).unwrap(), false).unwrap();
+
+    // dC_t/dWi  = (dC_{t-1}/dWi  * f_t) + ct_t  * inner_activation(z_i) * x_t
+    // dC_t/dWf  = (dC_{t-1}/dWf  * f_t) + c_tm1 * inner_activation(z_f) * x_t
+    // dC_t/dWct = (dC_{t-1}/dWct * f_t) + i_t   * outer_activation(Ct)  * x_t
+    let w_lhs = af::mul(dW_tm1, &af::rows(if_t, chunk_size, 2*chunk_size).unwrap(), true).unwrap(); // dC_{t-1}/dW * f_t
+    let w_rhs = af::mul(&dzprod, &inputs.data[DataIndex::Input]);
+    dW_tm1 = af::add(&w_lhs, &w_rhs).unwrap();
+
+    let u_lhs = af::mul(dU_tm1, &af::rows(if_t, chunk_size, 2*chunk_size).unwrap(), true).unwrap(); // dC_{t-1}/dU * f_t
+    let u_rhs = af::mul(&dzprod, &inputs.data[DataIndex::Recurrence]);
+    dU_tm1 = af::add(&u_lhs, &u_rhs).unwrap();
+
+    let b_lhs = af::mul(db_tm1, &af::rows(if_t, chunk_size, 2*chunk_size).unwrap(), true).unwrap(); // dC_{t-1}/db * f_t
+    dW_tm1 = af::add(&b_lhs, &dzprod).unwrap();
+
+    // //TODO: Optimize this to be all [W together, all U together, all b together]
+
+    // // input gate calculations
+    // // dC_t/dWi = (dC_{t-1}/dWi * f_t) + ct_t * inner_activation(z_i) * x_t
+    // // dC_t/dUi = (dC_{t-1}/dUi * f_t) + ct_t * inner_activation(z_i) * h_{t-1}
+    // // dC_t/dbi = (dC_{t-1}/dbi * f_t) + ct_t * inner_activation(z_i)
+    // let di_rhs = af::mul(&activations::get_activation(self.inner_activation, &ct_t).unwrap()
+    //                      , &af::rows(&ifo_t, 0, chunk_size).unwrap()).unwrap();
+    // d_tm1[0] = af::add(&dc_lhs[0], &af::mul(&di_rhs, inputs.data[DataIndex::Input]).unwrap).unwrap();
+    // d_tm1[1] = af::add(&dc_lhs[1], &af::mul(&di_rhs, inputs.data[DataIndex::Recurrence]).unwrap).unwrap();
+    // d_tm1[2] = af::add(&dc_lhs[2], &di_rhs);
+
+    // // forget gate calculations
+    // // dC_t/dWf = (dC_{t-1}/dWf * f_t) + c_tm1 * inner_activation(z_f) * x_t
+    // // dC_t/dUf = (dC_{t-1}/dUf * f_t) + c_tm1 * inner_activation(z_f) * h_{t-1}
+    // // dC_t/dbf = (dC_{t-1}/dbf * f_t) + c_tm1 * inner_activation(z_f)
+    // let df_rhs = af::mul(&activations::get_activation(self.inner_activation, &ct_t).unwrap()
+    //                      , &af::rows(&ifo_t, chunk_size, 2*chunk_size).unwrap()).unwrap();
+    // let df_dWi = af::add(&dc_lhs[0], &af::mul(&di_rhs, inputs.data[DataIndex::Input]).unwrap).unwrap();
+    // let df_dUi = af::add(&dc_lhs[1], &af::mul(&di_rhs, inputs.data[DataIndex::Recurrence]).unwrap).unwrap();
+    // let df_dbi = af::add(&dc_lhs[2], &di_rhs);
+
+
+    // // cell calculations
+    // // dC_t/dWct = (dC_{t-1}/dWct * f_t) + outer_activation(Ct) * x_t * i_t
+    // // dC_t/dUct = (dC_{t-1}/dUct * f_t) + outer_activation(Ct) * x_t * h_{t-1}
+    // // dC_t/dbct = (dC_{t-1}/dbct * f_t) + outer_activation(Ct)
+    // let dct_lhs = af::mul(&d_tm1[0], &af::rows(ifo_t, chunk_size, 2*chunk_size).unwrap()).unwrap();
+    // let dct_rhs = af::mul(&activations::get_activation(self.outer_activation, &ct_t).unwrap()
+    //                       , &af::rows(&ifo_t, 0, chunk_size).unwrap()).unwrap();
+    // let dc_dwct = af::add(&dct_lhs, &af::mul(&dct_rhs, inputs.data[DataIndex::Input]).unwrap).unwrap();
+    // let dc_duct = af::add(&dct_lhs, &af::mul(&dct_rhs, inputs.data[DataIndex::Recurrence]).unwrap).unwrap();
+    // let dc_dbct = af::add(&dct_lhs, &dct_rhs);
   }
 }
 
@@ -108,7 +151,7 @@ impl Layer for LSTM {
     assert!(block_size as f32 % 5.0f32 == 0); // there are 5 data pieces we need
     let chunk_size = block_size / 5;
     let ifo_tm1 = activations::get_activation(inputs.activation[ActivationIndex::Inner]
-                                                , &af::rows(&inputs.data[DataIndex::Recurrence], 0, 3 * chunk_size).unwrap).unwrap();
+                                              , &af::rows(&inputs.data[DataIndex::Recurrence], 0, 3 * chunk_size).unwrap).unwrap();
     let ct_tm1 = activations::get_activation(inputs.activation[ActivationIndex::Outer]
                                              , &af::rows(&inputs.data[DataIndex::Recurrence], 3 * chunk_size, 4 * chunk_size).unwrap).unwrap();
     let c_tm2 = af::rows(&inputs.data[DataIndex::Recurrence], 4 * chunk_size, 5 * chunk_size).unwrap();
@@ -138,27 +181,27 @@ impl Layer for LSTM {
                                , &af::matmul(&af::join_many(0, recurrents_ref).unwrap(), &h_tm1).unwrap(), false).unwrap()
                       , &af::join_many(0, bias_ref).unwrap(), true).unwrap();
     rtrl(&d_tm1, &z_t, )
-    if self.return_sequences {
-      Input { data: af::join_many(0, vec![&z_t, &c_tm1]).unwrap()
-              , activation: vec![self.inner_activation, self.outer_activation] }
-    }else { //TODO: Fix this
-      Input { data: af::join_many(0, vec![&ifo_tm1, &ct_tm1, &c_tm1]).unwrap()
-              , activation: vec![self.inner_activation, self.outer_activation] }
-   }
+      if self.return_sequences {
+        Input { data: af::join_many(0, vec![&z_t, &c_tm1]).unwrap()
+                , activation: vec![self.inner_activation, self.outer_activation] }
+      }else { //TODO: Fix this
+        Input { data: af::join_many(0, vec![&ifo_tm1, &ct_tm1, &c_tm1]).unwrap()
+                , activation: vec![self.inner_activation, self.outer_activation] }
+      }
   }
 
   fn backward(&mut self, delta: &Array) -> Array {
-    self.delta = delta.clone();
+  self.delta = delta.clone();
 
-    let activation_prev = activations::get_activation(self.inputs.activation[0], &self.inputs.data[DataIndex::Input]).unwrap();
-    let d_activation_prev = activations::get_activation_derivative(self.inputs.activation[0], &activation_prev).unwrap();
-    let delta_prev = af::mul(&af::matmul(&self.weights[0], delta, af::MatProp::TRANS, af::MatProp::NONE).unwrap()
-                             , &d_activation_prev, false).unwrap();
-    delta_prev
-  }
+  let activation_prev = activations::get_activation(self.inputs.activation[0], &self.inputs.data[DataIndex::Input]).unwrap();
+  let d_activation_prev = activations::get_activation_derivative(self.inputs.activation[0], &activation_prev).unwrap();
+  let delta_prev = af::mul(&af::matmul(&self.weights[0], delta, af::MatProp::TRANS, af::MatProp::NONE).unwrap()
+                           , &d_activation_prev, false).unwrap();
+  delta_prev
+}
 
-  fn get_delta(&self) -> Array {
-    self.delta.clone()
+fn get_delta(&self) -> Array {
+self.delta.clone()
   }
 
   fn get_weights(&self) -> Vec<Array> {

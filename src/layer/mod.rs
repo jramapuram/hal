@@ -37,5 +37,9 @@ pub trait RecurrentLayer: Layer {
 }
 
 pub trait RTRL{
-fn rtrl()
+  fn rtrl(&self, dW_tm1: &mut Array  // previous W derivatives for [I, F, Ct]
+              , dU_tm1: &mut Array   // previous U derivatives for [I, F, Ct]
+              , db_tm1: &mut Array   // previous b derivatives for [I, F, Ct]
+              , z_t: &Array          // current time activation
+              , inputs: &Input);     // x_t & h_{t-1}
 }
