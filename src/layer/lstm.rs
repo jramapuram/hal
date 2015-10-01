@@ -93,46 +93,18 @@ impl RTRL for LSTM {
     let w_rhs = af::mul(&dzprod, &inputs.data[DataIndex::Input]);
     dW_tm1 = af::add(&w_lhs, &w_rhs).unwrap();
 
+    // dC_t/dUi = (dC_{t-1}/dUi * f_t) + ct_t * inner_activation(z_i) * h_{t-1}
+    // dC_t/dUf = (dC_{t-1}/dUf * f_t) + c_tm1 * inner_activation(z_f) * h_{t-1}
+    // dC_t/dUct = (dC_{t-1}/dUct * f_t) + outer_activation(Ct) * x_t * h_{t-1}
     let u_lhs = af::mul(dU_tm1, &af::rows(if_t, chunk_size, 2*chunk_size).unwrap(), true).unwrap(); // dC_{t-1}/dU * f_t
     let u_rhs = af::mul(&dzprod, &inputs.data[DataIndex::Recurrence]);
     dU_tm1 = af::add(&u_lhs, &u_rhs).unwrap();
 
+    // dC_t/dbi = (dC_{t-1}/dbi * f_t) + ct_t * inner_activation(z_i)
+    // dC_t/dbf = (dC_{t-1}/dbf * f_t) + c_tm1 * inner_activation(z_f)
+    // dC_t/dbct = (dC_{t-1}/dbct * f_t) + outer_activation(Ct)
     let b_lhs = af::mul(db_tm1, &af::rows(if_t, chunk_size, 2*chunk_size).unwrap(), true).unwrap(); // dC_{t-1}/db * f_t
     dW_tm1 = af::add(&b_lhs, &dzprod).unwrap();
-
-    // //TODO: Optimize this to be all [W together, all U together, all b together]
-
-    // // input gate calculations
-    // // dC_t/dWi = (dC_{t-1}/dWi * f_t) + ct_t * inner_activation(z_i) * x_t
-    // // dC_t/dUi = (dC_{t-1}/dUi * f_t) + ct_t * inner_activation(z_i) * h_{t-1}
-    // // dC_t/dbi = (dC_{t-1}/dbi * f_t) + ct_t * inner_activation(z_i)
-    // let di_rhs = af::mul(&activations::get_activation(self.inner_activation, &ct_t).unwrap()
-    //                      , &af::rows(&ifo_t, 0, chunk_size).unwrap()).unwrap();
-    // d_tm1[0] = af::add(&dc_lhs[0], &af::mul(&di_rhs, inputs.data[DataIndex::Input]).unwrap).unwrap();
-    // d_tm1[1] = af::add(&dc_lhs[1], &af::mul(&di_rhs, inputs.data[DataIndex::Recurrence]).unwrap).unwrap();
-    // d_tm1[2] = af::add(&dc_lhs[2], &di_rhs);
-
-    // // forget gate calculations
-    // // dC_t/dWf = (dC_{t-1}/dWf * f_t) + c_tm1 * inner_activation(z_f) * x_t
-    // // dC_t/dUf = (dC_{t-1}/dUf * f_t) + c_tm1 * inner_activation(z_f) * h_{t-1}
-    // // dC_t/dbf = (dC_{t-1}/dbf * f_t) + c_tm1 * inner_activation(z_f)
-    // let df_rhs = af::mul(&activations::get_activation(self.inner_activation, &ct_t).unwrap()
-    //                      , &af::rows(&ifo_t, chunk_size, 2*chunk_size).unwrap()).unwrap();
-    // let df_dWi = af::add(&dc_lhs[0], &af::mul(&di_rhs, inputs.data[DataIndex::Input]).unwrap).unwrap();
-    // let df_dUi = af::add(&dc_lhs[1], &af::mul(&di_rhs, inputs.data[DataIndex::Recurrence]).unwrap).unwrap();
-    // let df_dbi = af::add(&dc_lhs[2], &di_rhs);
-
-
-    // // cell calculations
-    // // dC_t/dWct = (dC_{t-1}/dWct * f_t) + outer_activation(Ct) * x_t * i_t
-    // // dC_t/dUct = (dC_{t-1}/dUct * f_t) + outer_activation(Ct) * x_t * h_{t-1}
-    // // dC_t/dbct = (dC_{t-1}/dbct * f_t) + outer_activation(Ct)
-    // let dct_lhs = af::mul(&d_tm1[0], &af::rows(ifo_t, chunk_size, 2*chunk_size).unwrap()).unwrap();
-    // let dct_rhs = af::mul(&activations::get_activation(self.outer_activation, &ct_t).unwrap()
-    //                       , &af::rows(&ifo_t, 0, chunk_size).unwrap()).unwrap();
-    // let dc_dwct = af::add(&dct_lhs, &af::mul(&dct_rhs, inputs.data[DataIndex::Input]).unwrap).unwrap();
-    // let dc_duct = af::add(&dct_lhs, &af::mul(&dct_rhs, inputs.data[DataIndex::Recurrence]).unwrap).unwrap();
-    // let dc_dbct = af::add(&dct_lhs, &dct_rhs);
   }
 }
 
