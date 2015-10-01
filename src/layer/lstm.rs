@@ -152,14 +152,15 @@ impl Layer for LSTM {
     let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), &activated_input).unwrap()
                                , &af::matmul(&af::join_many(0, recurrents_ref).unwrap(), &h_tm1).unwrap(), false).unwrap()
                       , &af::join_many(0, bias_ref).unwrap(), true).unwrap();
-    rtrl(&d_tm1, &z_t, )
-      if self.return_sequences {
-        Input { data: af::join_many(0, vec![&z_t, &c_tm1]).unwrap()
-                , activation: vec![self.inner_activation, self.outer_activation] }
-      }else { //TODO: Fix this
-        Input { data: af::join_many(0, vec![&ifo_tm1, &ct_tm1, &c_tm1]).unwrap()
-                , activation: vec![self.inner_activation, self.outer_activation] }
-      }
+    self.rtrl(&self.dW, &self.dU, &self.db, &z_t, inputs);
+    // since we are RTRL'ing I, F, Ct w.r.t. C we just need to shoot out O
+    if self.return_sequences {
+      Input { data: af::join_many(0, vec![&z_t, &c_tm1]).unwrap()
+              , activation: vec![self.inner_activation, self.outer_activation] }
+    }else { //TODO: Fix this
+      Input { data: af::join_many(0, vec![&ifo_tm1, &ct_tm1, &c_tm1]).unwrap()
+              , activation: vec![self.inner_activation, self.outer_activation] }
+    }
   }
 
   fn backward(&mut self, delta: &Array) -> Array {
