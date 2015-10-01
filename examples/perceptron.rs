@@ -2,8 +2,8 @@ extern crate hal;
 extern crate nalgebra as na;
 
 use hal::utils;
+use hal::Model;
 use na::{DMat, ColSlice, Shape};
-use hal::{Model, Layer};
 use hal::optimizer::{Optimizer, SGD};
 use hal::error::HALError;
 use hal::model::{Sequential};
@@ -36,7 +36,7 @@ fn main() {
   let hidden_dims = 32;
   let output_dims = 64;
   let num_train_samples = 65536;
-  let batch_size = 16;
+  let batch_size = 32;
   let optimizer_type = "SGD";
 
   // Now, let's build a model with an optimizer and a loss function
@@ -60,8 +60,8 @@ fn main() {
   let (loss, prediction) = model.fit(&mut data, &mut target, batch_size, true, true);
 
   // plot our loss
-  plot_vec(loss, "Loss vs. Iterations", 512, 512);
   println!("pred shape: {:?}", prediction.shape());
+  plot_vec(loss, "Loss vs. Iterations", 512, 512);
   let pred_rows = prediction.nrows();
   plot_dvec(&prediction.col_slice(0, 0, pred_rows - 1), "Final Prediction Rows", 512, 512);
 

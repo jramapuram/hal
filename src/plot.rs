@@ -10,14 +10,11 @@ pub fn plot_array(values: &Array, title: &'static str, window_x: u16, window_y: 
 
   // create a window
   let title_str = String::from(title);
-  let wnd = match af::Window::new(window_x as i32, window_y as i32, title_str.clone()) {
+  let wnd = match af::Window::new(window_x as i32, window_y as i32, title_str) {
     Ok(v)  => v,
     Err(e) => panic!("Window creation failed: {}", e), //XXX: handle better
   };
 
-  //af::print(&af::min(&values, 0).unwrap());
-  //af::print(&af::max(&values, 0).unwrap());
-  
   // display till closed
   loop {
     wnd.draw_plot(&af::range(values.dims().unwrap().clone()
