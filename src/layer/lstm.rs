@@ -164,17 +164,17 @@ impl Layer for LSTM {
   }
 
   fn backward(&mut self, delta: &Array) -> Array {
-  self.delta = delta.clone();
+    self.delta = delta.clone();
 
-  let activation_prev = activations::get_activation(self.inputs.activation[0], &self.inputs.data[DataIndex::Input]).unwrap();
-  let d_activation_prev = activations::get_activation_derivative(self.inputs.activation[0], &activation_prev).unwrap();
-  let delta_prev = af::mul(&af::matmul(&self.weights[0], delta, af::MatProp::TRANS, af::MatProp::NONE).unwrap()
-                           , &d_activation_prev, false).unwrap();
-  delta_prev
-}
+    let activation_prev = activations::get_activation(self.inputs.activation[0], &self.inputs.data[DataIndex::Input]).unwrap();
+    let d_activation_prev = activations::get_activation_derivative(self.inputs.activation[0], &activation_prev).unwrap();
+    let delta_prev = af::mul(&af::matmul(&self.weights[0], delta, af::MatProp::TRANS, af::MatProp::NONE).unwrap()
+                             , &d_activation_prev, false).unwrap();
+    delta_prev
+  }
 
-fn get_delta(&self) -> Array {
-self.delta.clone()
+  fn get_delta(&self) -> Array {
+    self.delta.clone()
   }
 
   fn get_weights(&self) -> Vec<Array> {
