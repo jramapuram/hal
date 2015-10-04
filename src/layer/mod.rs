@@ -7,13 +7,6 @@ mod dense;
 use af::Dim4;
 use af::Array;
 
-#[derive(Clone)]
-pub struct
-  Input {
-  pub data: Vec<Array>,
-  pub activation: Vec<&'static str>,
-}
-
 pub trait Layer {
   fn forward(&mut self, input: &Input) -> Input;
   fn backward(&mut self, delta: &Array) -> Array;

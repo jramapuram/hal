@@ -16,6 +16,7 @@ pub mod model;
 pub use optimizer::{Optimizer};
 pub mod optimizer;
 
+pub mod params;
 pub mod error;
 pub mod loss;
 pub mod activations;
