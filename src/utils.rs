@@ -14,6 +14,16 @@ use rustc_serialize::Encodable;
 
 //use error::HALError;
 
+// allows for let a = hashmap!['key1' => value1, ...];
+// http://stackoverflow.com/questions/28392008/more-concise-hashmap-initialization
+macro_rules! hashmap {
+    ($( $key: expr => $val: expr ),*) => {{
+         let mut map = ::std::collections::HashMap::new();
+         $( map.insert($key, $val); )*
+         map
+    }}
+}
+
 // Convert a vector of elements to a vector of Array
 pub fn vec_to_array<T>(vec_values: Vec<T>, rows: usize, cols: usize) -> Array {
   raw_to_array(vec_values.as_ref(), rows, cols)

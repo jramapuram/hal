@@ -32,6 +32,10 @@ pub fn ones(dims: Dim4) -> Array {
   af::constant(1.0 as f32, dims).unwrap()
 }
 
+pub fn empty() -> Array {
+  zeros(Dim4::new(&[0, 0, 0, 0]))
+}
+
 pub fn glorot_uniform(dims: Dim4) -> Array {
   let (fan_in, fan_out) = get_fans(dims);
   let s = (6.0f32 / (fan_in + fan_out)).sqrt();

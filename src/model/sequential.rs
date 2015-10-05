@@ -3,20 +3,21 @@ use af::{Array, Dim4};
 use na::{DMat, Shape, Transpose};
 use std::cmp::max;
 use std::default::Default;
+use std::collections::HashMap;
 use itertools::Zip;
 
 use utils;
 use loss;
 use activations;
 use initializations;
-use layer::{Layer, Input};
+use layer::{Layer, Dense};
 use model::Model;
 use optimizer::{Optimizer, SGD};
-use params::{ParamManager, DenseGenerator, LSTMGenerator};
+use params::{ParamManager, DenseGenerator, LSTMGenerator, Input};
 
 pub struct Sequential {
   layers: Vec<Box<Layer>>,
-  param_manager: &ParamManager,
+  param_manager: ParamManager,
   optimizer: Box<Optimizer>,
   loss: &'static str,
   device: i32,
@@ -26,7 +27,7 @@ impl Default for Sequential {
   fn default() -> Sequential {
     Sequential {
       layers: Vec::new(),
-      param_manager: &ParamManager::default(),
+      param_manager: ParamManager::default(),
       optimizer: Box::new(SGD::default()),
       loss: "mse",
       device: 0,
@@ -35,20 +36,45 @@ impl Default for Sequential {
 }
 
 impl Model for Sequential {
-  fn new(param_manager: &ParamManager
-         , optimizer: Box<Optimizer>
+  fn new(optimizer: Box<Optimizer>
          , loss: &'static str) -> Sequential {
     Sequential {
       layers: Vec::new(),
-      param_manager: param_manager,
+      param_manager: ParamManager::default(),
       loss: loss,
       optimizer: optimizer,
       device: -1,
     }
   }
 
-  fn add(&mut self, layer: Box<Layer>) {
-    self.layers.push(layer);
+  fn add(&mut self, layer: &'static str
+         , params: &HashMap<&'static str, &'static str>)
+  {
+    //TODO: Error handling for hashmap
+    let input_size = params.get("input_size").unwrap().parse::<u64>().unwrap() as usize;
+    let output_size = params.get("output_size").unwrap().parse::<u64>().unwrap() as usize;
+    match layer {
+      "dense" => {
+        self.param_manager.add_dense(input_size, output_size
+                                     , params.get("activation").unwrap()
+                                     , params.get("w_init").unwrap()
+                                     , params.get("b_init").unwrap());
+        self.layers.push(Box::new(Dense{input_size: input_size
+                                        , output_size: output_size}));
+      },
+      // "lstm"  => {
+      //   self.param_manager.add_lstm(input_size, output_size
+      //                               , params.get("input_activation").unwrap()
+      //                               , params.get("outer_activation").unwrap()
+      //                               , params.get("w_init").unwrap()
+      //                               , params.get("w_recurrent_init").unwrap()
+      //                               , params.get("forget_b_init").unwrap(),
+      //                               , params.get("b_init").unwrap());
+      //   self.layers.push(Box::new(LSTM{input_size: input_size
+      //                                   , output_size: output_size}));
+      // },
+      _  => panic!("Error unknown layer type"),
+    }
   }
 
   //TODO: convert to log crate [or hashmap]
@@ -72,31 +98,31 @@ impl Model for Sequential {
   }
 
   fn forward(&mut self, activation: &Array) -> Array {
-    let bptt_unroll = max(activation.dims[2], 1); // we will need to unwind at least once for non RNNs
-    let mut activate = Input {data: vec![activation.clone()], activation: vec!["ones"]};
-    // let mut activate = match bptt_unroll {
-    //   1 => Input {data: vec![activation.clone()], activation: vec!["ones"]},
-    //   _ => Input {data: vec![activation.clone()], activation: vec!["ones", "ones"]},
-    // };
+    // if dim[3] > 1 we assume we have an RNN
+    // we will need to unwind at least once for non RNNs
+    let bptt_unroll = max(activation.dims().unwrap()[2], 1);
+    let mut activate = Input {data: af::slice(activation, 0).unwrap(), activation: "ones"};
+    let mut recurrences: Vec<Input> = vec![Input {data: initializations::empty(), activation: "ones"}
+                                           ; self.layers.len()];
 
-    let mut recurrences = Vec::new();
     for t in 0..bptt_unroll {
-      activate.data[0] = af::slice(activation.data[0], t).unwrap();
+      activate.data = af::slice(activation, t).unwrap();
       for i in 0..self.layers.len() {
-        activate = self.layers[i].forward(&activate); //NOTE: This is non-activated output
-        if activate.data.len() == 2 { // store the recurrences
-          recurrences.push(self.layers[i].forward(&activate));
-        }
+        //NOTE: This is non-activated output
+        let (a, r) = self.layers[i].forward(&mut self.param_manager.get_params(i)
+                                            , &activate
+                                            , &recurrences[i]);
+        activate = a.clone();
+        recurrences[i] = r;
       }
     }
 
-    // TODO: This is ambiguous, is last the correct activation?
-    activations::get_activation(activate.activation.last().unwrap()
-                                , activate.data.last().unwrap()).unwrap()
+    activations::get_activation(activate.activation, &activate.data).unwrap()
   }
 
+
   fn fit(&mut self, input: &mut DMat<f32>, target: &mut DMat<f32>
-         , batch_size: u64, shuffle: bool, verbose: bool) -> (Vec<f32>, DMat<f32>)
+         , batch_size: usize, shuffle: bool, verbose: bool) -> (Vec<f32>, DMat<f32>)
   {
     // some required data validity checks
     let iter = input.nrows() as u64 / batch_size;
@@ -104,13 +130,13 @@ impl Model for Sequential {
              , input.shape(), target.shape(), batch_size, iter);
     assert!(target.nrows() == input.nrows());
     assert!(input.nrows() as u64 >= batch_size
-            && input.nrows() as u64 % batch_size == 0);
+            && input.nrows() as u64 % batch_size == 0); //ease up later
     self.optimizer.setup(&self.layers);
 
     // create the container to hold the forward pass & loss results
     let mut forward_pass = initializations::zeros(Dim4::new(&[1, input.ncols() as u64, 1, 1]));
     let mut lossvec = Vec::<f32>::new();
-    let mut loss: f32;// = 0.0f32;
+    let mut loss: f32;
 
     // randomly shuffle the data
     if shuffle {
@@ -123,10 +149,10 @@ impl Model for Sequential {
     *target = utils::normalize_dmat(target, 3.0f32);
 
     // over every batch
-    let incols = input.ncols();
-    let tncols = target.ncols();
+    let incols = input.ncols() as usize;
+    let tncols = target.ncols() as usize;
     let mut current_iteration = 0;
-    for (i, t) in Zip::new((input.transpose().as_vec().chunks(incols * batch_size as usize)
+    for (i, t) in Zip::new((input.transpose().as_vec().chunks(incols * batch_size)
                             , target.transpose().as_vec().chunks(tncols * batch_size as usize)))
     {
       if verbose {
@@ -163,6 +189,7 @@ impl Model for Sequential {
     let mut delta = loss::loss_delta(prediction
                                      , target
                                      , self.loss
+                                     , self.param_manager.get_params()
                                      , self.layers[last_index].get_activation_type());
     for i in (0..last_index + 1).rev() {
       delta = self.layers[i].backward(&delta);
