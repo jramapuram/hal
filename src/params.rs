@@ -22,7 +22,7 @@ impl Default for Input {
   }
 }
 
-#[derive(Clone)]
+[derive(Clone)]
 pub struct Params {
   layer_type: &'static str,
   weights: Vec<Array>,
@@ -35,6 +35,15 @@ pub struct Params {
 pub struct ParamManager {
   layer_storage: Vec<Params>,
   has_recurrence: bool,
+}
+
+impl Default for ParamManager {
+  fn default() -> ParamManager {
+    ParamManager {
+      layer_storage: Vec::new(),
+      has_recurrence: false,
+    }
+  }
 }
 
 impl ParamManager {
@@ -98,6 +107,37 @@ impl ParamManager {
     self.layer_storage[layer_index].biases[bias_num].clone()
   }
 
+  fn get_bias_dims(&self, layer_index: u64) -> Vec<Dim4> {
+    let mut dims = Vec::new();
+    for b in &self.layer_storage[layer_index].biases {
+      dims.push(b.dims().unwrap().clone())
+    }
+    dims
+  }
+
+  fn get_weight_dims(&self, layer_index: u64) -> Vec<Dim4> {
+    let mut dims = Vec::new();
+    for w in &self.layer_storage[layer_index].weights {
+      dims.push(w.dims().unwrap().clone())
+    }
+    dims
+  }
+
+  // fn output_size(&self) -> u64 {
+  //   let weight_dims = self.get_weight_dims();
+  //   weight_dims[weight_dims.len() - 1][1]
+  // }
+
+  // fn input_size(&self) -> u64 {
+  //   let weight_dims = self.get_weight_dims();
+  //   weight_dims[0][0]
+  // }
+
+  // fn get_activation_type(&self) -> &'static str {
+  //   &self.activation
+  // }
+
+
   fn set_weights(&mut self, layer_index: u64, weights: &Vec<Array>){
     assert!(self.layer_storage.len() - 1 <= layer_index);
     self.layer_storage[layer_index].weights = weights.clone();
@@ -118,6 +158,16 @@ impl ParamManager {
     assert!(self.layer_storage.len() - 1 <= layer_index);
     assert!(self.layer_storage[layer_index].bias.len() - 1 <= bias_num);
     self.layer_storage[layer_index].biases[bias_num] = bias;
+  }
+
+  fn get_delta(&self, layer_index: u64) -> Vec<Array> {
+    assert!(self.layer_storage.len() - 1 <= layer_index);
+    self.layer_storage[layer_index].delta.clone()
+  }
+
+  fn set_delta(&mut self, layer_index: u64, delta: Vec<Array>) {
+    assert!(self.layer_storage.len() - 1 <= layer_index);
+    self.layer_storage[layer_index].delta = delta;
   }
 
   fn tie_weight(&self, layer_input: u64, iweight_index: u64

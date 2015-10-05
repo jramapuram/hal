@@ -14,7 +14,6 @@ pub enum LSTMIndex {
 }
 
 pub enum ActivationIndex {
-  Input,
   Inner,
   Outer,
 }
@@ -110,23 +109,36 @@ impl RTRL for LSTM {
 
 impl Layer for LSTM {
 
-  pub fn forward(&mut self, inputs:& Input) {
+  pub fn forward(&mut self, inputs: &Input) -> Input {
     // keep previous layer's outputs
+    assert!(inputs.data[DataIndex::Input].dims().unwrap()[2] == 1);
     self.inputs = inputs.clone();
 
     // apply the activation to the previous layer [Optimization: Memory saving]
-    let activated_input = activations::get_activation(inputs.activation[ActivationIndex::Inner]
-                                                      , &inputs.data[DataIndex::Input]).unwrap();
+    let activated_input = activations::get_activation(self.inputs.activation[ActivationIndex::Inner]
+                                                      , &self.inputs.data[DataIndex::Input]).unwrap();
 
-    // extract the sub-block of each gate [i_tm1, f_tm1, o_tm1, ct_tm1, c_tm2]
-    let block_size = inputs.data[DataIndex::Recurrence].dims().unwrap()[0];
-    assert!(block_size as f32 % 5.0f32 == 0); // there are 5 data pieces we need
-    let chunk_size = block_size / 5;
-    let ifo_tm1 = activations::get_activation(inputs.activation[ActivationIndex::Inner]
-                                              , &af::rows(&inputs.data[DataIndex::Recurrence], 0, 3 * chunk_size).unwrap).unwrap();
-    let ct_tm1 = activations::get_activation(inputs.activation[ActivationIndex::Outer]
-                                             , &af::rows(&inputs.data[DataIndex::Recurrence], 3 * chunk_size, 4 * chunk_size).unwrap).unwrap();
-    let c_tm2 = af::rows(&inputs.data[DataIndex::Recurrence], 4 * chunk_size, 5 * chunk_size).unwrap();
+    let ifo_tm1; // input, forget, output @ t-1
+    let ct_tm1;  // cell internal @ t-1
+    let c_tm2;   // cell output @ t-1
+    if inputs.data.len() == 2 {
+      // extract the sub-block of each gate [i_tm1, f_tm1, o_tm1, ct_tm1, c_tm2]
+      let block_size = inputs.data[DataIndex::Recurrence].dims().unwrap()[0];
+      assert!(block_size as f32 % 5.0f32 == 0); // there are 5 data pieces we need
+      let chunk_size = block_size / 5;
+      ifo_tm1 = activations::get_activation(inputs.activation[ActivationIndex::Inner]
+                                            , &af::rows(&inputs.data[DataIndex::Recurrence], 0, 3 * chunk_size).unwrap).unwrap();
+      ct_tm1 = activations::get_activation(inputs.activation[ActivationIndex::Outer]
+                                           , &af::rows(&inputs.data[DataIndex::Recurrence], 3 * chunk_size, 4 * chunk_size).unwrap).unwrap();
+      c_tm2 = af::rows(&inputs.data[DataIndex::Recurrence], 4 * chunk_size, 5 * chunk_size).unwrap();
+    }else { // this is the first node in the recurrence
+      let ifo_recurrence_dims = Dim4::new([3*inputs.data[DataIndex::Input].dims().unwrap()[0], self.output_size(), 1, 1]).unwrap();
+      let ct_recurrence_dims = Dim4::new([inputs.data[DataIndex::Input].dims().unwrap()[0], self.output_size(), 1, 1]).unwrap();
+      let c_recurrence_dims = Dim4::new([inputs.data[DataIndex::Input].dims().unwrap()[0], self.output_size(), 1, 1]).unwrap();
+      ifo_tm1 = initializations::get_initialization("zeros", ifo_recurrence_dims).unwrap();
+      ct_tm1 = initializations::get_initialization("zeros", ct_recurrence_dims).unwrap();
+      c_tm2 = initializations::get_initialization("zeros", c_recurrence_dims).unwrap();
+    }
 
     // calculate c_tm1 & h_tm1
     let c_tm1 = af::add(&af::mul(&af::rows(&ifo_tm1, 0, chunk_size).unwrap(), &ct_tm1, false).unwrap()
@@ -153,12 +165,13 @@ impl Layer for LSTM {
                                , &af::matmul(&af::join_many(0, recurrents_ref).unwrap(), &h_tm1).unwrap(), false).unwrap()
                       , &af::join_many(0, bias_ref).unwrap(), true).unwrap();
     self.rtrl(&self.dW, &self.dU, &self.db, &z_t, inputs);
-    // since we are RTRL'ing I, F, Ct w.r.t. C we just need to shoot out O
+
+    // since we are RTRL'ing I, F, Ct w.r.t. C we technically just need to pass z_o & c_t
     if self.return_sequences {
-      Input { data: af::join_many(0, vec![&z_t, &c_tm1]).unwrap()
+      Input { data: vec![af::join_many(0, vec![&z_t, &c_tm1]).unwrap()]
               , activation: vec![self.inner_activation, self.outer_activation] }
-    }else { //TODO: Fix this
-      Input { data: af::join_many(0, vec![&ifo_tm1, &ct_tm1, &c_tm1]).unwrap()
+    }else {
+      Input { data: vec![z_t.clone()]
               , activation: vec![self.inner_activation, self.outer_activation] }
     }
   }

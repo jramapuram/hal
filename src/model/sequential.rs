@@ -1,6 +1,7 @@
 use af;
 use af::{Array, Dim4};
 use na::{DMat, Shape, Transpose};
+use std::cmp::max;
 use std::default::Default;
 use itertools::Zip;
 
@@ -11,18 +12,21 @@ use initializations;
 use layer::{Layer, Input};
 use model::Model;
 use optimizer::{Optimizer, SGD};
+use params::{ParamManager, DenseGenerator, LSTMGenerator};
 
 pub struct Sequential {
   layers: Vec<Box<Layer>>,
+  param_manager: &ParamManager,
   optimizer: Box<Optimizer>,
   loss: &'static str,
   device: i32,
 }
 
-impl Default for Sequential{
+impl Default for Sequential {
   fn default() -> Sequential {
     Sequential {
       layers: Vec::new(),
+      param_manager: &ParamManager::default(),
       optimizer: Box::new(SGD::default()),
       loss: "mse",
       device: 0,
@@ -31,9 +35,12 @@ impl Default for Sequential{
 }
 
 impl Model for Sequential {
-  fn new(optimizer: Box<Optimizer>, loss: &'static str) -> Sequential {
+  fn new(param_manager: &ParamManager
+         , optimizer: Box<Optimizer>
+         , loss: &'static str) -> Sequential {
     Sequential {
       layers: Vec::new(),
+      param_manager: param_manager,
       loss: loss,
       optimizer: optimizer,
       device: -1,
@@ -44,7 +51,7 @@ impl Model for Sequential {
     self.layers.push(layer);
   }
 
-  //TODO: convert to log crate
+  //TODO: convert to log crate [or hashmap]
   fn info(&self) {
     match af::info() {
       Ok(_)   => {},
@@ -65,10 +72,25 @@ impl Model for Sequential {
   }
 
   fn forward(&mut self, activation: &Array) -> Array {
+    let bptt_unroll = max(activation.dims[2], 1); // we will need to unwind at least once for non RNNs
     let mut activate = Input {data: vec![activation.clone()], activation: vec!["ones"]};
-    for i in 0..self.layers.len() {
-      activate = self.layers[i].forward(&activate); //NOTE: This is non-activated output
+    // let mut activate = match bptt_unroll {
+    //   1 => Input {data: vec![activation.clone()], activation: vec!["ones"]},
+    //   _ => Input {data: vec![activation.clone()], activation: vec!["ones", "ones"]},
+    // };
+
+    let mut recurrences = Vec::new();
+    for t in 0..bptt_unroll {
+      activate.data[0] = af::slice(activation.data[0], t).unwrap();
+      for i in 0..self.layers.len() {
+        activate = self.layers[i].forward(&activate); //NOTE: This is non-activated output
+        if activate.data.len() == 2 { // store the recurrences
+          recurrences.push(self.layers[i].forward(&activate));
+        }
+      }
     }
+
+    // TODO: This is ambiguous, is last the correct activation?
     activations::get_activation(activate.activation.last().unwrap()
                                 , activate.data.last().unwrap()).unwrap()
   }
