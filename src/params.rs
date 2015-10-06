@@ -8,24 +8,15 @@ use initializations;
 #[derive(Clone)]
 pub struct Input {
   pub data: Array,
-  pub activation: &'static str,
-}
-
-impl Default for Input {
-  fn default() -> Input {
-    Input {
-      data: initializations::empty(),
-      activation: "ones",
-    }
-  }
+  pub activation: String,
 }
 
 #[derive(Clone)]
 pub struct Params {
-  pub layer_type: &'static str,
+  pub layer_type: String,
   pub weights: Vec<Array>,
   pub biases: Vec<Array>,
-  pub activations: Vec<&'static str>,
+  pub activations: Vec<String>,
   pub deltas: Vec<Array>,
   pub inputs: Vec<Input>,
 }
@@ -46,12 +37,12 @@ impl Default for ParamManager {
 
 impl ParamManager {
   pub fn add(&mut self
-             , layer_type: &'static str
-             , weight_init: Vec<&'static str>
+             , layer_type: &str
+             , weight_init: Vec<&str>
              , weight_dims: Vec<(usize, usize)>
-             , biases_init: Vec<&'static str>
+             , biases_init: Vec<&str>
              , biases_dims: Vec<(usize, usize)>
-             , activations: Vec<&'static str>)
+             , activations: Vec<&str>)
   {
     // generate the weights
     let mut weights: Vec<Array> = Vec::with_capacity(weight_dims.len());
@@ -68,17 +59,18 @@ impl ParamManager {
       self.has_recurrence = true;
     }
 
+    let owned_activations = activations.iter().map(|x| x.to_string()).collect::<Vec<String>>();
     self.layer_storage.push(Params{
-      layer_type: layer_type,
+      layer_type: layer_type.to_string(),
       weights: weights,
       biases: biases,
-      activations: activations,
+      activations: owned_activations,
       deltas: Vec::new(),
       inputs: Vec::new(),
     });
   }
 
-  fn generate(&self, init: &'static str, dims: &(usize, usize)) -> Array {
+  fn generate(&self, init: &str, dims: &(usize, usize)) -> Array {
     let dims = Dim4::new(&[dims.0 as u64, dims.1 as u64, 1, 1]);
     initializations::get_initialization(init, dims).unwrap()
   }
@@ -88,29 +80,34 @@ impl ParamManager {
   }
 
   pub fn get_params(&self, layer_index: usize) -> Params {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
     self.layer_storage[layer_index].clone()
   }
 
+  pub fn get_mut_params(&mut self, layer_index: usize) -> &mut Params {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    &mut self.layer_storage[layer_index]
+  }
+
   pub fn get_weights(&self, layer_index: usize) -> Vec<Array> {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
     self.layer_storage[layer_index].weights.clone()
   }
 
   pub fn get_weight(&self, layer_index: usize, weight_num: usize) -> Array {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
-    assert!(self.layer_storage[layer_index].weights.len() - 1 <= weight_num);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].weights.len() - 1 >= weight_num);
     self.layer_storage[layer_index].weights[weight_num].clone()
   }
 
   pub fn get_biases(&self, layer_index: usize) -> Vec<Array> {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
     self.layer_storage[layer_index].biases.clone()
   }
 
   pub fn get_bias(&self, layer_index: usize, bias_num: usize) -> Array {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
-    assert!(self.layer_storage[layer_index].biases.len() - 1 <= bias_num);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].biases.len() - 1 >= bias_num);
     self.layer_storage[layer_index].biases[bias_num].clone()
   }
 
@@ -151,79 +148,91 @@ impl ParamManager {
   }
 
   pub fn set_weights(&mut self, layer_index: usize, weights: Vec<Array>){
-    assert!(self.layer_storage.len() - 1 <= layer_index);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
     self.layer_storage[layer_index].weights = weights;
   }
 
   pub fn set_weight(&mut self, layer_index: usize, weight_num: usize, weight: Array){
-    assert!(self.layer_storage.len() - 1 <= layer_index);
-    assert!(self.layer_storage[layer_index].weights.len() - 1 <= weight_num);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].weights.len() - 1 >= weight_num);
     self.layer_storage[layer_index].weights[weight_num] = weight;
   }
 
   pub fn set_biases(&mut self, layer_index: usize, biases: Vec<Array>){
-    assert!(self.layer_storage.len() - 1 <= layer_index);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
     self.layer_storage[layer_index].biases = biases;
   }
 
   pub fn set_bias(&mut self, layer_index: usize, bias_num: usize, bias: Array){
-    assert!(self.layer_storage.len() - 1 <= layer_index);
-    assert!(self.layer_storage[layer_index].biases.len() - 1 <= bias_num);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].biases.len() - 1 >= bias_num);
     self.layer_storage[layer_index].biases[bias_num] = bias;
   }
 
   pub fn get_deltas(&self, layer_index: usize) -> Vec<Array> {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
     self.layer_storage[layer_index].deltas.clone()
   }
 
   pub fn get_delta(&self, layer_index: usize, delta_num: usize) -> Array {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
-    assert!(self.layer_storage[layer_index].deltas.len() - 1 <= delta_num);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].deltas.len() - 1 >= delta_num);
     self.layer_storage[layer_index].deltas[delta_num].clone()
   }
 
   pub fn set_deltas(&mut self, layer_index: usize, deltas: Vec<Array>) {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
     self.layer_storage[layer_index].deltas = deltas;
   }
 
   pub fn set_delta(&mut self, layer_index: usize, delta_num: usize, delta: Array) {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
-    assert!(self.layer_storage[layer_index].deltas.len() - 1 <= delta_num);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].deltas.len() - 1 >= delta_num);
     self.layer_storage[layer_index].deltas[delta_num] = delta;
   }
 
   pub fn get_inputs(&self, layer_index: usize) -> Vec<Input> {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
     self.layer_storage[layer_index].inputs.clone()
   }
 
   pub fn get_input(&self, layer_index: usize, input_num: usize) -> Input {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
-    assert!(self.layer_storage[layer_index].inputs.len() - 1 <= input_num);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].inputs.len() - 1 >= input_num);
     self.layer_storage[layer_index].inputs[input_num].clone()
   }
 
   pub fn set_inputs(&mut self, layer_index: usize, input_num: usize, input: Vec<Input>) {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
-    assert!(self.layer_storage[layer_index].inputs.len() - 1 <= input_num);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].inputs.len() - 1 >= input_num);
     self.layer_storage[layer_index].inputs = input;
   }
 
   pub fn set_input(&mut self, layer_index: usize, input_num: usize, input: Input) {
-    assert!(self.layer_storage.len() - 1 <= layer_index);
-    assert!(self.layer_storage[layer_index].inputs.len() - 1 <= input_num);
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].inputs.len() - 1 >= input_num);
     self.layer_storage[layer_index].inputs[input_num] = input;
   }
+
+  pub fn get_activations(&self, layer_index: usize) -> Vec<String> {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    self.layer_storage[layer_index].activations.clone()
+  }
+
+  pub fn get_activation(&self, layer_index: usize, activation_num: usize) -> String {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].activations.len() - 1 >= activation_num);
+    self.layer_storage[layer_index].activations[activation_num].clone()
+  }
+
 
   pub fn tie_weight(&mut self, layer_input: usize, iweight_index: usize
                 , layer_output: usize, oweight_index: usize)
   {
-    assert!(self.layer_storage.len() - 1 <= layer_input);
-    assert!(self.layer_storage.len() - 1 <= layer_output);
-    assert!(self.layer_storage[layer_input].weights.len() - 1 <= iweight_index);
-    assert!(self.layer_storage[layer_output].weights.len() - 1 <= oweight_index);
+    assert!(self.layer_storage.len() - 1 >= layer_input);
+    assert!(self.layer_storage.len() - 1 >= layer_output);
+    assert!(self.layer_storage[layer_input].weights.len() - 1 >= iweight_index);
+    assert!(self.layer_storage[layer_output].weights.len() - 1 >= oweight_index);
     let input_dims = self.layer_storage[layer_input].weights[iweight_index].dims().unwrap();
     let output_dims = self.layer_storage[layer_output].weights[oweight_index].dims().unwrap();
     assert!((input_dims[0] == output_dims[0] && input_dims[1] == output_dims[1])
@@ -235,10 +244,10 @@ impl ParamManager {
   pub fn tie_bias(&mut self, layer_input: usize, ibias_index: usize
               , layer_output: usize, obias_index: usize)
   {
-    assert!(self.layer_storage.len() - 1 <= layer_input);
-    assert!(self.layer_storage.len() - 1 <= layer_output);
-    assert!(self.layer_storage[layer_input].biases.len() - 1 <= ibias_index);
-    assert!(self.layer_storage[layer_output].biases.len() - 1 <= obias_index);
+    assert!(self.layer_storage.len() - 1 >= layer_input);
+    assert!(self.layer_storage.len() - 1 >= layer_output);
+    assert!(self.layer_storage[layer_input].biases.len() - 1 >= ibias_index);
+    assert!(self.layer_storage[layer_output].biases.len() - 1 >= obias_index);
     let input_dims = self.layer_storage[layer_input].biases[ibias_index].dims().unwrap();
     let output_dims = self.layer_storage[layer_output].biases[obias_index].dims().unwrap();
     assert!(input_dims[0] == output_dims[0] && input_dims[1] == output_dims[1]);
@@ -252,9 +261,9 @@ pub trait DenseGenerator {
   fn add_dense(&mut self
                , input_size: usize
                , output_size: usize
-               , activation: &'static str
-               , w_init: &'static str
-               , b_init: &'static str);
+               , activation: &str
+               , w_init: &str
+               , b_init: &str);
 
 }
 
@@ -269,12 +278,12 @@ pub trait LSTMGenerator {
   fn add_lstm(&mut self
               , input_size: usize
               , output_size: usize
-              , input_activation: &'static str
-              , output_activation: &'static str
-              , w_inner_init: &'static str
-              , w_outer_init: &'static str
-              , forget_bias_init: &'static str
-              , b_init: &'static str);
+              , input_activation: &str
+              , output_activation: &str
+              , w_inner_init: &str
+              , w_outer_init: &str
+              , forget_bias_init: &str
+              , b_init: &str);
   fn get_recurrences(&self, layer_index: usize) -> Vec<Array>;
   fn get_recurrence(&self, layer_index: usize, recur_name: LSTMIndex) -> Array;
   fn set_recurrences(&mut self, layer_index: usize, recurrences: Vec<Array>);
@@ -286,9 +295,9 @@ impl DenseGenerator for ParamManager {
   fn add_dense(&mut self
                , input_size: usize
                , output_size: usize
-               , activation: &'static str
-               , w_init: &'static str
-               , b_init: &'static str)
+               , activation: &str
+               , w_init: &str
+               , b_init: &str)
   {
     self.add("dense"
              , vec![w_init]
@@ -303,12 +312,12 @@ impl LSTMGenerator for ParamManager {
   fn add_lstm(&mut self
               , input_size: usize
               , output_size: usize
-              , inner_activation: &'static str
-              , outer_activation: &'static str
-              , w_init: &'static str
-              , w_recurrent_init: &'static str
-              , forget_b_init: &'static str
-              , b_init: &'static str)
+              , inner_activation: &str
+              , outer_activation: &str
+              , w_init: &str
+              , w_recurrent_init: &str
+              , forget_b_init: &str
+              , b_init: &str)
   {
     let input_dims = (output_size, input_size);
     let recurrent_dims = (output_size, output_size);

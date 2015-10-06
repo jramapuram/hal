@@ -19,7 +19,7 @@ pub trait Layer {
   // fn get_bias_dims(&self) -> Vec<Dim4>;
   // fn get_weight_dims(&self) -> Vec<Dim4>;
   // fn get_input(&self) -> Input;
-  // fn get_activation_type(&self) -> &'static str;
+  // fn get_activation_type(&self) -> &str;
   // fn input_size(&self) -> u64;
   // fn output_size(&self) -> u64;
 }

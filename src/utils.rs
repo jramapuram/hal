@@ -109,7 +109,7 @@ pub fn shuffle<T>(v: &mut[&mut [T]], cols: &[usize], row_major: bool) {
 }
 
 // Helper to write a vector to a csv file
-pub fn write_csv<T>(filename: &'static str, v: &Vec<T>)
+pub fn write_csv<T>(filename: &str, v: &Vec<T>)
   where T: Encodable
 {
   let wtr = csv::Writer::from_file(Path::new(filename));
@@ -125,7 +125,7 @@ pub fn write_csv<T>(filename: &'static str, v: &Vec<T>)
 }
 
 // Helper to read a csv file to a vector
-pub fn read_csv<T>(filename: &'static str) -> Vec<T>
+pub fn read_csv<T>(filename: &str) -> Vec<T>
   where T: std::str::FromStr, <T as std::str::FromStr>::Err: std::fmt::Debug
 {
   let mut retval: Vec<T> = Vec::new();

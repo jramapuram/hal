@@ -27,7 +27,7 @@ pub fn cross_entropy_derivative(pred: &Array, target: &Array) -> Array {
 }
 
 pub fn loss_delta(prediction: &Array, target: &Array
-              , loss: &'static str, activation_type: &'static str) -> Array
+              , loss: &str, activation_type: &str) -> Array
 {
   // d_L = d_loss * d(z) where z = activation w/out non-linearity (& in this case the predictions)
   let activated_prediction = activations::get_activation(activation_type, prediction).unwrap();

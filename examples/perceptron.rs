@@ -7,10 +7,9 @@ use na::{DMat, ColSlice, Shape};
 use hal::optimizer::{Optimizer, SGD};
 use hal::error::HALError;
 use hal::model::{Sequential};
-use hal::layer::{Dense};
 use hal::plot::{plot_vec, plot_dvec};
 
-fn build_optimizer(name: &'static str) -> Result<Box<Optimizer>, HALError> {
+fn build_optimizer(name: &str) -> Result<Box<Optimizer>, HALError> {
   match name{
     "SGD" => Ok(Box::new(SGD::default())),
     _     => Err(HALError::UNKNOWN),
@@ -46,13 +45,16 @@ fn main() {
   model.set_device(0);
 
   // Let's add a few layers why don't we?
-  model.add("dense", hashmap!["input_size"    => &input_dims.to_string()
-                              , "output_size" => &hidden_dims.to_string()
+  let input_str: &str = &input_dims.to_string();
+  let hidden_str: &str = &hidden_dims.to_string();
+  let output_str: &str = &output_dims.to_string();
+  model.add("dense", hashmap!["input_size"    => input_str
+                              , "output_size" => hidden_str
                               , "activation"  => "tanh"
                               , "w_init"      => "glorot_uniform"
                               , "b_init"      => "zeros"]);
-  model.add("dense", hashmap!["input_size"    => &hidden_dims.to_string()
-                              , "output_size" => &output_dims.to_string()
+  model.add("dense", hashmap!["input_size"    => hidden_str
+                              , "output_size" => output_str
                               , "activation"  => "tanh"
                               , "w_init"      => "glorot_uniform"
                               , "b_init"      => "zeros"]);

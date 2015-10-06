@@ -19,7 +19,7 @@ pub struct Sequential {
   layers: Vec<Box<Layer>>,
   param_manager: ParamManager,
   optimizer: Box<Optimizer>,
-  loss: &'static str,
+  loss: String,
   device: i32,
 }
 
@@ -29,7 +29,7 @@ impl Default for Sequential {
       layers: Vec::new(),
       param_manager: ParamManager::default(),
       optimizer: Box::new(SGD::default()),
-      loss: "mse",
+      loss: "mse".to_string(),
       device: 0,
     }
   }
@@ -37,17 +37,17 @@ impl Default for Sequential {
 
 impl Model for Sequential {
   fn new(optimizer: Box<Optimizer>
-         , loss: &'static str) -> Sequential {
+         , loss: &str) -> Sequential {
     Sequential {
       layers: Vec::new(),
       param_manager: ParamManager::default(),
-      loss: loss,
+      loss: loss.to_string(),
       optimizer: optimizer,
       device: -1,
     }
   }
 
-  fn add(&mut self, layer: &'static str
+  fn add(&mut self, layer: &str
          , params: HashMap<&str, &str>)
   {
     //TODO: Error handling for hashmap
@@ -101,15 +101,15 @@ impl Model for Sequential {
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
     let bptt_unroll = max(activation.dims().unwrap()[2], 1);
-    let mut activate = Input {data: af::slice(activation, 0).unwrap(), activation: "ones"};
-    let mut recurrences: Vec<Input> = vec![Input {data: initializations::empty(), activation: "ones"}
+    let mut activate = Input {data: af::slice(activation, 0).unwrap(), activation: "ones".to_string()};
+    let mut recurrences: Vec<Input> = vec![Input {data: initializations::zeros(activation.dims().unwrap())
+                                                  , activation: "ones".to_string()}
                                            ; self.layers.len()];
-
     for t in 0..bptt_unroll {
       activate.data = af::slice(activation, t).unwrap();
       for i in 0..self.layers.len() {
         //NOTE: This is non-activated output
-        let (a, r) = self.layers[i].forward(&mut self.param_manager.get_params(i)
+        let (a, r) = self.layers[i].forward(self.param_manager.get_mut_params(i)
                                             , &activate
                                             , &recurrences[i]);
         activate = a.clone();
@@ -117,7 +117,7 @@ impl Model for Sequential {
       }
     }
 
-    activations::get_activation(activate.activation, &activate.data).unwrap()
+    activations::get_activation(&activate.activation, &activate.data).unwrap()
   }
 
 
@@ -169,7 +169,6 @@ impl Model for Sequential {
       // println!("batched [input: {:?} | target: {:?}]"
       //          , batch_input.dims().unwrap()
       //          , batch_target.dims().unwrap());
-
       forward_pass = self.forward(&batch_input);
       loss = self.backward(&forward_pass, &batch_target);
       self.optimizer.update(&mut self.param_manager, batch_size as u64);
@@ -185,17 +184,16 @@ impl Model for Sequential {
   }
 
   fn backward(&mut self, prediction: &Array, target: &Array) -> f32 {
-    //    self.optimizer.optimize(&mut self.layers, prediction, target, self.loss)
     let last_index = self.layers.len() - 1;
     let mut delta = loss::loss_delta(prediction
                                      , target
-                                     , self.loss
-                                     , self.param_manager.get_params(last_index).activations.last().unwrap());
-                                     //, self.layers[last_index].get_activation_type());
+                                     , &self.loss
+                                     , &self.param_manager.get_activation(last_index, 0));
+
     for i in (0..last_index + 1).rev() {
-      delta = self.layers[i].backward(&mut self.param_manager.get_params(i), &delta);
+      delta = self.layers[i].backward(self.param_manager.get_mut_params(i), &delta);
     }
 
-    loss::get_loss(self.loss, prediction, target).unwrap()
+    loss::get_loss(&self.loss, prediction, target).unwrap()
   }
 }

@@ -5,7 +5,7 @@ use na::{DMat, DVec};
 use utils;
 //use error::HALError;
 
-pub fn plot_array(values: &Array, title: &'static str, window_x: u16, window_y: u16) {
+pub fn plot_array(values: &Array, title: &str, window_x: u16, window_y: u16) {
   assert!(values.dims().unwrap()[1] == 1);
 
   // create a window
@@ -23,20 +23,20 @@ pub fn plot_array(values: &Array, title: &'static str, window_x: u16, window_y: 
   }
 }
 
-pub fn plot_dmat<T>(raw_values: &DMat<T>, title: &'static str, window_x: u16, window_y: u16) {
+pub fn plot_dmat<T>(raw_values: &DMat<T>, title: &str, window_x: u16, window_y: u16) {
   // copy from DMat to Array
   assert!(raw_values.ncols() == 1);
   let values = utils::dmat_to_array(raw_values);
   plot_array(&values, title, window_x, window_y);
 }
 
-pub fn plot_dvec<T>(raw_values: &DVec<T>, title: &'static str, window_x: u16, window_y: u16) {
+pub fn plot_dvec<T>(raw_values: &DVec<T>, title: &str, window_x: u16, window_y: u16) {
   // copy from DMat to Array
   let values = utils::dvec_to_array(raw_values);
   plot_array(&values, title, window_x, window_y);
 }
 
-pub fn plot_vec<T>(raw_values: Vec<T>, title: &'static str, window_x: u16, window_y: u16) {
+pub fn plot_vec<T>(raw_values: Vec<T>, title: &str, window_x: u16, window_y: u16) {
   // copy from float vector to Array
   let num_rows = raw_values.len();
   let values = utils::vec_to_array(raw_values, num_rows, 1);

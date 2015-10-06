@@ -27,8 +27,8 @@ pub struct LSTM {
   weights: Vec<Array>,
   recurrent_weights: Vec<Array>,
   bias: Vec<Array>,
-  inner_activation: &'static str,
-  outer_activation: &'static str,
+  inner_activation: &str,
+  outer_activation: &str,
   return_sequences: bool,
   delta: Array,
   inputs: Input,
@@ -36,12 +36,12 @@ pub struct LSTM {
 
 impl LSTM {
   pub fn new(input_size: u64, output_size: u64
-             , outer_activation: &'static str
-             , inner_activation: &'static str
-             , w_init: &'static str
-             , w_inner_init: &'static str
-             , bias_init: &'static str
-             , forget_bias_init: &'static str
+             , outer_activation: &str
+             , inner_activation: &str
+             , w_init: &str
+             , w_inner_init: &str
+             , bias_init: &str
+             , forget_bias_init: &str
              , return_sequences: bool) -> LSTM
   {
     LSTM{
@@ -239,7 +239,7 @@ impl Layer for LSTM {
     weight_dims[0][0]
   }
 
-  fn get_activation_type(&self) -> &'static str {
+  fn get_activation_type(&self) -> &str {
     &self.activation
   }
 }

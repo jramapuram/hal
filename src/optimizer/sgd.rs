@@ -9,7 +9,7 @@ use optimizer::Optimizer;
 
 #[allow(non_snake_case)]
 pub struct SGD {
-  pub name: &'static str,
+  pub name: String,
   pub learning_rate: f32,
   pub momemtum: f32,
   pub decay: f32,
@@ -23,7 +23,7 @@ pub struct SGD {
 impl Default for SGD {
   fn default() -> SGD {
     SGD {
-      name: "SGD",
+      name: "SGD".to_string(),
       learning_rate: 0.01,
       momemtum: 0.1,
       decay: 0.0,
@@ -39,7 +39,7 @@ impl Default for SGD {
 impl Optimizer for SGD {
   fn new(params: &HashMap<&str, &str>) -> SGD {
     SGD{
-      name: "SGD",
+      name: "SGD".to_string(),
       learning_rate: params.get("learning_rate").unwrap().parse::<f32>().unwrap(),
       momemtum: params.get("momemtum").unwrap().parse::<f32>().unwrap(),
       decay: params.get("decay").unwrap().parse::<f32>().unwrap(),
