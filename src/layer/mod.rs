@@ -4,7 +4,6 @@ mod dense;
 // pub use self::lstm::LSTM;
 // mod lstm;
 
-use af::Dim4;
 use af::Array;
 
 use params::{Input, Params};

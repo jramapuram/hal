@@ -8,7 +8,6 @@ use af::{Array};
 use na::DMat;
 use std::collections::HashMap;
 
-use layer::Layer;
 use optimizer::Optimizer;
 
 pub trait Model {
@@ -18,7 +17,7 @@ pub trait Model {
   fn forward(&mut self, activation: &Array) -> Array;
   fn backward(&mut self, prediction: &Array, target: &Array) -> f32;
   fn add(&mut self, layer: &'static str
-         , params: &HashMap<&'static str, &'static str>);
+         , params: HashMap<&str, &str>);
   fn set_device(&mut self, device_id: i32);
   fn info(&self);
 }

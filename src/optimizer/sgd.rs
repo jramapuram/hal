@@ -1,10 +1,10 @@
 use af;
-use af::{Array};
+use af::{Array, Dim4};
 use std::collections::HashMap;
 use std::default::Default;
 
+use params::ParamManager;
 use initializations;
-use layer::{Layer};
 use optimizer::Optimizer;
 
 #[allow(non_snake_case)]
@@ -51,57 +51,49 @@ impl Optimizer for SGD {
     }
   }
 
-  fn setup(&mut self, layers: &Vec<Box<Layer>>){
-    for layer in layers {
-      for wdim in layer.get_weight_dims() {
-        self.velocity_W.push(initializations::zeros(wdim));
-      }
-      for bdim in layer.get_bias_dims() {
-        self.velocity_b.push(initializations::zeros(bdim));
-      }
+  fn setup(&mut self, w_dims: Vec<Dim4>, b_dims: Vec<Dim4>){
+    for w in w_dims {
+      self.velocity_W.push(initializations::zeros(w));
+    }
+
+    for b in b_dims {
+      self.velocity_b.push(initializations::zeros(b));
     }
   }
 
-  fn update(&mut self, layers: &mut Vec<Box<Layer>>, batch_size: u64)
+  fn update(&mut self, parameter_manager: &mut ParamManager, batch_size: u64)
   {
     self.iter += 1;
     self.learning_rate *= 1.0 / (1.0 + self.decay * (self.iter as f32));
     let alpha = self.learning_rate / batch_size as f32;
     let mut velocity_index = [0, 0];
 
-    for layer_num in 0..layers.len() {
+    for layer_num in 0..parameter_manager.num_layers(){
       // v = momemtum * v + learning_rate * d_w
       // W = W - v
-      let weights = layers[layer_num].get_weights();
+      let weights = parameter_manager.get_weights(layer_num);
       for weight_num in (0..weights.len()) {
-        //DEBUG:
-        // println!("weight size: {:?} | delta dims: {:?} | input dims: {:?}"
-        //          , weights[weight_num].dims().unwrap()
-        //          , layers[layer_num].get_delta().dims().unwrap()
-        //          , layers[layer_num].get_input().data.dims().unwrap());
-        let w_update = af::matmul(&layers[layer_num].get_delta()
-                                  , &layers[layer_num].get_input().data.last().unwrap()
+        let w_update = af::matmul(&parameter_manager.get_delta(layer_num, 0)   //layers[layer_num].get_delta()
+                                  , &parameter_manager.get_input(layer_num, 0).data //layers[layer_num].get_input().data.last().unwrap()
                                   , af::MatProp::NONE, af::MatProp::TRANS).unwrap();
         self.velocity_W[velocity_index[0]] = af::mul(&self.momemtum, &self.velocity_W[velocity_index[0]], false).unwrap();
         self.velocity_W[velocity_index[0]] = af::sub(&self.velocity_W[velocity_index[0]]
                                                      , &af::mul(&alpha, &w_update, false).unwrap(), false).unwrap();
-        layers[layer_num].set_weights(&af::add(&weights[weight_num]
-                                               , &self.velocity_W[velocity_index[0]], false).unwrap()
-                                      , weight_num);
+        parameter_manager.set_weight(layer_num, weight_num
+                                     , af::add(&weights[weight_num], &self.velocity_W[velocity_index[0]], false).unwrap());
         velocity_index[0] += 1;
       }
 
       // v = momemtum * v + learning_rate * d_b
       // b = b - v
-      let biases = layers[layer_num].get_bias();
+      let biases = parameter_manager.get_biases(layer_num);
       for bias_num in (0..biases.len()) {
-        let b_update = layers[layer_num].get_delta();
+        let b_update = parameter_manager.get_delta(layer_num, bias_num);
         self.velocity_b[velocity_index[1]] = af::mul(&self.momemtum, &self.velocity_b[velocity_index[1]], false).unwrap();
         self.velocity_b[velocity_index[1]] = af::sub(&self.velocity_b[velocity_index[1]]
                                                      , &af::mul(&alpha, &b_update, false).unwrap(), true).unwrap();
-        layers[layer_num].set_bias(&af::sub(&biases[bias_num]
-                                            , &self.velocity_b[velocity_index[1]], true).unwrap()
-                                   , bias_num);
+        parameter_manager.set_bias(layer_num, bias_num
+                                   , af::sub(&biases[bias_num], &self.velocity_b[velocity_index[1]], true).unwrap());
         velocity_index[1] += 1;
       }
     }

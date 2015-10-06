@@ -1,14 +1,13 @@
 use af;
-use af::{Dim4, Array, MatProp};
+use af::{Array, MatProp};
 
 use activations;
-use initializations;
 use params::{Input, Params};
 use layer::Layer;
 
 pub struct Dense {
-  input_size: usize,
-  output_size: usize,
+  pub input_size: usize,
+  pub output_size: usize,
 }
 
 // impl Dense {
@@ -56,7 +55,7 @@ impl Layer for Dense {
 
   fn backward(&self, params: &mut Params, delta: &Array) -> Array {
     // d_l = (transpose(W) * d_{l}) .* dActivation(z-1) where z = activation w/out non-linearity
-    params.delta = vec![delta.clone()];
+    params.deltas = vec![delta.clone()];
     let activation_prev = activations::get_activation(params.inputs[0].activation, &params.inputs[0].data).unwrap();
     let d_activation_prev = activations::get_activation_derivative(params.inputs[0].activation, &activation_prev).unwrap();
     let delta_prev = af::mul(&af::matmul(&params.weights[0], delta, af::MatProp::TRANS, af::MatProp::NONE).unwrap()

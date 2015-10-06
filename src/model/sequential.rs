@@ -48,7 +48,7 @@ impl Model for Sequential {
   }
 
   fn add(&mut self, layer: &'static str
-         , params: &HashMap<&'static str, &'static str>)
+         , params: HashMap<&str, &str>)
   {
     //TODO: Error handling for hashmap
     let input_size = params.get("input_size").unwrap().parse::<u64>().unwrap() as usize;
@@ -125,13 +125,14 @@ impl Model for Sequential {
          , batch_size: usize, shuffle: bool, verbose: bool) -> (Vec<f32>, DMat<f32>)
   {
     // some required data validity checks
-    let iter = input.nrows() as u64 / batch_size;
+    let iter = input.nrows() as u64 / batch_size as u64;
     println!("\ntrain samples: {:?} | target samples: {:?} | batch size: {} | iterations: {}"
              , input.shape(), target.shape(), batch_size, iter);
     assert!(target.nrows() == input.nrows());
-    assert!(input.nrows() as u64 >= batch_size
-            && input.nrows() as u64 % batch_size == 0); //ease up later
-    self.optimizer.setup(&self.layers);
+    assert!(input.nrows() >= batch_size
+            && input.nrows() % batch_size == 0); //ease up later
+    self.optimizer.setup(self.param_manager.get_all_weight_dims()
+                         , self.param_manager.get_all_bias_dims());
 
     // create the container to hold the forward pass & loss results
     let mut forward_pass = initializations::zeros(Dim4::new(&[1, input.ncols() as u64, 1, 1]));
@@ -171,7 +172,7 @@ impl Model for Sequential {
 
       forward_pass = self.forward(&batch_input);
       loss = self.backward(&forward_pass, &batch_target);
-      self.optimizer.update(&mut self.layers, batch_size);
+      self.optimizer.update(&mut self.param_manager, batch_size as u64);
 
       lossvec.push(loss);
       if verbose {
@@ -189,10 +190,10 @@ impl Model for Sequential {
     let mut delta = loss::loss_delta(prediction
                                      , target
                                      , self.loss
-                                     , self.param_manager.get_params()
-                                     , self.layers[last_index].get_activation_type());
+                                     , self.param_manager.get_params(last_index).activations.last().unwrap());
+                                     //, self.layers[last_index].get_activation_type());
     for i in (0..last_index + 1).rev() {
-      delta = self.layers[i].backward(&delta);
+      delta = self.layers[i].backward(&mut self.param_manager.get_params(i), &delta);
     }
 
     loss::get_loss(self.loss, prediction, target).unwrap()

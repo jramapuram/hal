@@ -16,6 +16,7 @@ arrayfire = { path ="arrayfire-rust" }
 [lib]
 name = "hal"
 path = "src/lib.rs"
+plugin = true
 
 [[example]]
 name = "perceptron"

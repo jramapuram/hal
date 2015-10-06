@@ -1,4 +1,4 @@
-extern crate hal;
+#[macro_use] extern crate hal;
 extern crate nalgebra as na;
 
 use hal::utils;
@@ -46,8 +46,16 @@ fn main() {
   model.set_device(0);
 
   // Let's add a few layers why don't we?
-  model.add(Box::new(Dense::new(input_dims, hidden_dims, "tanh", "glorot_uniform", "zeros")));
-  model.add(Box::new(Dense::new(hidden_dims, output_dims, "tanh", "glorot_uniform", "zeros")));
+  model.add("dense", hashmap!["input_size"    => &input_dims.to_string()
+                              , "output_size" => &hidden_dims.to_string()
+                              , "activation"  => "tanh"
+                              , "w_init"      => "glorot_uniform"
+                              , "b_init"      => "zeros"]);
+  model.add("dense", hashmap!["input_size"    => &hidden_dims.to_string()
+                              , "output_size" => &output_dims.to_string()
+                              , "activation"  => "tanh"
+                              , "w_init"      => "glorot_uniform"
+                              , "b_init"      => "zeros"]);
 
   // Get some nice information about our model
   model.info();

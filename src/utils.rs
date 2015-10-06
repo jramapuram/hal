@@ -16,6 +16,7 @@ use rustc_serialize::Encodable;
 
 // allows for let a = hashmap!['key1' => value1, ...];
 // http://stackoverflow.com/questions/28392008/more-concise-hashmap-initialization
+#[macro_export]
 macro_rules! hashmap {
     ($( $key: expr => $val: expr ),*) => {{
          let mut map = ::std::collections::HashMap::new();
