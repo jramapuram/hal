@@ -14,7 +14,7 @@ impl Layer for Dense {
 
   fn forward(&self, params: &mut Params
              , inputs: &Input
-             , recurrence: &Input) -> (Input, Input)
+             , recurrence: &Option<Input>) -> (Input, Option<Input>)
   {
     // keep previous_activation
     params.inputs = vec![inputs.clone()];
@@ -30,7 +30,7 @@ impl Layer for Dense {
                          , MatProp::NONE).unwrap();
     (Input { data: af::add(&mul, &params.biases[0], true).unwrap()
              , activation: params.activations[0].clone() }
-     , recurrence.clone())
+     , None)
   }
 
   fn backward(&self, params: &mut Params, delta: &Array) -> Array {

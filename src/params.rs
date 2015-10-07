@@ -334,7 +334,7 @@ impl LSTMGenerator for ParamManager {
   }
 
   fn get_recurrences(&self, layer_index: usize) -> Vec<Array>{
-    let offset = 4;
+    let offset = 3;
     vec![self.get_weight(layer_index, LSTMIndex::Input as usize + offset)
          , self.get_weight(layer_index, LSTMIndex::Forget as usize + offset)
          , self.get_weight(layer_index, LSTMIndex::Output as usize+ offset)
@@ -342,7 +342,7 @@ impl LSTMGenerator for ParamManager {
   }
 
   fn get_recurrence(&self, layer_index: usize, recur_name: LSTMIndex) -> Array{
-    let offset = 4;
+    let offset = 3;
     self.get_weight(layer_index, recur_name as usize + offset)
   }
 
@@ -354,7 +354,7 @@ impl LSTMGenerator for ParamManager {
   }
 
   fn set_recurrence(&mut self, layer_index: usize, recur_name: LSTMIndex, recurrence: Array){
-    let offset = 4;
+    let offset = 3;
     self.set_weight(layer_index, offset + recur_name as usize, recurrence);
   }
 }
