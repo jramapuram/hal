@@ -34,7 +34,7 @@ impl Layer for Dense {
   }
 
   fn backward(&self, params: &mut Params, delta: &Array) -> Array {
-    // d_l = (transpose(W) * d_{l}) .* dActivation(z-1) where z = activation w/out non-linearity
+    // d_lm1 = (transpose(W) * d_{l}) .* dActivation(z-1) where z = activation w/out non-linearity
     params.deltas = vec![delta.clone()];
     let activation_prev = activations::get_activation(&params.inputs[0].activation, &params.inputs[0].data).unwrap();
     let d_activation_prev = activations::get_activation_derivative(&params.inputs[0].activation, &activation_prev).unwrap();
