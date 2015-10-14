@@ -19,18 +19,17 @@ pub struct Params {
   pub activations: Vec<String>,
   pub deltas: Vec<Array>,
   pub inputs: Vec<Input>,
+  pub recurrences: Vec<Input>,
 }
 
 pub struct ParamManager {
   layer_storage: Vec<Params>,
-  has_recurrence: bool,
 }
 
 impl Default for ParamManager {
   fn default() -> ParamManager {
     ParamManager {
       layer_storage: Vec::new(),
-      has_recurrence: false,
     }
   }
 }
@@ -55,9 +54,9 @@ impl ParamManager {
       biases.push(self.generate(b_init, b_dims));
     }
 
-    if layer_type == "lstm" || layer_type == "gru" || layer_type == "rnn"{
-      self.has_recurrence = true;
-    }
+    // if layer_type == "lstm" || layer_type == "gru" || layer_type == "rnn"{
+    //   self.has_recurrence = true;
+    // }
 
     let owned_activations = activations.iter().map(|x| x.to_string()).collect::<Vec<String>>();
     self.layer_storage.push(Params{
@@ -67,6 +66,7 @@ impl ParamManager {
       activations: owned_activations,
       deltas: Vec::new(),
       inputs: Vec::new(),
+      recurrences: Vec::new(),
     });
   }
 
@@ -278,6 +278,7 @@ pub trait LSTMGenerator {
   fn add_lstm(&mut self
               , input_size: usize
               , output_size: usize
+              , max_seq_size: usize
               , input_activation: &str
               , output_activation: &str
               , w_inner_init: &str
