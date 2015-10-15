@@ -314,6 +314,7 @@ impl LSTMGenerator for ParamManager {
   fn add_lstm(&mut self
               , input_size: usize
               , output_size: usize
+              , max_seq_size: usize
               , inner_activation: &str
               , outer_activation: &str
               , w_init: &str

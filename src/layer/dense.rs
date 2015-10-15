@@ -19,16 +19,14 @@ impl Layer for Dense {
     // keep previous_activation
     params.inputs = vec![inputs.clone()];
 
-    // apply the activation to the previous layer [Optimization: Memory saving]
-    let activated_input = activations::get_activation(&inputs.activation
-                                                      , &inputs.data).unwrap();
+    // a_t = sigma(Wx + b) [the bias is added in parallel for batch]
+    let a_t = af::add(&af::matmul(&params.weights[0]
+                                  , &inputs.data//activated_input
+                                  , MatProp::NONE
+                                  , MatProp::NONE).unwrap()
+                      , &params.biases[0], true).unwrap();
 
-    // sigma(Wx + b)
-    let mul = af::matmul(&params.weights[0]
-                         , &activated_input
-                         , MatProp::NONE
-                         , MatProp::NONE).unwrap();
-    (Input { data: af::add(&mul, &params.biases[0], true).unwrap()
+    (Input { data: activations::get_activation(&params.activations[0], &a_t).unwrap()
              , activation: params.activations[0].clone() }
      , None)
   }

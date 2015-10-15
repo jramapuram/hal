@@ -23,20 +23,23 @@ pub fn softmax(x: &Array) -> Array {
 
 pub fn tanh_derivative(x: &Array) -> Array {
   // 1 - tanh(x)*tanh(x)
-  let t = tanh(x);
-  af::sub(&1.0f32, &af::mul(&t, &t, false).unwrap(), false).unwrap()
+  // let t = tanh(x);
+  // af::sub(&1.0f32, &af::mul(&t, &t, false).unwrap(), false).unwrap()
+  af::sub(&1.0f32, &af::mul(x, x, false).unwrap(), false).unwrap()
 }
 
 pub fn sigmoid_derivative(x: &Array) -> Array {
   // x * (1 - x)
-  let s = sigmoid(x);
-  af::mul(&s, &af::sub(&1.0f32, &s, false).unwrap(), false).unwrap()
+  //let s = sigmoid(x);
+  //af::mul(&s, &af::sub(&1.0f32, &s, false).unwrap(), false).unwrap()
+  af::mul(x, &af::sub(&1.0f32, x, false).unwrap(), false).unwrap()
 }
 
 pub fn softmax_derivative(x: &Array) -> Array {
   // x * (1 - x)
-  let s = softmax(x);
-  af::mul(&s, &af::sub(&1.0f32, &s, false).unwrap(), false).unwrap()
+  //let s = softmax(x);
+  //af::mul(&s, &af::sub(&1.0f32, &s, false).unwrap(), false).unwrap()
+  sigmoid_derivative(x)
 }
 
 pub fn ones(x: &Array) -> Array {

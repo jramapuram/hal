@@ -85,8 +85,11 @@ impl Layer for LSTM {
 
     // apply the activation to the previous layer [Optimization: Memory saving]
     // the input activation is the activation of the previous output [outer]
-    let activated_input = activations::get_activation(inputs.activation        // self.inputs.activation[ActivationIndex::Inner]
-                                                      , inputs.data).unwrap(); //&self.inputs.data[DataIndex::Input]).unwrap();
+    // let activated_input = activations::get_activation(inputs.activation        // self.inputs.activation[ActivationIndex::Inner]
+    //                                                   , inputs.data).unwrap(); //&self.inputs.data[DataIndex::Input]).unwrap();
+
+    let inner_activation = params.activations[0];
+    let outer_activation = params.activations[1];
 
     let i_tm1;   // input gate @ t-1
     let f_tm1;   // forget gate @ t-1
