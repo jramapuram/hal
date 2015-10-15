@@ -272,6 +272,7 @@ pub enum LSTMIndex {
   Forget,
   Output,
   CellTilda,
+  Cell,
 }
 
 pub trait LSTMGenerator {

@@ -76,6 +76,9 @@ impl Layer for LSTM {
              , inputs: &Input
              , recurrence: &Option<Input>) -> (Input, Option<Input>)
   {
+    // inputs = x_tm1
+    // recurrence = h_tm1
+
     // keep previous layer's outputs
     assert!(inputs.data.dims().unwrap()[2] == 1);
     params.inputs[0] = vec![inputs.clone()];
@@ -147,7 +150,6 @@ impl Layer for LSTM {
     let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), &activated_input).unwrap()
                                , &af::matmul(&af::join_many(0, recurrents_ref).unwrap(), &h_tm1).unwrap(), false).unwrap()
                       , &af::join_many(0, bias_ref).unwrap(), true).unwrap();
-    self.rtrl(&self.dW, &self.dU, &self.db, &z_t, inputs);
 
     // since we are RTRL'ing i, f, Ct w.r.t. C we technically just need to pass z_o & c_t
     if self.return_sequences {
@@ -159,11 +161,24 @@ impl Layer for LSTM {
     }
   }
 
-  fn backward(&mut self, delta: &Array, recurrences: &Option<Input>) -> Array {
+  fn backward(&self, params: &mut Params, delta: &Array) -> Array{
     self.delta = delta.clone();
+    let inner_activation = params.activations[0];
+    let outer_activation = params.activations[1];
 
-    // calculate d_o first
-    let d_o = activations::get_activation_derivative(
+    // d_h = inner_activation'(z_o)  * outer_activation(c_t) * delta
+    let d_h = af::mul(&af::mul(&activations::get_activation_derivative(inner_activation, params.recurrences[LSTMIndex::Output]).unwrap()
+                               , &activations::get_activation(outer_activation, params.recurrences[LSTMIndex::Cell]).unwrap()).unwrap()
+                      , delta).unwrap();
+    // e_t = o_t * outer_activation'(c_t) * delta
+    let e_t = af::mul(&af::mul(&activations::get_activation(inner_activation, params.recurrences[LSTMIndex::Output]).unwrap()
+                               , &activations::get_activation_derivative(outer_activation, params.recurrences[LSTMIndex::Cell]).unwrap()).unwrap()
+                      , delta).unwrap();
+    // dW = delta[0]
+    // dU = delta[1]
+    // db = delta[2]
+    //self.rtrl(&self.dW, &self.dU, &self.db, &z_t, inputs);
+    self.rtrl(, &self.dU, &self.db, &z_t, inputs);
 
     let activation_prev = activations::get_activation(self.inputs.activation[0], &self.inputs.data[DataIndex::Input]).unwrap();
     let d_activation_prev = activations::get_activation_derivative(self.inputs.activation[0], &activation_prev).unwrap();
