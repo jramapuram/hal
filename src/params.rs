@@ -20,7 +20,7 @@ pub struct Params {
   pub deltas: Vec<Array>,
   pub inputs: Vec<Input>,
   pub outputs: Vec<Input>,
-  pub recurrences: Vec<Input>,
+  pub recurrences: Vec<Array>,
 }
 
 pub struct ParamManager {
@@ -34,6 +34,31 @@ impl Default for ParamManager {
     }
   }
 }
+
+// macro_rules! set_params_func {
+//     ($fn_name: ident, $base_type: ty) => (
+//         #[allow(unused_mut)]
+//         pub fn $fn_name(&mut self, layer_index: usize, num: usize, p: Vec<) {
+//             unsafe {
+//                 let mut temp: i64 = 0;
+//                 let err_val = $ffi_fn(&mut temp as MutAfArray,
+//                                       lhs.get() as AfArray, rhs.get() as AfArray,
+//                                       0);
+//                 match err_val {
+//                     0 => Ok(Array::from(temp)),
+//                     _ => Err(AfError::from(err_val)),
+//                 }
+//             }
+//         }
+//     )
+// }
+
+
+//   pub fn set_inputs(&mut self, layer_index: usize, input_num: usize, input: Vec<Input>) {
+//     assert!(self.layer_storage.len() - 1 >= layer_index);
+//     assert!(self.layer_storage[layer_index].inputs.len() - 1 >= input_num);
+//     self.layer_storage[layer_index].inputs = input;
+//   }
 
 impl ParamManager {
   pub fn add(&mut self
@@ -60,7 +85,7 @@ impl ParamManager {
       "lstm"  => {
         // htm1, i, f, o, ct, c
         assert!(recurrence_dims.is_some());
-        vec![self.generate("zeros", recurrence_dims); 5];
+        vec![self.generate("zeros", &recurrence_dims.unwrap()); 5]
       },
       "dense" => {
         Vec::new()
@@ -76,6 +101,7 @@ impl ParamManager {
       activations: owned_activations,
       deltas: Vec::new(),
       inputs: Vec::new(),
+      outputs: Vec::new(),
       recurrences: recurrences,
     });
   }
@@ -157,10 +183,6 @@ impl ParamManager {
     dims
   }
 
-  marco_rules! get_vec {
-
-  }
-
   pub fn set_weights(&mut self, layer_index: usize, weights: Vec<Array>){
     assert!(self.layer_storage.len() - 1 >= layer_index);
     self.layer_storage[layer_index].weights = weights;
@@ -235,8 +257,8 @@ impl ParamManager {
 
   pub fn get_output(&self, layer_index: usize, output_num: usize) -> Input {
     assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].outputs.len() - 1 >= outputs_num);
-    self.layer_storage[layer_index].inputs[outputs_num].clone()
+    assert!(self.layer_storage[layer_index].outputs.len() - 1 >= output_num);
+    self.layer_storage[layer_index].inputs[output_num].clone()
   }
 
   pub fn set_outputs(&mut self, layer_index: usize, output_num: usize, output: Vec<Input>) {
@@ -371,7 +393,7 @@ impl LSTMGenerator for ParamManager {
                     , recurrent_dims, recurrent_dims, recurrent_dims, recurrent_dims]
              , vec![b_init, forget_b_init, b_init, b_init]
              , vec![bias_dims; 4]
-             , bias_dims
+             , Some(bias_dims)
              , vec![inner_activation, outer_activation]);
   }
 
