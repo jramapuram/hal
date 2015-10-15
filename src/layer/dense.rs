@@ -12,11 +12,9 @@ pub struct Dense {
 
 impl Layer for Dense {
 
-  fn forward(&self, params: &mut Params
-             , inputs: &Input
-             , recurrence: &Option<Input>) -> (Input, Option<Input>)
+  fn forward(&self, params: &mut Params, inputs: &Input)-> Input
   {
-    // keep previous_activation
+    // parameter manager keeps previous activation
     params.inputs = vec![inputs.clone()];
 
     // a_t = sigma(Wx + b) [the bias is added in parallel for batch]
@@ -26,19 +24,16 @@ impl Layer for Dense {
                                   , MatProp::NONE).unwrap()
                       , &params.biases[0], true).unwrap();
 
-    (Input { data: activations::get_activation(&params.activations[0], &a_t).unwrap()
-             , activation: params.activations[0].clone() }
-     , None)
+    // parameter manager keeps the output
+    params.outputs = vec![activations::get_activation(&params.activations[0], &a_t).unwrap()];
+    params.outputs[0].clone() //clone is merely incrementing a refcount
   }
 
   fn backward(&self, params: &mut Params, delta: &Array) -> Array {
-    // d_lm1 = (transpose(W) * d_{l}) .* dActivation(z-1) where z = activation w/out non-linearity
-    params.deltas = vec![delta.clone()];
-    let activation_prev = activations::get_activation(&params.inputs[0].activation, &params.inputs[0].data).unwrap();
-    let d_activation_prev = activations::get_activation_derivative(&params.inputs[0].activation, &activation_prev).unwrap();
-    let delta_prev = af::mul(&af::matmul(&params.weights[0], delta, af::MatProp::TRANS, af::MatProp::NONE).unwrap()
-                             , &d_activation_prev, false).unwrap();
-    delta_prev
+    // delta_t     = (transpose(W_{t+1}) * d_{l+1}) .* dActivation(z)
+    // delta_{t-1} = (transpose(W_{t}) * d_{l})
+    params.deltas = vec![af::mul(delta, &activations::get_activation_derivative(params.activations[0], params.outputs[0]).unwrap()).unwrap()];
+    af::matmul(&params.weights[0], &params.deltas[0], af::MatProp::TRANS, af::MatProp::NONE).unwrap()
   }
 
 }

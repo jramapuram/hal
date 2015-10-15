@@ -72,68 +72,17 @@ impl RTRL for LSTM {
 }
 
 impl Layer for LSTM {
-  fn forward(&self, params: &mut Params
-             , inputs: &Input
-             , recurrence: &Option<Input>) -> (Input, Option<Input>)
+  fn forward(&self, params: &mut Params, inputs: &Input) -> Input
   {
-    // inputs = x_tm1
-    // recurrence = h_tm1
+    assert!(inputs.data.dims().unwrap()[2] == 1); // only planar data here
 
     // keep previous layer's outputs
-    assert!(inputs.data.dims().unwrap()[2] == 1);
     params.inputs[0] = vec![inputs.clone()];
 
-    // apply the activation to the previous layer [Optimization: Memory saving]
-    // the input activation is the activation of the previous output [outer]
-    // let activated_input = activations::get_activation(inputs.activation        // self.inputs.activation[ActivationIndex::Inner]
-    //                                                   , inputs.data).unwrap(); //&self.inputs.data[DataIndex::Input]).unwrap();
-
+    let h_tm1 = params.recurrences[0];  // cell output @ t-1
+    let c_tm1 = params.recurrences[1];  // cell memory @ t-1
     let inner_activation = params.activations[0];
     let outer_activation = params.activations[1];
-
-    let i_tm1;   // input gate @ t-1
-    let f_tm1;   // forget gate @ t-1
-    let o_tm1;   // output gate @ t-1
-    let ct_tm1;  // cell internal @ t-1
-    let c_tm2;   // cell output @ t-2
-
-    if recurrence.is_some() {
-      // extract the sub-block of each gate [i_tm1, f_tm1, o_tm1, ct_tm1, c_tm2]
-      let block_size = recurrence.data.dims().unwrap()[0];
-      assert!(block_size as f32 % 5.0f32 == 0);
-      let chunk_size = block_size / 5;
-
-      // i_{t-1} = inner_activation(zi_{t-1})
-      // f_{t-1} = inner_activation(zf_{t-1})
-      // o_{t-1} = inner_activation(zo_{t-1})
-      ifo_tm1 = activations::get_activation(recurrence.activation, &af::rows(&recurrence.data, 0, 3 * chunk_size).unwrap()).unwrap();
-
-      // Ct_{t-1} = outer_activation(zct_{t-1})
-      ct_tm1 = activations::get_activation(inputs.activation
-                                           , &af::rows(&recurrence.data , 3 * chunk_size, 4 * chunk_size).unwrap()).unwrap();
-      // C_{t-2} = last_chunk(recurrence)
-      c_tm2 = af::rows(&recurrence.data, 4 * chunk_size, 5 * chunk_size).unwrap();
-    }else { // this is the first node in the recurrence
-      let batch_size = inputs.data.dims().unwrap()[0];
-      ifo_recurrence_dims = Dim4::new([3*batch_size, self.output_size, 1, 1]).unwrap();
-      ct_recurrence_dims = Dim4::new([batch_size, self.output_size, 1, 1]).unwrap();
-      c_recurrence_dims = Dim4::new([batch_size, self.output_size, 1, 1]).unwrap();
-      ifo_tm1 = initializations::get_initialization("zeros", ifo_recurrence_dims).unwrap();
-      ct_tm1 = initializations::get_initialization("zeros", ct_recurrence_dims).unwrap();
-      c_tm2 = initializations::get_initialization("zeros", c_recurrence_dims).unwrap();
-    }
-
-    // extract these gate values
-    let i_tm1 = af::rows(&ifo_tm1, 0, chunk_size).unwrap();
-    let f_tm1 = af::rows(&ifo_tm1, chunk_size, 2*chunk_size).unwrap();
-    let o_tm1 = af::rows(&ifo_tm1, 2*chunk_size, 3*chunk_size).unwrap();
-
-    // C_{t-1} = i_{t-1} * Ct_{t-1} + f_{t-1} * C_{t-2}
-    // h_{t-1} = o_{t-1} * outer_activation(C_{t-1})
-    let c_tm1 = af::add(&af::mul(&i_tm1, &ct_tm1, false).unwrap()
-                        , &af::mul(&f_tm1, &c_tm2, false).unwrap()
-                        , false).unwrap();
-    let h_tm1 = af::mul(&o_tm1, activations::get_activation(inputs.activation, &c_tm1).unwrap(), false).unwrap();
 
     // forward pass in a batch for performance
     let weights_ref    = vec![&params.weights[LSTMIndex::Input]
@@ -150,17 +99,27 @@ impl Layer for LSTM {
                               , &params.biases[LSTMIndex::Output]
                               , &params.biases[LSTMIndex::CellTilda]];
     // [z(i,f,o,ct)_t] = W*x + U*h_tm1 + b
-    let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), &activated_input).unwrap()
+    let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), &inputs.data).unwrap()
                                , &af::matmul(&af::join_many(0, recurrents_ref).unwrap(), &h_tm1).unwrap(), false).unwrap()
                       , &af::join_many(0, bias_ref).unwrap(), true).unwrap();
+    let i_t   = activations::get_activation(inner_activation, &af::rows(&z_t, 0, 1).unwrap());
+    let f_t   = activations::get_activation(inner_activation, &af::rows(&z_t, 1, 2).unwrap());
+    let o_t   = activations::get_activation(inner_activation, &af::rows(&z_t, 2, 3).unwrap());
+    let ct_t  = activations::get_activation(inner_activation, &af::rows(&z_t, 3, 4).unwrap());
 
-    // since we are RTRL'ing i, f, Ct w.r.t. C we technically just need to pass z_o & c_t
+    // C_{t} = i_{t} * Ct_{t} + f_{t} * C_{t-1}
+    // h_{t} = o_{t} * outer_activation(C_{t})
+    let c_t = af::add(&af::mul(&i_t, &ct_t, false).unwrap()
+                      , &af::mul(&f_t, &c_tm1, false).unwrap()
+                      , false).unwrap();
+    let h_t = af::mul(&o_t, &activations::get_activation(outer_activation, &c_t).unwrap(), false).unwrap();
+
     if self.return_sequences {
-      (Input { data: af::join_many(0, vec![&z_t, &c_tm1]).unwrap()
-              , activation: self.inner_activation, self.outer_activation] }
+      Input { data: af::join_many(0, vec![&h_t, &c_t]).unwrap()
+              , activation: self.outer_activation }
     }else {
-      Input { data: vec![z_t.clone()]
-              , activation: vec![self.inner_activation, self.outer_activation] }
+      Input { data: h_t.clone()
+              , activation: self.outer_activation }
     }
   }
 

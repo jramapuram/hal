@@ -19,6 +19,7 @@ pub struct Params {
   pub activations: Vec<String>,
   pub deltas: Vec<Array>,
   pub inputs: Vec<Input>,
+  pub outputs: Vec<Input>,
   pub recurrences: Vec<Input>,
 }
 
@@ -41,6 +42,7 @@ impl ParamManager {
              , weight_dims: Vec<(usize, usize)>
              , biases_init: Vec<&str>
              , biases_dims: Vec<(usize, usize)>
+             , recurrence_dims: Option<(usize, usize)>
              , activations: Vec<&str>)
   {
     // generate the weights
@@ -54,9 +56,17 @@ impl ParamManager {
       biases.push(self.generate(b_init, b_dims));
     }
 
-    // if layer_type == "lstm" || layer_type == "gru" || layer_type == "rnn"{
-    //   self.has_recurrence = true;
-    // }
+    let recurrences = match layer_type {
+      "lstm"  => {
+        // htm1, i, f, o, ct, c
+        assert!(recurrence_dims.is_some());
+        vec![self.generate("zeros", recurrence_dims); 5];
+      },
+      "dense" => {
+        Vec::new()
+      },
+      _       => panic!("unknown layer type detected"),
+    };
 
     let owned_activations = activations.iter().map(|x| x.to_string()).collect::<Vec<String>>();
     self.layer_storage.push(Params{
@@ -66,7 +76,7 @@ impl ParamManager {
       activations: owned_activations,
       deltas: Vec::new(),
       inputs: Vec::new(),
-      recurrences: Vec::new(),
+      recurrences: recurrences,
     });
   }
 
@@ -147,6 +157,10 @@ impl ParamManager {
     dims
   }
 
+  marco_rules! get_vec {
+
+  }
+
   pub fn set_weights(&mut self, layer_index: usize, weights: Vec<Array>){
     assert!(self.layer_storage.len() - 1 >= layer_index);
     self.layer_storage[layer_index].weights = weights;
@@ -212,6 +226,29 @@ impl ParamManager {
     assert!(self.layer_storage.len() - 1 >= layer_index);
     assert!(self.layer_storage[layer_index].inputs.len() - 1 >= input_num);
     self.layer_storage[layer_index].inputs[input_num] = input;
+  }
+
+  pub fn get_outputs(&self, layer_index: usize) -> Vec<Input> {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    self.layer_storage[layer_index].outputs.clone()
+  }
+
+  pub fn get_output(&self, layer_index: usize, output_num: usize) -> Input {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].outputs.len() - 1 >= outputs_num);
+    self.layer_storage[layer_index].inputs[outputs_num].clone()
+  }
+
+  pub fn set_outputs(&mut self, layer_index: usize, output_num: usize, output: Vec<Input>) {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].outputs.len() - 1 >= output_num);
+    self.layer_storage[layer_index].outputs = output;
+  }
+
+  pub fn set_output(&mut self, layer_index: usize, output_num: usize, output: Input) {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    assert!(self.layer_storage[layer_index].outputs.len() - 1 >= output_num);
+    self.layer_storage[layer_index].inputs[output_num] = output;
   }
 
   pub fn get_activations(&self, layer_index: usize) -> Vec<String> {
@@ -306,6 +343,7 @@ impl DenseGenerator for ParamManager {
              , vec![(output_size, input_size)]
              , vec![b_init]
              , vec![(output_size, 1)]
+             , None
              , vec![activation]);
   }
 }
@@ -333,6 +371,7 @@ impl LSTMGenerator for ParamManager {
                     , recurrent_dims, recurrent_dims, recurrent_dims, recurrent_dims]
              , vec![b_init, forget_b_init, b_init, b_init]
              , vec![bias_dims; 4]
+             , bias_dims
              , vec![inner_activation, outer_activation]);
   }
 

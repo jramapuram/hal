@@ -102,16 +102,11 @@ impl Model for Sequential {
     // we will need to unwind at least once for non RNNs
     let bptt_unroll = max(activation.dims().unwrap()[2], 1);
     let mut activate = Input {data: af::slice(activation, 0).unwrap(), activation: "ones".to_string()};
-    let mut recurrences: Vec<Option<Input>> = vec![None; self.layers.len()];
     for t in 0..bptt_unroll {
       activate.data = af::slice(activation, t).unwrap();
       for i in 0..self.layers.len() {
-        //NOTE: This is non-activated output
-        let (a, r) = self.layers[i].forward(self.param_manager.get_mut_params(i)
-                                            , &activate
-                                            , &recurrences[i]);
-        activate = a.clone();
-        recurrences[i] = r;
+        activate = self.layers[i].forward(self.param_manager.get_mut_params(i)
+                                          , &activate);
       }
     }
 

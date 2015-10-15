@@ -73,8 +73,8 @@ impl Optimizer for SGD {
       // W = W - v
       let weights = parameter_manager.get_weights(layer_num);
       for weight_num in (0..weights.len()) {
-        let w_update = af::matmul(&parameter_manager.get_delta(layer_num, 0)   //layers[layer_num].get_delta()
-                                  , &parameter_manager.get_input(layer_num, 0).data //layers[layer_num].get_input().data.last().unwrap()
+        let w_update = af::matmul(&parameter_manager.get_delta(layer_num, 0)
+                                  , &parameter_manager.get_input(layer_num, 0).data
                                   , af::MatProp::NONE, af::MatProp::TRANS).unwrap();
         self.velocity_W[velocity_index[0]] = af::mul(&self.momemtum, &self.velocity_W[velocity_index[0]], false).unwrap();
         self.velocity_W[velocity_index[0]] = af::sub(&self.velocity_W[velocity_index[0]]
