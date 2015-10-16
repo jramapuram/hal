@@ -4,7 +4,7 @@ use af::MatProp;
 
 use activations;
 use initializations;
-use params::{LSTMIndex, Input, Params};
+use params::{LSTMIndex, GatedRecurrence, Input, Params};
 
 pub struct LSTM {
   pub input_size: usize,
@@ -18,31 +18,27 @@ pub enum ActivationIndex {
 }
 
 impl RTRL for LSTM {
-  pub fn rtrl(&self, dW_tm1: &mut Array  // previous W derivatives for [I, F, Ct]
-              , dU_tm1: &mut Array       // previous U derivatives for [I, F, Ct]
-              , db_tm1: &mut Array       // previous b derivatives for [I, F, Ct]
-              , z_t: &Array              // current time activation
-              , inputs: &Input           // x_t
-              , recurrences: &Input      // h_{t-1}
+  pub fn rtrl(&self, params: &mut Params)
   {
-    let block_size = z_t.dims().unwrap()[0]; // the batch size * 5
-    assert!(block_size as f32 % 5.0f32 == 0); // there are 5 data pieces we need
-    let chunk_size = block_size / 5;
-    // chunk out zi, zf, zct, zc_tm1
-    let zi_t = af::rows(z_t, 0, chunk_size).unwrap();
-    let zf_t = af::rows(z_t, chunk_size, 2*chunk_size).unwrap();
-    let zct_t = af::rows(z_t, 3*chunk_size, 4*chunk_size).unwrap();
+    let inner_activation = params.activation[0];
+    let outer_activation = params.activation[1];
+    let i_t  = params.recurrences[LSTMIndex::Input];
+    let f_t  = params.recurrences[LSTMIndex::Forget];
+    let o_t  = params.recurrences[LSTMIndex::Output];
+    let ct_t = params.recurrences[LSTMIndex::CellTilda];
+    let c_t  = params.recurrences[LSTMIndex::Cell];
+    let h_t  = params.recurrences[LSTMIndex::CellOutput];
 
-    // compute their activations
-    let i_t =  activations::get_activation(self.inner_activation, &zi_t).unwrap();
-    let f_t =  activations::get_activation(self.inner_activation, &zf_t).unwrap();
-    let ct_t = activations::get_activation(self.outer_activation, &zct_t).unwrap();
-    let c_tm1 = af::rows(z_t, 4*chunk_size, 5*chunk_size).unwrap();
+    let inputs = params.inputs.pop().unwrap();
+    let mut derivatives = params.optional.pop().unwrap();
+    let mut dW_tm1 = derivatives[0];
+    let mut dU_tm1 = derivatives[1];
+    let mut db_tm1 = derivatives[2];//TODO: Continue from here
 
     // compute their derivatives [diff(z_i), diff(z_f), diff(z_ct)]
-    let dz = vec![&activations::get_activation_derivative(self.inner_activation, &zi_t).unwrap()
-                  , &activations::get_activation_derivative(self.inner_activation, &zf_t).unwrap()
-                  , &activations::get_activation_derivative(self.outer_activation, &zct_t).unwrap()];
+    let dz = vec![&activations::get_activation_derivative(inner_activation, &i_t).unwrap()
+                  , &activations::get_activation_derivative(inner_activation, &f_t).unwrap()
+                  , &activations::get_activation_derivative(.outer_activation, &ct_t).unwrap()];
     let ct_ctm1_it = vec![&ct_t, &c_tm1, &i_t).unwrap()];
 
     // [Ct_t; C_{t-1}; i_t] * dz
@@ -77,10 +73,11 @@ impl Layer for LSTM {
     assert!(inputs.data.dims().unwrap()[2] == 1); // only planar data here
 
     // keep previous layer's outputs
-    params.inputs[0] = vec![inputs.clone()];
+    params.inputs.push(inputs.clone());
 
-    let h_tm1 = params.recurrences[0];  // cell output @ t-1
-    let c_tm1 = params.recurrences[1];  // cell memory @ t-1
+    let h_tm1 = params.recurrences[LSTMIndex::CellOutput].last().unwrap();  // cell output @ t-1
+    let c_tm1 = params.recurrences[LSTMIndex::Cell].last().unwrap();        // cell memory @ t-1
+    let x_t   = params.inputs.last().unwrap();                              // x_t
     let inner_activation = params.activations[0];
     let outer_activation = params.activations[1];
 
@@ -89,7 +86,7 @@ impl Layer for LSTM {
                               , &params.weights[LSTMIndex::Forget]
                               , &params.weights[LSTMIndex::Output]
                               , &params.weights[LSTMIndex::CellTilda]];
-    let offset = 3; // the offset from weights --> recurrent weights
+    let offset = 4; // the offset from weights --> recurrent weights
     let recurrents_ref = vec![&params.weights[LSTMIndex::Input as usize + offset]
                               , &params.weights[LSTMIndex::Forget as usize + offset]
                               , &params.weights[LSTMIndex::Output as usize + offset]
@@ -99,7 +96,7 @@ impl Layer for LSTM {
                               , &params.biases[LSTMIndex::Output]
                               , &params.biases[LSTMIndex::CellTilda]];
     // [z(i,f,o,ct)_t] = W*x + U*h_tm1 + b
-    let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), &inputs.data).unwrap()
+    let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), &x_t.data).unwrap()
                                , &af::matmul(&af::join_many(0, recurrents_ref).unwrap(), &h_tm1).unwrap(), false).unwrap()
                       , &af::join_many(0, bias_ref).unwrap(), true).unwrap();
     let i_t   = activations::get_activation(inner_activation, &af::rows(&z_t, 0, 1).unwrap());
@@ -114,8 +111,16 @@ impl Layer for LSTM {
                       , false).unwrap();
     let h_t = af::mul(&o_t, &activations::get_activation(outer_activation, &c_t).unwrap(), false).unwrap();
 
+    // store the outputs in the parameter manager
+    params.recurrences[LSTMIndex::Input].push(i_t.clone());
+    params.recurrences[LSTMIndex::Forget].push(f_t.clone());
+    params.recurrences[LSTMIndex::Output].push(o_t.clone());
+    params.recurrences[LSTMIndex::CellTilda].push(ct_t.clone());
+    params.recurrences[LSTMIndex::Cell].push(c_t.clone()); // TODO: we need c{t-1}
+    params.recurrences[LSTMIndex::CellOutput].push(h_t.clone());
+
     if self.return_sequences {
-      Input { data: af::join_many(0, vec![&h_t, &c_t]).unwrap()
+      Input { data: af::join_many(1, vec![&h_t, &c_t]).unwrap() // join on col
               , activation: self.outer_activation }
     }else {
       Input { data: h_t.clone()
@@ -123,24 +128,25 @@ impl Layer for LSTM {
     }
   }
 
-  fn backward(&self, params: &mut Params, delta: &Array) -> Array{
+  fn backward(&self, params: &mut Params, delta: &Array) -> Array {
     self.delta = delta.clone();
     let inner_activation = params.activations[0];
     let outer_activation = params.activations[1];
+    let o_t = params.recurrences[LSTMIndex::Output].last().unwrap();
+    let c_t = params.recurrences[LSTMIndex::Cell].last().unwrap();
 
     // d_h = inner_activation'(z_o)  * outer_activation(c_t) * delta
-    let d_h = af::mul(&af::mul(&activations::get_activation_derivative(inner_activation, params.recurrences[LSTMIndex::Output]).unwrap()
-                               , &activations::get_activation(outer_activation, params.recurrences[LSTMIndex::Cell]).unwrap()).unwrap()
+    let d_h = af::mul(&af::mul(&activations::get_activation_derivative(inner_activation, &o_t).unwrap()
+                               , &activations::get_activation(outer_activation, &c_t).unwrap()).unwrap()
                       , delta).unwrap();
     // e_t = o_t * outer_activation'(c_t) * delta
-    let e_t = af::mul(&af::mul(&activations::get_activation(inner_activation, params.recurrences[LSTMIndex::Output]).unwrap()
-                               , &activations::get_activation_derivative(outer_activation, params.recurrences[LSTMIndex::Cell]).unwrap()).unwrap()
-                      , delta).unwrap();
-    // dW = delta[0]
-    // dU = delta[1]
-    // db = delta[2]
-    //self.rtrl(&self.dW, &self.dU, &self.db, &z_t, inputs);
-    self.rtrl(, &self.dU, &self.db, &z_t, inputs);
+    let e_t = af::mul(&af::mul(&o_t, &activations::get_activation_derivative(outer_activation, &c_t).unwrap()
+                               , delta).unwrap();
+    self.rtrl(&mut params.optional[0]   // dW
+              , &mut params.optional[1] // dU
+              , &mut params.optional[2] // db
+              , &params.recurrences     // i, f, o, ct, c, h
+              , &params.inputs);        // x_t
 
     let activation_prev = activations::get_activation(self.inputs.activation[0], &self.inputs.data[DataIndex::Input]).unwrap();
     let d_activation_prev = activations::get_activation_derivative(self.inputs.activation[0], &activation_prev).unwrap();

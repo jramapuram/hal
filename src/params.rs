@@ -3,7 +3,7 @@ use std::default::Default;
 use itertools::Zip;
 
 use initializations;
-//use error::HALError;
+//use error::HAL Error;
 
 #[derive(Clone)]
 pub struct Input {
@@ -20,7 +20,8 @@ pub struct Params {
   pub deltas: Vec<Array>,
   pub inputs: Vec<Input>,
   pub outputs: Vec<Input>,
-  pub recurrences: Vec<Array>,
+  pub recurrences: Vec<Vec<Array>>,
+  pub optional: Vec<Array>,
 }
 
 pub struct ParamManager {
@@ -63,29 +64,29 @@ impl Default for ParamManager {
 impl ParamManager {
   pub fn add(&mut self
              , layer_type: &str
-             , weight_init: Vec<&str>
-             , weight_dims: Vec<(usize, usize)>
-             , biases_init: Vec<&str>
-             , biases_dims: Vec<(usize, usize)>
-             , recurrence_dims: Option<(usize, usize)>
-             , activations: Vec<&str>)
+             , weight_params: Vec<(&str, (usize, usize))> //(init, (i, o))
+             , biases_params: Vec<(&str, (usize, usize))> //(init, (i, o))
+             , activations: Vec<&str>
+             , recurrence_dims: Option<Vec<(usize, usize)>>
+             , optional: Option<Vec<(usize, usize)>>)
   {
     // generate the weights
-    let mut weights: Vec<Array> = Vec::with_capacity(weight_dims.len());
-    for (w_init, w_dims) in Zip::new((&weight_init, &weight_dims)) {
+    let mut weights: Vec<Array> = Vec::with_capacity(weight_params.len());
+    for (w_init, w_dims) in weight_params {
       weights.push(self.generate(w_init, w_dims));
     }
     // generate the biases
-    let mut biases: Vec<Array> = Vec::with_capacity(biases_dims.len());
-    for (b_init, b_dims) in Zip::new((&biases_init, &biases_dims)) {
+    let mut biases: Vec<Array> = Vec::with_capacity(biases_params.len());
+    for (b_init, b_dims) in biases_params {
       biases.push(self.generate(b_init, b_dims));
     }
 
-    let recurrences = match layer_type {
+    let (recurrences, optional) = match layer_type {
       "lstm"  => {
         // htm1, i, f, o, ct, c
         assert!(recurrence_dims.is_some());
-        vec![self.generate("zeros", &recurrence_dims.unwrap()); 5]
+        (vec![self.generate("zeros", &recurrence_dims.unwrap()); 5]
+         , )
       },
       "dense" => {
         Vec::new()
@@ -103,6 +104,7 @@ impl ParamManager {
       inputs: Vec::new(),
       outputs: Vec::new(),
       recurrences: recurrences,
+      optional: optional,
     });
   }
 
@@ -327,11 +329,12 @@ pub trait DenseGenerator {
 }
 
 pub enum LSTMIndex {
-  Input,
-  Forget,
-  Output,
-  CellTilda,
-  Cell,
+  Input,      // i_t
+  Forget,     // f_t
+  Output,     // o_t
+  CellTilda,  // ct_t
+  Cell,       // c_t
+  CellOutput, // h_t
 }
 
 pub trait LSTMGenerator {
@@ -365,8 +368,8 @@ impl DenseGenerator for ParamManager {
              , vec![(output_size, input_size)]
              , vec![b_init]
              , vec![(output_size, 1)]
-             , None
-             , vec![activation]);
+             , vec![activation]
+             , None, None);
   }
 }
 
@@ -393,12 +396,14 @@ impl LSTMGenerator for ParamManager {
                     , recurrent_dims, recurrent_dims, recurrent_dims, recurrent_dims]
              , vec![b_init, forget_b_init, b_init, b_init]
              , vec![bias_dims; 4]
-             , Some(bias_dims)
-             , vec![inner_activation, outer_activation]);
+             , vec![inner_activation, outer_activation]
+             , Some(vec![bias_dims; 6])
+             , Some(vec![("zeros", input_dims), ("zeros", recurrent_dims), ("zeros", bias_dims)])); // dW, dU, db
+
   }
 
   fn get_recurrences(&self, layer_index: usize) -> Vec<Array>{
-    let offset = 3;
+    let offset = 4;
     vec![self.get_weight(layer_index, LSTMIndex::Input as usize + offset)
          , self.get_weight(layer_index, LSTMIndex::Forget as usize + offset)
          , self.get_weight(layer_index, LSTMIndex::Output as usize+ offset)
@@ -406,7 +411,7 @@ impl LSTMGenerator for ParamManager {
   }
 
   fn get_recurrence(&self, layer_index: usize, recur_name: LSTMIndex) -> Array{
-    let offset = 3;
+    let offset = 4;
     self.get_weight(layer_index, recur_name as usize + offset)
   }
 
@@ -418,7 +423,7 @@ impl LSTMGenerator for ParamManager {
   }
 
   fn set_recurrence(&mut self, layer_index: usize, recur_name: LSTMIndex, recurrence: Array){
-    let offset = 3;
+    let offset = 4;
     self.set_weight(layer_index, offset + recur_name as usize, recurrence);
   }
 }
