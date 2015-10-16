@@ -21,7 +21,7 @@ pub struct Params {
   pub inputs: Vec<Input>,
   pub outputs: Vec<Input>,
   pub recurrences: Vec<Vec<Array>>,
-  pub optional: Vec<Array>,
+  pub optional: Vec<Vec<Array>>,
 }
 
 pub struct ParamManager {
@@ -81,18 +81,17 @@ impl ParamManager {
       biases.push(self.generate(b_init, b_dims));
     }
 
-    let (recurrences, optional) = match layer_type {
-      "lstm"  => {
-        // htm1, i, f, o, ct, c
-        assert!(recurrence_dims.is_some());
-        (vec![self.generate("zeros", &recurrence_dims.unwrap()); 5]
-         , )
-      },
-      "dense" => {
-        Vec::new()
-      },
-      _       => panic!("unknown layer type detected"),
-    };
+    // generate recurrence vectors
+    let mut recurrences: Vec<Array> = Vec::new();
+    for r_dims in recurrence_dims {
+      recurrences.push(self.generate("zeros", r_dims));
+    }
+
+    // some elements have optional params
+    let mut optional: Vec<Array> = Vec::new();
+    for o_dims in optional {
+      optional.push(self.generate("zeros", r_dims));
+    }
 
     let owned_activations = activations.iter().map(|x| x.to_string()).collect::<Vec<String>>();
     self.layer_storage.push(Params{
@@ -103,8 +102,8 @@ impl ParamManager {
       deltas: Vec::new(),
       inputs: Vec::new(),
       outputs: Vec::new(),
-      recurrences: recurrences,
-      optional: optional,
+      recurrences: vec![recurrences],
+      optional: vec![optional],
     });
   }
 
@@ -398,8 +397,9 @@ impl LSTMGenerator for ParamManager {
              , vec![bias_dims; 4]
              , vec![inner_activation, outer_activation]
              , Some(vec![bias_dims; 6])
-             , Some(vec![("zeros", input_dims), ("zeros", recurrent_dims), ("zeros", bias_dims)])); // dW, dU, db
-
+             , Some(vec![("zeros", input_dims)       // dW
+                         , ("zeros", recurrent_dims) // dU
+                         , ("zeros", bias_dims)]));  // db
   }
 
   fn get_recurrences(&self, layer_index: usize) -> Vec<Array>{

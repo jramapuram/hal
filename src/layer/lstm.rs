@@ -18,7 +18,7 @@ pub enum ActivationIndex {
 }
 
 impl RTRL for LSTM {
-  pub fn rtrl(&self, params: &mut Params)
+  pub fn rtrl(&self, params: &mut Params) -> Array
   {
     let inner_activation = params.activation[0];
     let outer_activation = params.activation[1];
@@ -39,7 +39,7 @@ impl RTRL for LSTM {
     let dz = vec![&activations::get_activation_derivative(inner_activation, &i_t).unwrap()
                   , &activations::get_activation_derivative(inner_activation, &f_t).unwrap()
                   , &activations::get_activation_derivative(.outer_activation, &ct_t).unwrap()];
-    let ct_ctm1_it = vec![&ct_t, &c_tm1, &i_t).unwrap()];
+    let ct_ctm1_it = vec![&ct_t, &c_tm1, &i_t];
 
     // [Ct_t; C_{t-1}; i_t] * dz
     let dzprod = af::mul(&af::join_many(0, ct_ctm1_it).unwrap()
@@ -63,7 +63,17 @@ impl RTRL for LSTM {
     // dC_t/dbf = (dC_{t-1}/dbf * f_t) + c_tm1 * inner_activation(z_f)
     // dC_t/dbct = (dC_{t-1}/dbct * f_t) + outer_activation(Ct)
     let b_lhs = af::mul(db_tm1, &f_t, true).unwrap(); // dC_{t-1}/db * f_t
-    dW_tm1 = af::add(&b_lhs, &dzprod, false).unwrap();
+    params.optional[2] = af::add(&b_lhs, &dzprod, false).unwrap(); //db_{t-1}
+
+    // cleanup members because this backprop is done
+    params.recurrences[LSTMIndex::Cell].pop();
+    params.recurrences[LSTMIndex::CellOutput].pop();
+    params.recurrences[LSTMIndex::CellTilda].pop();
+    params.recurrences[LSTMIndex::Forget].pop();
+    params.recurrences[LSTMIndex::Input].pop();
+    params.recurrences[LSTMIndex::Output].pop();
+
+
   }
 }
 
