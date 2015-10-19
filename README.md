@@ -7,7 +7,7 @@ Rust was chosen specifically because of [this](http://www.oreilly.com/programmin
 
 # Features
   
-  - Multi GPU support
+  - Multi GPU [model based] support
   - **OpenCL + CUDA + CPU build support**
   - **LSTM's with internal RTRL**
   - Perceptron's
@@ -16,6 +16,7 @@ Rust was chosen specifically because of [this](http://www.oreilly.com/programmin
   - Loss Functions:  [MSE, Cross-Entropy]
   - OpenGL based plotting
   - AutoEncoder's **[Work in Progress]**
+  - Multi GPU [horizontal] support **[TODO]**
   
 # Installation
 See [here](docs/installation.md)
