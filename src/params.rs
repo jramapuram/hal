@@ -5,6 +5,69 @@ use itertools::Zip;
 use initializations;
 //use error::HAL Error;
 
+macro_rules! set_param_vec_func {
+  ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
+    #[allow(unused_mut)]
+    pub fn $fn_name(&mut self, layer_index: usize, p: Vec<$base_type>) {
+      assert!(self.layer_storage.len() - 1 >= layer_index);
+      self.layer_storage[layer_index].$vec_extension = p;
+    }
+    )
+}
+
+macro_rules! get_param_vec_func {
+  ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
+    #[allow(unused_mut)]
+    pub fn $fn_name(&mut self, layer_index: usize) -> Vec<$base_type> {
+      assert!(self.layer_storage.len() - 1 >= layer_index);
+      self.layer_storage[layer_index].$vec_extension.clone()
+    }
+    )
+}
+
+macro_rules! get_mut_param_vec_func {
+  ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
+    #[allow(unused_mut)]
+    pub fn $fn_name(&mut self, layer_index: usize) -> &mut Vec<$base_type> {
+      assert!(self.layer_storage.len() - 1 >= layer_index);
+      &mut self.layer_storage[layer_index].$vec_extension
+    }
+    )
+}
+
+macro_rules! set_param_func {
+  ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
+    #[allow(unused_mut)]
+    pub fn $fn_name(&mut self, layer_index: usize, num: usize, p: $base_type) {
+      assert!(self.layer_storage.len() - 1 >= layer_index);
+      assert!(self.layer_storage[layer_index].$vec_extension.len() - 1 >= num);
+      self.layer_storage[layer_index].$vec_extension[num] = p;
+    }
+    )
+}
+
+macro_rules! get_param_func {
+  ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
+    #[allow(unused_mut)]
+    pub fn $fn_name(&mut self, layer_index: usize, num: usize) -> $base_type {
+      assert!(self.layer_storage.len() - 1 >= layer_index);
+      assert!(self.layer_storage[layer_index].$vec_extension.len() - 1 >= num);
+      self.layer_storage[layer_index].$vec_extension[num].clone()
+    }
+    )
+}
+
+macro_rules! get_mut_param_func {
+  ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
+    #[allow(unused_mut)]
+    pub fn $fn_name(&mut self, layer_index: usize, num: usize) -> &mut $base_type {
+      assert!(self.layer_storage.len() - 1 >= layer_index);
+      assert!(self.layer_storage[layer_index].$vec_extension.len() - 1 >= num);
+      &mut self.layer_storage[layer_index].$vec_extension[num]
+    }
+    )
+}
+
 #[derive(Clone)]
 pub struct Input {
   pub data: Array,
@@ -35,31 +98,6 @@ impl Default for ParamManager {
     }
   }
 }
-
-// macro_rules! set_params_func {
-//     ($fn_name: ident, $base_type: ty) => (
-//         #[allow(unused_mut)]
-//         pub fn $fn_name(&mut self, layer_index: usize, num: usize, p: Vec<) {
-//             unsafe {
-//                 let mut temp: i64 = 0;
-//                 let err_val = $ffi_fn(&mut temp as MutAfArray,
-//                                       lhs.get() as AfArray, rhs.get() as AfArray,
-//                                       0);
-//                 match err_val {
-//                     0 => Ok(Array::from(temp)),
-//                     _ => Err(AfError::from(err_val)),
-//                 }
-//             }
-//         }
-//     )
-// }
-
-
-//   pub fn set_inputs(&mut self, layer_index: usize, input_num: usize, input: Vec<Input>) {
-//     assert!(self.layer_storage.len() - 1 >= layer_index);
-//     assert!(self.layer_storage[layer_index].inputs.len() - 1 >= input_num);
-//     self.layer_storage[layer_index].inputs = input;
-//   }
 
 impl ParamManager {
   pub fn add(&mut self

@@ -109,8 +109,7 @@ impl Model for Sequential {
                                           , &activate);
       }
     }
-
-    activations::get_activation(&activate.activation, &activate.data).unwrap()
+    activate.clone()
   }
 
 
