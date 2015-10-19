@@ -15,13 +15,14 @@ For other OS's please install all the required dependencies[[linux](https://gith
   3. Clone the repo with the **submodules**:
 
   ```bash
-  $ git clone --recursive https://github.com/jramapuram/hal_rust
+  $ git clone --recursive https://github.com/jramapuram/hal
   ```
   4. Modify `build.conf` (located at `arrayfire-rust/build.conf`) to suit your compute device backend (eg: CUDA or openCL, etc).
   5. Build & run example:
   
   ```bash
   $ cargo build
+  $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:<path to libaf(cuda/cl/cpu).(so/dylib)>
   $ cargo run --example perceptron
   ```
 #### Example CUDA Ubuntu 14.10 `build.conf`
