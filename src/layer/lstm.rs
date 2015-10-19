@@ -18,7 +18,7 @@ pub enum ActivationIndex {
 }
 
 impl RTRL for LSTM {
-  pub fn rtrl(&self, params: &mut Params) -> Array
+  pub fn rtrl(&self, delta: &Array, params: &mut Params) -> Array
   {
     let inner_activation = params.activation[0];
     let outer_activation = params.activation[1];
@@ -29,11 +29,15 @@ impl RTRL for LSTM {
     let c_t  = params.recurrences[LSTMIndex::Cell];
     let h_t  = params.recurrences[LSTMIndex::CellOutput];
 
-    let inputs = params.inputs.pop().unwrap();
+    let inputs = params.inputs.last().unwrap();
     let mut derivatives = params.optional.pop().unwrap();
     let mut dW_tm1 = derivatives[0];
     let mut dU_tm1 = derivatives[1];
-    let mut db_tm1 = derivatives[2];//TODO: Continue from here
+    let mut db_tm1 = derivatives[2];
+
+    // e_t = o_t * outer_activation'(c_t) * delta
+    let e_t = af::mul(&af::mul(&o_t, &activations::get_activation_derivative(outer_activation, &c_t).unwrap()).unwrap()
+                               , delta).unwrap();
 
     // compute their derivatives [diff(z_i), diff(z_f), diff(z_ct)]
     let dz = vec![&activations::get_activation_derivative(inner_activation, &i_t).unwrap()
@@ -64,16 +68,6 @@ impl RTRL for LSTM {
     // dC_t/dbct = (dC_{t-1}/dbct * f_t) + outer_activation(Ct)
     let b_lhs = af::mul(db_tm1, &f_t, true).unwrap(); // dC_{t-1}/db * f_t
     params.optional[2] = af::add(&b_lhs, &dzprod, false).unwrap(); //db_{t-1}
-
-    // cleanup members because this backprop is done
-    params.recurrences[LSTMIndex::Cell].pop();
-    params.recurrences[LSTMIndex::CellOutput].pop();
-    params.recurrences[LSTMIndex::CellTilda].pop();
-    params.recurrences[LSTMIndex::Forget].pop();
-    params.recurrences[LSTMIndex::Input].pop();
-    params.recurrences[LSTMIndex::Output].pop();
-
-
   }
 }
 
@@ -139,24 +133,30 @@ impl Layer for LSTM {
   }
 
   fn backward(&self, params: &mut Params, delta: &Array) -> Array {
-    self.delta = delta.clone();
     let inner_activation = params.activations[0];
     let outer_activation = params.activations[1];
     let o_t = params.recurrences[LSTMIndex::Output].last().unwrap();
     let c_t = params.recurrences[LSTMIndex::Cell].last().unwrap();
 
+    // delta_t     = (transpose(W_{t+1}) * d_{l+1}) .* dActivation(z)
+    // delta_{t-1} = (transpose(W_{t}) * d_{l})
+    params.deltas = vec![af::mul(delta, &activations::get_activation_derivative(&params.activations[0]
+                                                                                , &params.outputs[0].data).unwrap(), false).unwrap()];
+
+    //TODO: redundant?
     // d_h = inner_activation'(z_o)  * outer_activation(c_t) * delta
     let d_h = af::mul(&af::mul(&activations::get_activation_derivative(inner_activation, &o_t).unwrap()
                                , &activations::get_activation(outer_activation, &c_t).unwrap()).unwrap()
                       , delta).unwrap();
-    // e_t = o_t * outer_activation'(c_t) * delta
-    let e_t = af::mul(&af::mul(&o_t, &activations::get_activation_derivative(outer_activation, &c_t).unwrap()
-                               , delta).unwrap();
-    self.rtrl(&mut params.optional[0]   // dW
-              , &mut params.optional[1] // dU
-              , &mut params.optional[2] // db
-              , &params.recurrences     // i, f, o, ct, c, h
-              , &params.inputs);        // x_t
+    let d_i = self.rtrl(delta, &d_h, &mut params); // input gate delta is returned
+
+    // cleanup members because this layer's backprop is done
+    params.recurrences[LSTMIndex::Cell].pop();
+    params.recurrences[LSTMIndex::CellOutput].pop();
+    params.recurrences[LSTMIndex::CellTilda].pop();
+    params.recurrences[LSTMIndex::Forget].pop();
+    params.recurrences[LSTMIndex::Input].pop();
+    params.recurrences[LSTMIndex::Output].pop();
 
     let activation_prev = activations::get_activation(self.inputs.activation[0], &self.inputs.data[DataIndex::Input]).unwrap();
     let d_activation_prev = activations::get_activation_derivative(self.inputs.activation[0], &activation_prev).unwrap();
