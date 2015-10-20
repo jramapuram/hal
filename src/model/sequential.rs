@@ -1,6 +1,5 @@
 use af;
 use af::{Array, Dim4, AfBackend};
-use na::{DMat, Shape, Transpose};
 use std::cmp::max;
 use std::default::Default;
 use std::collections::HashMap;
@@ -31,7 +30,7 @@ impl Default for Sequential {
       param_manager: ParamManager::default(),
       optimizer: Box::new(SGD::default()),
       loss: "mse".to_string(),
-      backend: AfBackend::AP_BACKEND_CPU,
+      backend: AfBackend::AF_BACKEND_CPU,
       device: 0,
     }
   }
@@ -139,15 +138,14 @@ impl Model for Sequential {
                          , self.param_manager.get_all_bias_dims());
 
     // create the container to hold the forward pass & loss results
-    let mut forward_pass = initializations::zeros(Dim4::new(&[1, input.ncols() as u64, 1, 1]));
-    let mut lossvec = Vec::<f32>::new();
-    let mut fwdpassvec = Vec::<Array>::new();
+    let mut a_t: Array;
     let mut loss: f32;
+    let mut a_t_vec = Vec::<Array>::new();
+    let mut lossvec = Vec::<f32>::new();
 
     // randomly shuffle the data
     if shuffle {
-      let col_vec = [input.ncols(), target.ncols()];
-      utils::shuffle(&mut[input.as_mut_vec(), target.as_mut_vec()], &col_vec, false);
+      utils::shuffle_array(&mut[&mut input, &mut target], idims[0]);
     }
 
     // normalize the data by mean and 3 std deviations
@@ -155,25 +153,27 @@ impl Model for Sequential {
     *target = utils::normalize_array(target, 3.0f32);
 
     // over every batch
-    let mut current_iteration = 0; //TODO: get this working with array chunks!!
-    for (i, t) in Zip::new((input.transpose().as_vec().chunks(idims[1] * batch_size)
-                            , target.transpose().as_vec().chunks(tdims[1] * batch_size as usize)))
-    {
+    let mut current_iteration = 0;
+    for i in (0..idims[0]).filter(|&x| x % batch_size == 0) {
       if verbose {
         print!("\n[iter: {}] ", current_iteration);
         current_iteration += 1;
       }
 
-      // column major order is preferred for BLAS
-      let batch_input  = utils::raw_to_array(i, idims[1],  batch_size as usize);
-      let batch_target = utils::raw_to_array(t, tdims[1], batch_size as usize);
+      // extract part of the array onto the GPU
+      let batch_input  = utils::array_swap_backend(utils::row_planes(input, i, i + batch_size as usize)
+                                                   , self.backend
+                                                   , self.device);
+      let batch_target = utils::array_swap_backend(utils::row_planes(target, i, i+ batch_size as usize)
+                                                   , self.backend
+                                                   , self.device);
 
       // DEBUG:
       // println!("batched [input: {:?} | target: {:?}]"
       //          , batch_input.dims().unwrap()
       //          , batch_target.dims().unwrap());
-      forward_pass = self.forward(&batch_input);
-      loss = self.backward(&forward_pass, &batch_target);
+      a_t = self.forward(&batch_input);
+      loss = self.backward(&a_t, &batch_target);
       self.optimizer.update(&mut self.param_manager, batch_size as u64);
 
       lossvec.push(loss);
@@ -182,16 +182,16 @@ impl Model for Sequential {
       }
 
       if return_predictions {
-        self.set_device(AfBackend::AF_BACKEND_CPU, 0);
-        fwdpassvec.push(loss.clone());
-        self.set_device(self.backend, self.device_id);
+        a_t_vec.push(loss.clone());
       }
     }
 
     utils::write_csv::<f32>("loss.csv", &lossvec);
-    match fwdpassvec.len() {
+    match a_t_vec.len() {
       0 => (lossvec, None),
-      _ => (lossvec, fwdpassvec)
+      _ => (lossvec
+            , Some(a_t_vec.iter().map(|&x|
+                                      utils::array_swap_backend(x, AfBackend::AF_BACKEND_CPU, 0)).collect::<Vec<_>>())),
     }
   }
 

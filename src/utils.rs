@@ -7,8 +7,7 @@ use std::path::Path;
 use std::ops::Sub;
 use num::traits::Float;
 use statistical::{standard_deviation, mean};
-use af::{Dim4, Array, Aftype};
-use na::{DMat, DVec, Shape};
+use af::{Dim4, Array, Aftype, AfBackend, Seq};
 use itertools::Zip;
 use rustc_serialize::Encodable;
 
@@ -91,16 +90,17 @@ pub fn shuffle_matrix<T>(v: &mut[&mut [T]], cols: &[usize], row_major: bool) {
 }
 
 pub fn row_plane(input: &Array, slice_num: u64) -> Result<Array, AfError> {
-  assign_seq(input, &[Seq::new(slice_num as f64, slice_num as f64, 1.0)
-                      , Seq::default(), Seq::default()], new_row)
+  af::index(input, &[Seq::new(slice_num as f64, slice_num as f64, 1.0)
+                     , Seq::default()
+                     , Seq::default()])
 }
 
-pub fn set_row_plane(input: &Array, new_slice: &Array, slice_num: u64) -> Result<Array, AfError> {
-  assign_seq(input, &[Seq::new(slice_num as f64, slice_num as f64, 1.0)]
-             , Seq::default()
-             , Seq::default()
-             , new_slice)
+pub fn row_planes(input: &Array, first: u64, last: u64) -> Result<Array, AfError> {
+  af::index(input, &[Seq::new(first as f64, last as f64, 1.0)]
+            , Seq::default()
+            , Seq::default())
 }
+
 
 // Randomly shuffle planes of an array
 pub fn shuffle_array(o: &mut[&mut Array], rows: u64) {
