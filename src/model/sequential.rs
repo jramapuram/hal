@@ -1,5 +1,5 @@
 use af;
-use af::{Array, Dim4};
+use af::{Array, Dim4, AfBackend};
 use na::{DMat, Shape, Transpose};
 use std::cmp::max;
 use std::default::Default;
@@ -21,6 +21,7 @@ pub struct Sequential {
   optimizer: Box<Optimizer>,
   loss: String,
   device: i32,
+  backend: AfBackend,
 }
 
 impl Default for Sequential {
@@ -30,6 +31,7 @@ impl Default for Sequential {
       param_manager: ParamManager::default(),
       optimizer: Box::new(SGD::default()),
       loss: "mse".to_string(),
+      backend: AfBackend::AP_BACKEND_CPU,
       device: 0,
     }
   }
@@ -37,13 +39,16 @@ impl Default for Sequential {
 
 impl Model for Sequential {
   fn new(optimizer: Box<Optimizer>
-         , loss: &str) -> Sequential {
+         , loss: &str
+         , backend: AfBackend
+         , device: i32) -> Sequential {
     Sequential {
       layers: Vec::new(),
       param_manager: ParamManager::default(),
       loss: loss.to_string(),
       optimizer: optimizer,
-      device: -1,
+      backend: backend,
+      device: device,
     }
   }
 
@@ -89,8 +94,12 @@ impl Model for Sequential {
     println!("loss:           {}\nnum_layers:     {}", self.loss, self.layers.len());
   }
 
-  fn set_device(&mut self, device_id: i32) {
-    self.device = device_id;
+  fn set_device(&mut self, backend: AfBackend, device_id: i32) {
+    match af::set_backend(backend) {
+      Ok(_)  => {},
+      Err(e) =>  panic!("could not set backend: {:?}", e),
+     };
+
     match af::set_device(device_id) {
       Ok(_)  => {},
       Err(e) =>  panic!("could not set device: {:?}", e),
@@ -113,22 +122,26 @@ impl Model for Sequential {
   }
 
 
-  fn fit(&mut self, input: &mut DMat<f32>, target: &mut DMat<f32>
-         , batch_size: usize, shuffle: bool, verbose: bool) -> (Vec<f32>, DMat<f32>)
+  fn fit(&mut self, input: &mut Array, target: &mut Array
+         , batch_size: usize, return_predictions: bool
+         , shuffle: bool, verbose: bool) -> (Vec<f32>, Option<Vec<Array>>)
   {
     // some required data validity checks
-    let iter = input.nrows() as u64 / batch_size as u64;
+    let idims = input.dims().unwrap().get();
+    let tdims = target.dims().unwrap().get();
+    let iter =  idims[0] as u64 / batch_size as u64;
     println!("\ntrain samples: {:?} | target samples: {:?} | batch size: {} | iterations: {}"
-             , input.shape(), target.shape(), batch_size, iter);
-    assert!(target.nrows() == input.nrows());
-    assert!(input.nrows() >= batch_size
-            && input.nrows() % batch_size == 0); //ease up later
+             , idims, tdims, batch_size, iter);
+    assert!(tdims[0] == idims[0]);
+    assert!(idims[0] >= batch_size
+            && idims[0] % batch_size == 0); //ease up later
     self.optimizer.setup(self.param_manager.get_all_weight_dims()
                          , self.param_manager.get_all_bias_dims());
 
     // create the container to hold the forward pass & loss results
     let mut forward_pass = initializations::zeros(Dim4::new(&[1, input.ncols() as u64, 1, 1]));
     let mut lossvec = Vec::<f32>::new();
+    let mut fwdpassvec = Vec::<Array>::new();
     let mut loss: f32;
 
     // randomly shuffle the data
@@ -138,15 +151,13 @@ impl Model for Sequential {
     }
 
     // normalize the data by mean and 3 std deviations
-    *input = utils::normalize_dmat(input, 3.0f32);
-    *target = utils::normalize_dmat(target, 3.0f32);
+    *input = utils::normalize_array(input, 3.0f32);
+    *target = utils::normalize_array(target, 3.0f32);
 
     // over every batch
-    let incols = input.ncols() as usize;
-    let tncols = target.ncols() as usize;
-    let mut current_iteration = 0;
-    for (i, t) in Zip::new((input.transpose().as_vec().chunks(incols * batch_size)
-                            , target.transpose().as_vec().chunks(tncols * batch_size as usize)))
+    let mut current_iteration = 0; //TODO: get this working with array chunks!!
+    for (i, t) in Zip::new((input.transpose().as_vec().chunks(idims[1] * batch_size)
+                            , target.transpose().as_vec().chunks(tdims[1] * batch_size as usize)))
     {
       if verbose {
         print!("\n[iter: {}] ", current_iteration);
@@ -154,8 +165,8 @@ impl Model for Sequential {
       }
 
       // column major order is preferred for BLAS
-      let batch_input  = utils::raw_to_array(i, incols,  batch_size as usize);
-      let batch_target = utils::raw_to_array(t, tncols, batch_size as usize);
+      let batch_input  = utils::raw_to_array(i, idims[1],  batch_size as usize);
+      let batch_target = utils::raw_to_array(t, tdims[1], batch_size as usize);
 
       // DEBUG:
       // println!("batched [input: {:?} | target: {:?}]"
@@ -169,10 +180,19 @@ impl Model for Sequential {
       if verbose {
         print!("{} ", loss);
       }
+
+      if return_predictions {
+        self.set_device(AfBackend::AF_BACKEND_CPU, 0);
+        fwdpassvec.push(loss.clone());
+        self.set_device(self.backend, self.device_id);
+      }
     }
 
     utils::write_csv::<f32>("loss.csv", &lossvec);
-    (lossvec, utils::array_to_dmat(&forward_pass))
+    match fwdpassvec.len() {
+      0 => (lossvec, None),
+      _ => (lossvec, fwdpassvec)
+    }
   }
 
   fn backward(&mut self, prediction: &Array, target: &Array) -> f32 {

@@ -36,34 +36,16 @@ pub fn raw_to_array<T>(raw_values: &[T], rows: usize, cols: usize) -> Array {
   Array::new(dims, &raw_values, Aftype::F32).unwrap()
 }
 
-// Convert a dmat of elements to an array
-pub fn dmat_to_array<T>(dmat_values: &DMat<T>) -> Array {
-  raw_to_array(dmat_values.as_vec(), dmat_values.shape().0, dmat_values.shape().1)
-}
-
-// Convert a dvec of elements to an array
-pub fn dvec_to_array<T>(dvec_values: &DVec<T>) -> Array {
-  raw_to_array(dvec_values.at.as_ref(), dvec_values.len(), 1)
-}
-
-// Convert a GPU array to a dmat
-pub fn array_to_dmat(arr: &Array) -> DMat<f32>{
-  let mut retval = DMat::<f32>::new_zeros(arr.dims().unwrap()[0] as usize
-                                          , arr.dims().unwrap()[1] as usize);
-  match arr.host(retval.as_mut_vec()) {
-    Ok(_)  => {},
-    Err(e) => panic!("error pulling data from gpu to cpu: {:?}", e),
-  };
-  retval
-}
-
-// slice a plane from a 3-dimensional tensor
-pub fn slice_plane(input: &Array, plane_num: u8) -> Array {
-  let dims = input.dims().unwrap();
-  assert!(dims.ndims() == 3);
-  af::index(input, &[af::Seq::default()
-                     , af::Seq::default()
-                     , af::Seq::new(plane_num as f64, plane_num as f64, 1.0)]).unwrap()
+// Convert an array from one backend to the other
+pub fn array_swap_backend(input: &Array
+                          , backend: af::AfBackend
+                          , device_id: u8) -> Array
+{
+  let mut buffer: [f32; input.dims().unwrap().elements()];
+  input.host(&mut buffer);
+  af::set_backend(backend).unwrap();
+  af::set_device(device_id).unwrap();
+  Array::new(input.dims, &buffer, Aftype::F32).unwrap()
 }
 
 // Helper to swap rows (row major order) in a generic type [non GPU]
@@ -88,7 +70,7 @@ pub fn swap_col<T>(matrix: &mut [T], row_src: usize, row_dest: usize, cols: usiz
 }
 
 // Randomly shuffle a set of 2d matrices [or vectors] using knuth shuffle
-pub fn shuffle<T>(v: &mut[&mut [T]], cols: &[usize], row_major: bool) {
+pub fn shuffle_matrix<T>(v: &mut[&mut [T]], cols: &[usize], row_major: bool) {
   assert!(v.len() > 0 && cols.len() > 0);
 
   let total_length = v[0].len();
@@ -104,6 +86,33 @@ pub fn shuffle<T>(v: &mut[&mut [T]], cols: &[usize], row_major: bool) {
         true  => swap_row(mat, rnd_row, row_count - row - 1, col.clone()),
         false => swap_col(mat, rnd_row, row_count - row - 1, col.clone()),
       };
+    }
+  }
+}
+
+pub fn row_plane(input: &Array, slice_num: u64) -> Result<Array, AfError> {
+  assign_seq(input, &[Seq::new(slice_num as f64, slice_num as f64, 1.0)
+                      , Seq::default(), Seq::default()], new_row)
+}
+
+pub fn set_row_plane(input: &Array, new_slice: &Array, slice_num: u64) -> Result<Array, AfError> {
+  assign_seq(input, &[Seq::new(slice_num as f64, slice_num as f64, 1.0)]
+             , Seq::default()
+             , Seq::default()
+             , new_slice)
+}
+
+// Randomly shuffle planes of an array
+pub fn shuffle_array(o: &mut[&mut Array], rows: u64) {
+  let mut rng = rand::thread_rng();
+  for row in (0..rows) {
+    let rnd_row = rng.gen_range(0, rows - row);
+    for mat in v.iter_mut() { //swap all tensors similarly
+      let dims = mat.dims().unwrap().get();
+      let rnd_slice = row_plane(mat, rnd_row).unwrap();
+      let orig = row_plane(mat, dims[0] - row - 1).unwrap();
+      mat = set_row_plane(mat, rnd_slice, dims[0] - row - 1).unwrap();
+      mat = set_row_plane(mat, orig_slice, rnd_row).unwrap();
     }
   }
 }
@@ -160,15 +169,6 @@ pub fn normalize_array(src: &Array, num_std_dev: f32) -> Array {
   }else{
     af::sub(src, &mean, false).unwrap()
   }
-}
-
-// Normalize a dmat array based on mean & num_std_dev deviations
-pub fn normalize_dmat<T: Float>(src: &DMat<T>, num_std_dev: T) -> DMat<T> {
-  let cols = src.ncols();
-  let rows = src.nrows();
-  let mut dmat_vec = src.clone().to_vec();
-  dmat_vec = normalize(&dmat_vec[..], num_std_dev);
-  DMat::from_col_vec(rows, cols, &dmat_vec[..])
 }
 
 pub fn scale(src: &Array, low: f32, high: f32) -> Array {
