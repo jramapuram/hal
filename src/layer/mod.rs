@@ -9,7 +9,7 @@ use af::Array;
 use params::{Input, Params};
 
 pub trait Layer {
-  fn forward(&self, params: &mut Params, input: &Input) -> Input;
+  fn forward(&self, params: &mut Params, inputs: &Input, train: bool) -> Input;
   fn backward(&self, params: &mut Params, delta: &Array) -> Array;
 }
 

@@ -80,7 +80,7 @@ pub struct Params {
   pub weights: Vec<Array>,
   pub biases: Vec<Array>,
   pub activations: Vec<String>,
-  pub deltas: Vec<Array>,
+  pub deltas: Vec<Vec<Array>>,
   pub inputs: Vec<Input>,
   pub outputs: Vec<Input>,
   pub recurrences: Vec<Vec<Array>>,

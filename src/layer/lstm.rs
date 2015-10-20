@@ -72,16 +72,12 @@ impl RTRL for LSTM {
 }
 
 impl Layer for LSTM {
-  fn forward(&self, params: &mut Params, inputs: &Input) -> Input
+  fn forward(&self, params: &mut Params, inputs: &Input, train: bool) -> Input
   {
     assert!(inputs.data.dims().unwrap()[2] == 1); // only planar data here
 
-    // keep previous layer's outputs
-    params.inputs.push(inputs.clone());
-
     let h_tm1 = params.recurrences[LSTMIndex::CellOutput].last().unwrap();  // cell output @ t-1
     let c_tm1 = params.recurrences[LSTMIndex::Cell].last().unwrap();        // cell memory @ t-1
-    let x_t   = params.inputs.last().unwrap();                              // x_t
     let inner_activation = params.activations[0];
     let outer_activation = params.activations[1];
 
@@ -100,7 +96,7 @@ impl Layer for LSTM {
                               , &params.biases[LSTMIndex::Output]
                               , &params.biases[LSTMIndex::CellTilda]];
     // [z(i,f,o,ct)_t] = W*x + U*h_tm1 + b
-    let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), &x_t.data).unwrap()
+    let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), inputs.data).unwrap()
                                , &af::matmul(&af::join_many(0, recurrents_ref).unwrap(), &h_tm1).unwrap(), false).unwrap()
                       , &af::join_many(0, bias_ref).unwrap(), true).unwrap();
     let i_t   = activations::get_activation(inner_activation, &af::rows(&z_t, 0, 1).unwrap());
@@ -115,13 +111,16 @@ impl Layer for LSTM {
                       , false).unwrap();
     let h_t = af::mul(&o_t, &activations::get_activation(outer_activation, &c_t).unwrap(), false).unwrap();
 
-    // store the outputs in the parameter manager
-    params.recurrences[LSTMIndex::Input].push(i_t.clone());
-    params.recurrences[LSTMIndex::Forget].push(f_t.clone());
-    params.recurrences[LSTMIndex::Output].push(o_t.clone());
-    params.recurrences[LSTMIndex::CellTilda].push(ct_t.clone());
-    params.recurrences[LSTMIndex::Cell].push(c_t.clone()); // TODO: we need c{t-1}
-    params.recurrences[LSTMIndex::CellOutput].push(h_t.clone());
+    if train { // store the outputs & recurrences in the parameter manager
+      params.inputs.push(inputs.clone());
+      params.outputs.push(h_t.clone());
+      params.recurrences[LSTMIndex::Input].push(i_t.clone());
+      params.recurrences[LSTMIndex::Forget].push(f_t.clone());
+      params.recurrences[LSTMIndex::Output].push(o_t.clone());
+      params.recurrences[LSTMIndex::CellTilda].push(ct_t.clone());
+      params.recurrences[LSTMIndex::Cell].push(c_t.clone()); // TODO: we need c{t-1}
+      params.recurrences[LSTMIndex::CellOutput].push(h_t.clone());
+    }
 
     if self.return_sequences {
       Input { data: af::join_many(1, vec![&h_t, &c_t]).unwrap() // join on col
