@@ -12,29 +12,33 @@ pub struct Dense {
 
 impl Layer for Dense {
 
-  fn forward(&self, params: &mut Params, inputs: &Input)-> Input
+  fn forward(&self, params: &mut Params, inputs: &Input, train: bool)-> Input
   {
-    // parameter manager keeps previous activation
-    params.inputs = vec![inputs.clone()];
-
-    // a_t = sigma(Wx + b) [the bias is added in parallel for batch]
-    let a_t = af::add(&af::matmul(&params.weights[0]
+    // z_t = Wx + b [the bias is added in parallel for batch]
+    let z_t = af::add(&af::matmul(&params.weights[0]
                                   , &inputs.data//activated_input
                                   , MatProp::NONE
                                   , MatProp::NONE).unwrap()
                       , &params.biases[0], true).unwrap();
+    // a_t = sigma(z_t)
+    let a_t = Input{ data: activations::get_activation(&params.activations[0], &z_t).unwrap()
+                     , activation: params.activations[0].clone() };
 
-    // parameter manager keeps the output
-    params.outputs = vec![Input{ data: activations::get_activation(&params.activations[0], &a_t).unwrap()
-                                 , activation: params.activations[0].clone() }];
-    params.outputs[0].clone() //clone is merely incrementing a refcount
+    // parameter manager keeps the output & inputs
+    // these are only needed for training, so dont store otherwise
+    if train {
+      params.inputs.push(inputs.clone());
+      params.outputs.push(a_t.clone());
+    }
+
+    a_t.clone() // clone just increases the ref count
   }
 
   fn backward(&self, params: &mut Params, delta: &Array) -> Array {
     // delta_t     = (transpose(W_{t+1}) * d_{l+1}) .* dActivation(z)
     // delta_{t-1} = (transpose(W_{t}) * d_{l})
-    params.deltas = vec![af::mul(delta, &activations::get_activation_derivative(&params.activations[0]
-                                                                                , &params.outputs[0].data).unwrap(), false).unwrap()];
+    params.deltas.push(af::mul(delta, &activations::get_activation_derivative(&params.activations[0]
+                                                                              , &params.outputs[0].data).unwrap(), false).unwrap());
     af::matmul(&params.weights[0], &params.deltas[0], af::MatProp::TRANS, af::MatProp::NONE).unwrap()
   }
 

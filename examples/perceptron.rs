@@ -1,13 +1,13 @@
 #[macro_use] extern crate hal;
-extern crate nalgebra as na;
+extern crate arrayfire as af;
 
 use hal::utils;
 use hal::Model;
-use na::{DMat, ColSlice, Shape};
 use hal::optimizer::{Optimizer, SGD};
 use hal::error::HALError;
 use hal::model::{Sequential};
-use hal::plot::{plot_vec, plot_dvec};
+use hal::plot::{plot_vec, plot_array};
+use af::{Array, Dim4, AfBackend, Aftype};
 
 fn build_optimizer(name: &str) -> Result<Box<Optimizer>, HALError> {
   match name{
@@ -16,17 +16,12 @@ fn build_optimizer(name: &str) -> Result<Box<Optimizer>, HALError> {
   }
 }
 
-fn generate_sin_wave(input_dims: usize, num_rows: usize) -> DMat<f32> {
-  let mut waves = DMat::<f32>::new_zeros(num_rows, input_dims);
-  let mut index: f32 = 0.0f32;
-  let delta: f32 = 2.0*3.1415/(input_dims as f32);
-  for r in 0..num_rows {
-    for c in 0..input_dims {
-      waves[(r, c)] = index.sin();
-      index += delta;
-    }
-  }
-  waves
+fn generate_sin_wave(input_dims: u64, num_rows: u64) -> Array {
+  let dims = Dim4::new(&[input_dims * num_rows, 1, 1, 1]);
+  let x = af::div(&af::sin(&af::range(dims, 0, Aftype::F32).unwrap()).unwrap()
+                  , &input_dims, false).unwrap();
+  let wave = af::sin(&x).unwrap();
+  af::moddims(&wave, Dim4::new(&[num_rows, input_dims, 1, 1])).unwrap()
 }
 
 fn main() {
@@ -39,23 +34,27 @@ fn main() {
   let optimizer_type = "SGD";
 
   // Now, let's build a model with an optimizer and a loss function
-  let mut model = Box::new(Sequential::new(build_optimizer(optimizer_type).unwrap(), "mse"));
+  let mut model = Box::new(Sequential::new(build_optimizer(optimizer_type).unwrap() //optimizer
+                                           , "mse"                                  // loss
+                                           , AfBackend::AF_BACKEND_CUDA             // backend
+                                           , 0));                                   // device_id
 
-  // Set which GPU we want to run this model on
-  model.set_device(0);
+  // Temporarily set the backend to CPU so that we can load data into RAM
+  // The model will automatically toggle to the desired backend during training
+  model.set_device(AfBackend::AF_BACKEND_CPU, 0);
 
   // Let's add a few layers why don't we?
   let input_str: &str = &input_dims.to_string();
   let hidden_str: &str = &hidden_dims.to_string();
   let output_str: &str = &output_dims.to_string();
-  model.add("dense", hashmap!["input_size"    => input_str
-                              , "output_size" => hidden_str
-                              , "activation"  => "tanh"
+  model.add("dense", hashmap!["activation"    => "tanh"
+                              , "input_size"  => input_str//&input_dims.to_string()
+                              , "output_size" => hidden_str//&hidden_dims.to_string()
                               , "w_init"      => "glorot_uniform"
                               , "b_init"      => "zeros"]);
-  model.add("dense", hashmap!["input_size"    => hidden_str
-                              , "output_size" => output_str
-                              , "activation"  => "tanh"
+  model.add("dense", hashmap!["activation"    => "tanh"
+                              , "input_size"  => hidden_str//&hidden_dims.to_string()
+                              , "output_size" => output_str//&output_dims.to_string()
                               , "w_init"      => "glorot_uniform"
                               , "b_init"      => "zeros"]);
 
@@ -63,18 +62,24 @@ fn main() {
   model.info();
 
   // Test with learning to predict sin wave
-  let mut data = generate_sin_wave(input_dims as usize, num_train_samples);
+  let mut data = generate_sin_wave(input_dims, num_train_samples);
   let mut target = data.clone();
 
   // iterate our model in Verbose mode (printing loss)
-  let (loss, prediction) = model.fit(&mut data, &mut target, batch_size, true, true);
+  let (loss, prediction) = model.fit(&mut data, &mut target, batch_size
+                                     , true   // return predictions
+                                     , true   // shuffle
+                                     , true); // verbose
+
 
   // plot our loss
-  println!("pred shape: {:?}", prediction.shape());
   plot_vec(loss, "Loss vs. Iterations", 512, 512);
-  let pred_rows = prediction.nrows();
-  plot_dvec(&prediction.col_slice(0, 0, pred_rows - 1), "Final Prediction Rows", 512, 512);
 
-  // write one of the results to csv
-  utils::write_csv::<f32>("prediction_col.csv", &prediction.col_slice(0, 0, pred_rows - 1).at);
+  // plot one of our waves
+  if let Some(p) = prediction {
+    assert!(p.len() > 0);
+    println!("prediction count: {} | prediction shape: {:?}"
+             , p.len(), p[0].dims().unwrap().get().clone());
+    plot_array(&p.last().unwrap(), "Final Prediction Rows", 512, 512);
+  }
 }

@@ -1,6 +1,6 @@
 use af::{Array, Dim4};
 use std::default::Default;
-use itertools::Zip;
+//use itertools::Zip;
 
 use initializations;
 //use error::HAL Error;
@@ -80,11 +80,11 @@ pub struct Params {
   pub weights: Vec<Array>,
   pub biases: Vec<Array>,
   pub activations: Vec<String>,
-  pub deltas: Vec<Vec<Array>>,
+  pub deltas: Vec<Array>,
   pub inputs: Vec<Input>,
   pub outputs: Vec<Input>,
-  pub recurrences: Vec<Vec<Array>>,
-  pub optional: Vec<Vec<Array>>,
+  pub recurrences: Vec<Array>,
+  pub optional: Vec<Array>,
 }
 
 pub struct ParamManager {
@@ -105,8 +105,8 @@ impl ParamManager {
              , weight_params: Vec<(&str, (usize, usize))> //(init, (i, o))
              , biases_params: Vec<(&str, (usize, usize))> //(init, (i, o))
              , activations: Vec<&str>
-             , recurrence_dims: Option<Vec<(usize, usize)>>
-             , optional: Option<Vec<(usize, usize)>>)
+             , recurrence_dims: Option<Vec<(&str, (usize, usize))>>
+             , optional_dims: Option<Vec<(&str, (usize, usize))>>)
   {
     // generate the weights
     let mut weights: Vec<Array> = Vec::with_capacity(weight_params.len());
@@ -121,14 +121,18 @@ impl ParamManager {
 
     // generate recurrence vectors
     let mut recurrences: Vec<Array> = Vec::new();
-    for r_dims in recurrence_dims {
-      recurrences.push(self.generate("zeros", r_dims));
+    if let Some(r) = recurrence_dims{
+      for (r_init, r_dims) in r {
+        recurrences.push(self.generate(r_init, r_dims));
+      }
     }
 
     // some elements have optional params
     let mut optional: Vec<Array> = Vec::new();
-    for o_dims in optional {
-      optional.push(self.generate("zeros", r_dims));
+    if let Some(o) = optional_dims {
+      for (o_init, o_dims) in o {
+        optional.push(self.generate(o_init, o_dims));
+      }
     }
 
     let owned_activations = activations.iter().map(|x| x.to_string()).collect::<Vec<String>>();
@@ -140,12 +144,12 @@ impl ParamManager {
       deltas: Vec::new(),
       inputs: Vec::new(),
       outputs: Vec::new(),
-      recurrences: vec![recurrences],
-      optional: vec![optional],
+      recurrences: recurrences,
+      optional: optional,
     });
   }
 
-  fn generate(&self, init: &str, dims: &(usize, usize)) -> Array {
+  fn generate(&self, init: &str, dims: (usize, usize)) -> Array {
     let dims = Dim4::new(&[dims.0 as u64, dims.1 as u64, 1, 1]);
     initializations::get_initialization(init, dims).unwrap()
   }
@@ -164,27 +168,59 @@ impl ParamManager {
     &mut self.layer_storage[layer_index]
   }
 
-  pub fn get_weights(&self, layer_index: usize) -> Vec<Array> {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    self.layer_storage[layer_index].weights.clone()
-  }
+  get_param_func!(get_weight, weights, Array);
+  get_param_func!(get_bias, biases, Array);
+  get_param_func!(get_activation, activations, String);
+  get_param_func!(get_delta, deltas, Array);
+  get_param_func!(get_input, inputs, Input);
+  get_param_func!(get_output, outputs, Input);
+  get_param_func!(get_recurrence, recurrences, Array);
+  get_param_func!(get_optional, optional, Array);
 
-  pub fn get_weight(&self, layer_index: usize, weight_num: usize) -> Array {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].weights.len() - 1 >= weight_num);
-    self.layer_storage[layer_index].weights[weight_num].clone()
-  }
+  get_mut_param_func!(get_mut_weight, weights, Array);
+  get_mut_param_func!(get_mut_bias, biases, Array);
+  get_mut_param_func!(get_mut_activation, activations, String);
+  get_mut_param_func!(get_mut_delta, deltas, Array);
+  get_mut_param_func!(get_mut_input, inputs, Input);
+  get_mut_param_func!(get_mut_output, outputs, Input);
+  get_mut_param_func!(get_mut_recurrence, recurrences, Array);
+  get_mut_param_func!(get_mut_optional, optional, Array);
 
-  pub fn get_biases(&self, layer_index: usize) -> Vec<Array> {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    self.layer_storage[layer_index].biases.clone()
-  }
+  get_param_vec_func!(get_weights, weights, Array);
+  get_param_vec_func!(get_biases, biases, Array);
+  get_param_vec_func!(get_activations, activations, String);
+  get_param_vec_func!(get_deltas, deltas, Array);
+  get_param_vec_func!(get_inputs, inputs, Input);
+  get_param_vec_func!(get_outputs, outputs, Input);
+  get_param_vec_func!(get_recurrences, recurrences, Array);
+  get_param_vec_func!(get_optionals, optional, Array);
 
-  pub fn get_bias(&self, layer_index: usize, bias_num: usize) -> Array {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].biases.len() - 1 >= bias_num);
-    self.layer_storage[layer_index].biases[bias_num].clone()
-  }
+  get_param_vec_func!(get_mut_weights, weights, Array);
+  get_param_vec_func!(get_mut_biases, biases, Array);
+  get_param_vec_func!(get_mut_activations, activations, String);
+  get_param_vec_func!(get_mut_deltas, deltas, Array);
+  get_param_vec_func!(get_mut_inputs, inputs, Input);
+  get_param_vec_func!(get_mut_outputs, outputs, Input);
+  get_param_vec_func!(get_mut_recurrences, recurrences, Array);
+  get_param_vec_func!(get_mut_optionals, optional, Array);
+
+  set_param_func!(set_weight, weights, Array);
+  set_param_func!(set_bias, biases, Array);
+  set_param_func!(set_activation, activations, String);
+  set_param_func!(set_delta, deltas, Array);
+  set_param_func!(set_input, inputs, Input);
+  set_param_func!(set_output, outputs, Input);
+  set_param_func!(set_recurrence, recurrences, Array);
+  set_param_func!(set_optional, optional, Array);
+
+  set_param_vec_func!(set_weights, weights, Array);
+  set_param_vec_func!(set_biases, biases, Array);
+  set_param_vec_func!(set_activations, activations, String);
+  set_param_vec_func!(set_deltas, deltas, Array);
+  set_param_vec_func!(set_inputs, inputs, Input);
+  set_param_vec_func!(set_outputs, outputs, Input);
+  set_param_vec_func!(set_recurrences, recurrences, Array);
+  set_param_vec_func!(set_optionals, optional, Array);
 
   pub fn get_bias_dims(&self, layer_index: usize) -> Vec<Dim4> {
     let mut dims = Vec::new();
@@ -221,108 +257,6 @@ impl ParamManager {
     }
     dims
   }
-
-  pub fn set_weights(&mut self, layer_index: usize, weights: Vec<Array>){
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    self.layer_storage[layer_index].weights = weights;
-  }
-
-  pub fn set_weight(&mut self, layer_index: usize, weight_num: usize, weight: Array){
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].weights.len() - 1 >= weight_num);
-    self.layer_storage[layer_index].weights[weight_num] = weight;
-  }
-
-  pub fn set_biases(&mut self, layer_index: usize, biases: Vec<Array>){
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    self.layer_storage[layer_index].biases = biases;
-  }
-
-  pub fn set_bias(&mut self, layer_index: usize, bias_num: usize, bias: Array){
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].biases.len() - 1 >= bias_num);
-    self.layer_storage[layer_index].biases[bias_num] = bias;
-  }
-
-  pub fn get_deltas(&self, layer_index: usize) -> Vec<Array> {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    self.layer_storage[layer_index].deltas.clone()
-  }
-
-  pub fn get_delta(&self, layer_index: usize, delta_num: usize) -> Array {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].deltas.len() - 1 >= delta_num);
-    self.layer_storage[layer_index].deltas[delta_num].clone()
-  }
-
-  pub fn set_deltas(&mut self, layer_index: usize, deltas: Vec<Array>) {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    self.layer_storage[layer_index].deltas = deltas;
-  }
-
-  pub fn set_delta(&mut self, layer_index: usize, delta_num: usize, delta: Array) {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].deltas.len() - 1 >= delta_num);
-    self.layer_storage[layer_index].deltas[delta_num] = delta;
-  }
-
-  pub fn get_inputs(&self, layer_index: usize) -> Vec<Input> {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    self.layer_storage[layer_index].inputs.clone()
-  }
-
-  pub fn get_input(&self, layer_index: usize, input_num: usize) -> Input {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].inputs.len() - 1 >= input_num);
-    self.layer_storage[layer_index].inputs[input_num].clone()
-  }
-
-  pub fn set_inputs(&mut self, layer_index: usize, input_num: usize, input: Vec<Input>) {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].inputs.len() - 1 >= input_num);
-    self.layer_storage[layer_index].inputs = input;
-  }
-
-  pub fn set_input(&mut self, layer_index: usize, input_num: usize, input: Input) {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].inputs.len() - 1 >= input_num);
-    self.layer_storage[layer_index].inputs[input_num] = input;
-  }
-
-  pub fn get_outputs(&self, layer_index: usize) -> Vec<Input> {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    self.layer_storage[layer_index].outputs.clone()
-  }
-
-  pub fn get_output(&self, layer_index: usize, output_num: usize) -> Input {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].outputs.len() - 1 >= output_num);
-    self.layer_storage[layer_index].inputs[output_num].clone()
-  }
-
-  pub fn set_outputs(&mut self, layer_index: usize, output_num: usize, output: Vec<Input>) {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].outputs.len() - 1 >= output_num);
-    self.layer_storage[layer_index].outputs = output;
-  }
-
-  pub fn set_output(&mut self, layer_index: usize, output_num: usize, output: Input) {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].outputs.len() - 1 >= output_num);
-    self.layer_storage[layer_index].inputs[output_num] = output;
-  }
-
-  pub fn get_activations(&self, layer_index: usize) -> Vec<String> {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    self.layer_storage[layer_index].activations.clone()
-  }
-
-  pub fn get_activation(&self, layer_index: usize, activation_num: usize) -> String {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
-    assert!(self.layer_storage[layer_index].activations.len() - 1 >= activation_num);
-    self.layer_storage[layer_index].activations[activation_num].clone()
-  }
-
 
   pub fn tie_weight(&mut self, layer_input: usize, iweight_index: usize
                 , layer_output: usize, oweight_index: usize)
@@ -385,10 +319,6 @@ pub trait LSTMGenerator {
               , w_outer_init: &str
               , forget_bias_init: &str
               , b_init: &str);
-  fn get_recurrences(&self, layer_index: usize) -> Vec<Array>;
-  fn get_recurrence(&self, layer_index: usize, recur_name: LSTMIndex) -> Array;
-  fn set_recurrences(&mut self, layer_index: usize, recurrences: Vec<Array>);
-  fn set_recurrence(&mut self, layer_index: usize, recur_name: LSTMIndex, recurrence: Array);
 }
 
 /** Custom Layer Impls **/
@@ -401,10 +331,8 @@ impl DenseGenerator for ParamManager {
                , b_init: &str)
   {
     self.add("dense"
-             , vec![w_init]
-             , vec![(output_size, input_size)]
-             , vec![b_init]
-             , vec![(output_size, 1)]
+             , vec![(w_init, (output_size, input_size))]
+             , vec![(b_init, (output_size, 1))]
              , vec![activation]
              , None, None);
   }
@@ -427,41 +355,22 @@ impl LSTMGenerator for ParamManager {
     let bias_dims = (output_size, 1);
     // W_i, W_f, W_o, W_ct, U_i, U_f, U_o, U_ct
     self.add("lstm"
-             , vec![w_init, w_init, w_init, w_init
-                    , w_recurrent_init, w_recurrent_init, w_recurrent_init, w_recurrent_init]
-             , vec![input_dims, input_dims, input_dims, input_dims
-                    , recurrent_dims, recurrent_dims, recurrent_dims, recurrent_dims]
-             , vec![b_init, forget_b_init, b_init, b_init]
-             , vec![bias_dims; 4]
+             , vec![(w_init, input_dims)
+                    , (w_init, input_dims)
+                    , (w_init, input_dims)
+                    , (w_init, input_dims)
+                    , (w_recurrent_init, recurrent_dims)
+                    , (w_recurrent_init, recurrent_dims)
+                    , (w_recurrent_init, recurrent_dims)
+                    , (w_recurrent_init, recurrent_dims)]
+             , vec![(b_init, bias_dims)
+                    , (forget_b_init, bias_dims)
+                    , (b_init, bias_dims)
+                    , (b_init, bias_dims)]
              , vec![inner_activation, outer_activation]
-             , Some(vec![bias_dims; 6])
+             , Some(vec![("zeros", bias_dims); 6])   // i_f_o_ct_c_h @ t-1
              , Some(vec![("zeros", input_dims)       // dW
                          , ("zeros", recurrent_dims) // dU
                          , ("zeros", bias_dims)]));  // db
-  }
-
-  fn get_recurrences(&self, layer_index: usize) -> Vec<Array>{
-    let offset = 4;
-    vec![self.get_weight(layer_index, LSTMIndex::Input as usize + offset)
-         , self.get_weight(layer_index, LSTMIndex::Forget as usize + offset)
-         , self.get_weight(layer_index, LSTMIndex::Output as usize+ offset)
-         , self.get_weight(layer_index, LSTMIndex::CellTilda as usize + offset)]
-  }
-
-  fn get_recurrence(&self, layer_index: usize, recur_name: LSTMIndex) -> Array{
-    let offset = 4;
-    self.get_weight(layer_index, recur_name as usize + offset)
-  }
-
-  fn set_recurrences(&mut self, layer_index: usize, recurrences: Vec<Array>){
-    self.set_recurrence(layer_index, LSTMIndex::Input, recurrences[LSTMIndex::Input as usize].clone());
-    self.set_recurrence(layer_index, LSTMIndex::Forget, recurrences[LSTMIndex::Forget as usize].clone());
-    self.set_recurrence(layer_index, LSTMIndex::Output, recurrences[LSTMIndex::Output as usize].clone());
-    self.set_recurrence(layer_index, LSTMIndex::CellTilda, recurrences[LSTMIndex::CellTilda as usize].clone());
-  }
-
-  fn set_recurrence(&mut self, layer_index: usize, recur_name: LSTMIndex, recurrence: Array){
-    let offset = 4;
-    self.set_weight(layer_index, offset + recur_name as usize, recurrence);
   }
 }

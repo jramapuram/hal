@@ -7,7 +7,7 @@ use std::path::Path;
 use std::ops::Sub;
 use num::traits::Float;
 use statistical::{standard_deviation, mean};
-use af::{Dim4, Array, Aftype, AfBackend, Seq};
+use af::{Dim4, Array, Aftype, AfBackend, Seq, AfError};
 use itertools::Zip;
 use rustc_serialize::Encodable;
 
@@ -35,16 +35,42 @@ pub fn raw_to_array<T>(raw_values: &[T], rows: usize, cols: usize) -> Array {
   Array::new(dims, &raw_values, Aftype::F32).unwrap()
 }
 
+// convert an array into a vector of rows
+pub fn array_to_rows(input: &Array) -> Vec<Array> {
+  let mut rows = Vec::new();
+  for r in (0..input.dims().unwrap()[0]) {
+    rows.push(af::row(input, r as u64).unwrap());
+  }
+  rows
+}
+
+// convert a vector of rows into a single array
+pub fn rows_to_array(input: Vec<&Array>) -> Array {
+  // let mut arr = vec![input[0]];
+  // // af_join_many supports up to 10 (9 + previous) arrays being joined at once
+  // for rows in input[1..input.len()].iter().collect::<Vec<_>>().chunks(9) {
+  //   arr.extend(Vec::from(rows));
+  //   arr = vec![&af::join_many(0, arr).unwrap()];
+  // }
+  // arr[0].clone();
+  if input.len() > 10 {
+    panic!("cannot currently handle array merge of more than 10 items");
+  }
+
+  af::join_many(0, input).unwrap()
+}
+
 // Convert an array from one backend to the other
 pub fn array_swap_backend(input: &Array
                           , backend: af::AfBackend
-                          , device_id: u8) -> Array
+                          , device_id: i32) -> Array
 {
-  let mut buffer: [f32; input.dims().unwrap().elements()];
-  input.host(&mut buffer);
+  let dims = input.dims().unwrap();
+  let mut buffer = vec![0f32; dims.elements() as usize];
+  input.host(&mut buffer).unwrap();
   af::set_backend(backend).unwrap();
   af::set_device(device_id).unwrap();
-  Array::new(input.dims, &buffer, Aftype::F32).unwrap()
+  Array::new(dims, &buffer, Aftype::F32).unwrap()
 }
 
 // Helper to swap rows (row major order) in a generic type [non GPU]
@@ -89,32 +115,44 @@ pub fn shuffle_matrix<T>(v: &mut[&mut [T]], cols: &[usize], row_major: bool) {
   }
 }
 
+// Randomly shuffle planes of an array
+pub fn shuffle_array(v: &mut[&mut Array], rows: u64) {
+  let mut rng = rand::thread_rng();
+  for row in (0..rows) {
+    let rnd_row = rng.gen_range(0, rows - row);
+    for mat in v.iter_mut() { //swap all tensors similarly
+      let dims = mat.dims().unwrap();
+      let rnd_plane  = row_plane(mat, rnd_row).unwrap();
+      let orig_plane = row_plane(mat, dims[0] - row - 1).unwrap();
+      **mat = set_row_plane(mat, &rnd_plane, dims[0] - row - 1).unwrap();
+      **mat = set_row_plane(mat, &orig_plane, rnd_row).unwrap();
+    }
+  }
+}
+
 pub fn row_plane(input: &Array, slice_num: u64) -> Result<Array, AfError> {
   af::index(input, &[Seq::new(slice_num as f64, slice_num as f64, 1.0)
                      , Seq::default()
                      , Seq::default()])
 }
 
-pub fn row_planes(input: &Array, first: u64, last: u64) -> Result<Array, AfError> {
-  af::index(input, &[Seq::new(first as f64, last as f64, 1.0)]
-            , Seq::default()
-            , Seq::default())
+pub fn set_row_plane(input: &Array, new_plane: &Array, plane_num: u64) -> Result<Array, AfError> {
+  af::assign_seq(input, &[Seq::new(plane_num as f64, plane_num as f64, 1.0)
+                          , Seq::default(), Seq::default()]
+                 , new_plane)
 }
 
+pub fn row_planes(input: &Array, first: u64, last: u64) -> Result<Array, AfError> {
+  af::index(input, &[Seq::new(first as f64, last as f64, 1.0)
+                     , Seq::default()
+                     , Seq::default()])
+}
 
-// Randomly shuffle planes of an array
-pub fn shuffle_array(o: &mut[&mut Array], rows: u64) {
-  let mut rng = rand::thread_rng();
-  for row in (0..rows) {
-    let rnd_row = rng.gen_range(0, rows - row);
-    for mat in v.iter_mut() { //swap all tensors similarly
-      let dims = mat.dims().unwrap().get();
-      let rnd_slice = row_plane(mat, rnd_row).unwrap();
-      let orig = row_plane(mat, dims[0] - row - 1).unwrap();
-      mat = set_row_plane(mat, rnd_slice, dims[0] - row - 1).unwrap();
-      mat = set_row_plane(mat, orig_slice, rnd_row).unwrap();
-    }
-  }
+pub fn set_row_planes(input: &Array, new_planes: &Array, first: u64, last: u64) -> Result<Array, AfError> {
+  af::assign_seq(input, &[Seq::new(first as f64, last as f64, 1.0)
+                          , Seq::default()
+                          , Seq::default()]
+                 , new_planes)
 }
 
 // Helper to write a vector to a csv file

@@ -1,14 +1,11 @@
 use af;
-use af::{Array, Dim4, AfBackend};
+use af::{Array, AfBackend};
 use std::cmp::max;
 use std::default::Default;
 use std::collections::HashMap;
-use itertools::Zip;
 
 use utils;
 use loss;
-use activations;
-use initializations;
 use layer::{Layer, Dense};
 use model::Model;
 use optimizer::{Optimizer, SGD};
@@ -105,7 +102,7 @@ impl Model for Sequential {
      };
   }
 
-  fn forward(&mut self, activation: &Array) -> Array {
+  fn forward(&mut self, activation: &Array, train: bool) -> Array {
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
     let bptt_unroll = max(activation.dims().unwrap()[2], 1);
@@ -114,20 +111,20 @@ impl Model for Sequential {
       activate.data = af::slice(activation, t).unwrap();
       for i in 0..self.layers.len() {
         activate = self.layers[i].forward(self.param_manager.get_mut_params(i)
-                                          , &activate);
+                                          , &activate, train);
       }
     }
-    activate.clone()
+    activate.data
   }
 
 
   fn fit(&mut self, input: &mut Array, target: &mut Array
-         , batch_size: usize, return_predictions: bool
+         , batch_size: u64, return_predictions: bool
          , shuffle: bool, verbose: bool) -> (Vec<f32>, Option<Vec<Array>>)
   {
     // some required data validity checks
-    let idims = input.dims().unwrap().get();
-    let tdims = target.dims().unwrap().get();
+    let idims = input.dims().unwrap().get().clone();
+    let tdims = target.dims().unwrap().get().clone();
     let iter =  idims[0] as u64 / batch_size as u64;
     println!("\ntrain samples: {:?} | target samples: {:?} | batch size: {} | iterations: {}"
              , idims, tdims, batch_size, iter);
@@ -145,7 +142,7 @@ impl Model for Sequential {
 
     // randomly shuffle the data
     if shuffle {
-      utils::shuffle_array(&mut[&mut input, &mut target], idims[0]);
+      utils::shuffle_array(&mut[input, target], idims[0]);
     }
 
     // normalize the data by mean and 3 std deviations
@@ -161,10 +158,10 @@ impl Model for Sequential {
       }
 
       // extract part of the array onto the GPU
-      let batch_input  = utils::array_swap_backend(utils::row_planes(input, i, i + batch_size as usize)
+      let batch_input  = utils::array_swap_backend(&utils::row_planes(input, i, i + batch_size).unwrap()
                                                    , self.backend
                                                    , self.device);
-      let batch_target = utils::array_swap_backend(utils::row_planes(target, i, i+ batch_size as usize)
+      let batch_target = utils::array_swap_backend(&utils::row_planes(target, i, i+ batch_size).unwrap()
                                                    , self.backend
                                                    , self.device);
 
@@ -172,7 +169,7 @@ impl Model for Sequential {
       // println!("batched [input: {:?} | target: {:?}]"
       //          , batch_input.dims().unwrap()
       //          , batch_target.dims().unwrap());
-      a_t = self.forward(&batch_input);
+      a_t = self.forward(&batch_input, true);
       loss = self.backward(&a_t, &batch_target);
       self.optimizer.update(&mut self.param_manager, batch_size as u64);
 
@@ -182,7 +179,7 @@ impl Model for Sequential {
       }
 
       if return_predictions {
-        a_t_vec.push(loss.clone());
+        a_t_vec.push(a_t);
       }
     }
 
@@ -190,8 +187,8 @@ impl Model for Sequential {
     match a_t_vec.len() {
       0 => (lossvec, None),
       _ => (lossvec
-            , Some(a_t_vec.iter().map(|&x|
-                                      utils::array_swap_backend(x, AfBackend::AF_BACKEND_CPU, 0)).collect::<Vec<_>>())),
+            , Some(a_t_vec.iter().map(|x|
+                                      utils::array_swap_backend(&x, AfBackend::AF_BACKEND_CPU, 0)).collect::<Vec<_>>())),
     }
   }
 

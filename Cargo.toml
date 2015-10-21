@@ -8,7 +8,6 @@ rustc-serialize = "*"
 rand = "*"
 csv = "*"
 num= "*"
-nalgebra = "*"
 itertools = "*"
 statistical = "*"
 arrayfire = { path ="arrayfire-rust" }
