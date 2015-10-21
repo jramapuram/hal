@@ -80,17 +80,12 @@ impl Model for Sequential {
 
   //TODO: convert to log crate [or hashmap]
   fn info(&self) {
-    match af::info() {
-      Ok(_)   => {},
-      Err(e)  => panic!("could not get info: {:?}", e),
-    };
-
     println!("");
     self.optimizer.info();
     println!("loss:           {}\nnum_layers:     {}", self.loss, self.layers.len());
   }
 
-  fn set_device(&mut self, backend: AfBackend, device_id: i32) {
+  fn set_device(&self, backend: AfBackend, device_id: i32) {
     match af::set_backend(backend) {
       Ok(_)  => {},
       Err(e) =>  panic!("could not set backend: {:?}", e),
@@ -106,7 +101,8 @@ impl Model for Sequential {
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
     let bptt_unroll = max(activation.dims().unwrap()[2], 1);
-    let mut activate = Input {data: af::slice(activation, 0).unwrap(), activation: "ones".to_string()};
+    let mut activate = Input {data: af::slice(activation, 0).unwrap()
+                              , activation: "ones".to_string()};
     for t in 0..bptt_unroll {
       activate.data = af::slice(activation, t).unwrap();
       for i in 0..self.layers.len() {
@@ -158,19 +154,28 @@ impl Model for Sequential {
       }
 
       // extract part of the array onto the GPU
-      let batch_input  = utils::array_swap_backend(&utils::row_planes(input, i, i + batch_size).unwrap()
+      let batch_input  = utils::array_swap_backend(&utils::row_planes(input, i, i + batch_size - 1).unwrap()
+                                                   , AfBackend::AF_BACKEND_CPU
                                                    , self.backend
+                                                   , 0
                                                    , self.device);
-      let batch_target = utils::array_swap_backend(&utils::row_planes(target, i, i+ batch_size).unwrap()
+      println!("passed first one");
+      let batch_target = utils::array_swap_backend(&utils::row_planes(target, i, i+ batch_size - 1).unwrap()
+                                                   , AfBackend::AF_BACKEND_CPU
                                                    , self.backend
+                                                   , 0
                                                    , self.device);
 
       // DEBUG:
-      // println!("batched [input: {:?} | target: {:?}]"
-      //          , batch_input.dims().unwrap()
-      //          , batch_target.dims().unwrap());
+      println!("batched [input: {:?} | target: {:?}]"
+               , batch_input.dims().unwrap().get().clone()
+               , batch_target.dims().unwrap().get().clone());
+
+      self.set_device(self.backend, self.device);
       a_t = self.forward(&batch_input, true);
+      println!("past forward");
       loss = self.backward(&a_t, &batch_target);
+      println!("past backward");
       self.optimizer.update(&mut self.param_manager, batch_size as u64);
 
       lossvec.push(loss);
@@ -187,8 +192,10 @@ impl Model for Sequential {
     match a_t_vec.len() {
       0 => (lossvec, None),
       _ => (lossvec
-            , Some(a_t_vec.iter().map(|x|
-                                      utils::array_swap_backend(&x, AfBackend::AF_BACKEND_CPU, 0)).collect::<Vec<_>>())),
+            , Some(a_t_vec.iter().map(|x| utils::array_swap_backend(&x, self.backend
+                                                                , AfBackend::AF_BACKEND_CPU
+                                                                , self.device
+                                                                , 0)).collect::<Vec<_>>())),
     }
   }
 

@@ -62,15 +62,26 @@ pub fn rows_to_array(input: Vec<&Array>) -> Array {
 
 // Convert an array from one backend to the other
 pub fn array_swap_backend(input: &Array
-                          , backend: af::AfBackend
-                          , device_id: i32) -> Array
+                          , from: af::AfBackend
+                          , to: af::AfBackend
+                          , from_device_id: i32
+                          , to_device_id: i32) -> Array
 {
   let dims = input.dims().unwrap();
-  let mut buffer = vec![0f32; dims.elements() as usize];
+  let mut buffer: Vec<f32> = vec![0.0f32; dims.elements() as usize];
   input.host(&mut buffer).unwrap();
-  af::set_backend(backend).unwrap();
-  af::set_device(device_id).unwrap();
-  Array::new(dims, &buffer, Aftype::F32).unwrap()
+
+  // swap to the new buffer
+  af::set_backend(to).unwrap();
+  af::set_device(to_device_id).unwrap();
+
+  let converted = Array::new(dims, &buffer, Aftype::F32).unwrap();
+
+  // swap back to the old buffer
+  af::set_backend(from).unwrap();
+  af::set_device(from_device_id).unwrap();
+
+  converted
 }
 
 // Helper to swap rows (row major order) in a generic type [non GPU]
@@ -116,6 +127,7 @@ pub fn shuffle_matrix<T>(v: &mut[&mut [T]], cols: &[usize], row_major: bool) {
 }
 
 // Randomly shuffle planes of an array
+// SLOOOOOOW
 pub fn shuffle_array(v: &mut[&mut Array], rows: u64) {
   let mut rng = rand::thread_rng();
   for row in (0..rows) {
@@ -137,9 +149,23 @@ pub fn row_plane(input: &Array, slice_num: u64) -> Result<Array, AfError> {
 }
 
 pub fn set_row_plane(input: &Array, new_plane: &Array, plane_num: u64) -> Result<Array, AfError> {
-  af::assign_seq(input, &[Seq::new(plane_num as f64, plane_num as f64, 1.0)
-                          , Seq::default(), Seq::default()]
-                 , new_plane)
+  match input.dims().unwrap().ndims() {
+    4 => af::assign_seq(input, &[Seq::new(plane_num as f64, plane_num as f64, 1.0)
+                                 , Seq::default()
+                                 , Seq::default()
+                                 , Seq::default()]
+                        , new_plane),
+    3 => af::assign_seq(input, &[Seq::new(plane_num as f64, plane_num as f64, 1.0)
+                                 , Seq::default()
+                                 , Seq::default()]
+                        , new_plane),
+    2 => af::assign_seq(input, &[Seq::new(plane_num as f64, plane_num as f64, 1.0)
+                                 , Seq::default()]
+                        , new_plane),
+    1 => af::assign_seq(input, &[Seq::new(plane_num as f64, plane_num as f64, 1.0)]
+                        , new_plane),
+    _ => panic!("unknown dimensions provided to set_row_planes"),
+  }
 }
 
 pub fn row_planes(input: &Array, first: u64, last: u64) -> Result<Array, AfError> {
@@ -148,11 +174,26 @@ pub fn row_planes(input: &Array, first: u64, last: u64) -> Result<Array, AfError
                      , Seq::default()])
 }
 
-pub fn set_row_planes(input: &Array, new_planes: &Array, first: u64, last: u64) -> Result<Array, AfError> {
-  af::assign_seq(input, &[Seq::new(first as f64, last as f64, 1.0)
-                          , Seq::default()
-                          , Seq::default()]
-                 , new_planes)
+pub fn set_row_planes(input: &Array, new_planes: &Array
+                      , first: u64, last: u64) -> Result<Array, AfError>
+{
+  match input.dims().unwrap().ndims() {
+    4 => af::assign_seq(input, &[Seq::new(first as f64, last as f64, 1.0)
+                                 , Seq::default()
+                                 , Seq::default()
+                                 , Seq::default()]
+                        , new_planes),
+    3 => af::assign_seq(input, &[Seq::new(first as f64, last as f64, 1.0)
+                                 , Seq::default()
+                                 , Seq::default()]
+                        , new_planes),
+    2 => af::assign_seq(input, &[Seq::new(first as f64, last as f64, 1.0)
+                                 , Seq::default()]
+                        , new_planes),
+    1 => af::assign_seq(input, &[Seq::new(first as f64, last as f64, 1.0)]
+                        , new_planes),
+    _ => panic!("unknown dimensions provided to set_row_planes"),
+  }
 }
 
 // Helper to write a vector to a csv file

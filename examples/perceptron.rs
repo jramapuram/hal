@@ -68,7 +68,7 @@ fn main() {
   // iterate our model in Verbose mode (printing loss)
   let (loss, prediction) = model.fit(&mut data, &mut target, batch_size
                                      , true   // return predictions
-                                     , true   // shuffle
+                                     , false   // shuffle
                                      , true); // verbose
 
 
