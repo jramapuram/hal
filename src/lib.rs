@@ -15,6 +15,9 @@ pub mod model;
 pub use optimizer::{Optimizer};
 pub mod optimizer;
 
+pub use tensor::Tensor;
+pub mod tensor;
+
 pub mod params;
 pub mod error;
 pub mod loss;

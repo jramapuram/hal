@@ -3,6 +3,7 @@ extern crate arrayfire as af;
 
 use hal::Model;
 use hal::optimizer::{Optimizer, SGD};
+use hal::utils::set_device;
 use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::plot::{plot_vec, plot_array};
@@ -55,7 +56,7 @@ fn main() {
 
   // Temporarily set the backend to CPU so that we can load data into RAM
   // The model will automatically toggle to the desired backend during training
-  model.set_device(AfBackend::AF_BACKEND_CPU, 0);
+  set_device(AfBackend::AF_BACKEND_CPU, 0);
 
   // Test with learning to predict sin wave
   let mut data = generate_sin_wave(input_dims, num_train_samples);

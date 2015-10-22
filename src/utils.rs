@@ -44,6 +44,19 @@ pub fn array_to_rows(input: &Array) -> Vec<Array> {
   rows
 }
 
+// toggle the backend and device
+pub fn set_device(backend: AfBackend, device_id: i32) {
+  match af::set_backend(backend) {
+    Ok(_)  => {},
+    Err(e) =>  panic!("could not set backend: {:?}", e),
+  };
+
+  match af::set_device(device_id) {
+    Ok(_)  => {},
+    Err(e) =>  panic!("could not set device: {:?}", e),
+  };
+}
+
 // convert a vector of rows into a single array
 pub fn rows_to_array(input: Vec<&Array>) -> Array {
   // let mut arr = vec![input[0]];

@@ -20,6 +20,5 @@ pub trait Model {
   fn backward(&mut self, prediction: &Array, target: &Array) -> f32;
   fn add(&mut self, layer: &str
          , params: HashMap<&str, String>);
-  fn set_device(&self, backend: AfBackend, device_id: i32);
   fn info(&self);
 }

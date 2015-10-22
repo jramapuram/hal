@@ -86,18 +86,6 @@ impl Model for Sequential {
     println!("loss:           {}\nnum_layers:     {}", self.loss, self.layers.len());
   }
 
-  fn set_device(&self, backend: AfBackend, device_id: i32) {
-    match af::set_backend(backend) {
-      Ok(_)  => {},
-      Err(e) =>  panic!("could not set backend: {:?}", e),
-     };
-
-    match af::set_device(device_id) {
-      Ok(_)  => {},
-      Err(e) =>  panic!("could not set device: {:?}", e),
-     };
-  }
-
   fn forward(&mut self, activation: &Array, train: bool) -> Array {
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
