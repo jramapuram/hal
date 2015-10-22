@@ -67,6 +67,10 @@ pub fn array_swap_backend(input: &Array
                           , from_device_id: i32
                           , to_device_id: i32) -> Array
 {
+  // swap to the old buffer
+  af::set_backend(from).unwrap();
+  af::set_device(from_device_id).unwrap();
+
   let dims = input.dims().unwrap();
   let mut buffer: Vec<f32> = vec![0.0f32; dims.elements() as usize];
   input.host(&mut buffer).unwrap();
@@ -76,11 +80,6 @@ pub fn array_swap_backend(input: &Array
   af::set_device(to_device_id).unwrap();
 
   let converted = Array::new(dims, &buffer, Aftype::F32).unwrap();
-
-  // swap back to the old buffer
-  af::set_backend(from).unwrap();
-  af::set_device(from_device_id).unwrap();
-
   converted
 }
 

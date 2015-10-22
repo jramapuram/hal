@@ -1,7 +1,6 @@
 #[macro_use] extern crate hal;
 extern crate arrayfire as af;
 
-use hal::utils;
 use hal::Model;
 use hal::optimizer::{Optimizer, SGD};
 use hal::error::HALError;
@@ -39,10 +38,6 @@ fn main() {
                                            , AfBackend::AF_BACKEND_CUDA             // backend
                                            , 0));                                   // device_id
 
-  // Temporarily set the backend to CPU so that we can load data into RAM
-  // The model will automatically toggle to the desired backend during training
-  model.set_device(AfBackend::AF_BACKEND_CPU, 0);
-
   // Let's add a few layers why don't we?
   let input_str: &str = &input_dims.to_string();
   let hidden_str: &str = &hidden_dims.to_string();
@@ -61,25 +56,27 @@ fn main() {
   // Get some nice information about our model
   model.info();
 
+  // Temporarily set the backend to CPU so that we can load data into RAM
+  // The model will automatically toggle to the desired backend during training
+  model.set_device(AfBackend::AF_BACKEND_CPU, 0);
+
   // Test with learning to predict sin wave
   let mut data = generate_sin_wave(input_dims, num_train_samples);
   let mut target = data.clone();
 
   // iterate our model in Verbose mode (printing loss)
-  let (loss, prediction) = model.fit(&mut data, &mut target, batch_size
-                                     , true   // return predictions
-                                     , false   // shuffle
-                                     , true); // verbose
+  let loss = model.fit(&mut data, &mut target, batch_size
+                       , false  // shuffle
+                       , true); // verbose
 
 
   // plot our loss
   plot_vec(loss, "Loss vs. Iterations", 512, 512);
 
-  // plot one of our waves
-  if let Some(p) = prediction {
-    assert!(p.len() > 0);
-    println!("prediction count: {} | prediction shape: {:?}"
-             , p.len(), p[0].dims().unwrap().get().clone());
-    plot_array(&p.last().unwrap(), "Final Prediction Rows", 512, 512);
-  }
+  // infer on one of our samples
+  let temp = af::rows(&data, 0, batch_size - 1).unwrap();
+  println!("temp shape= {:?}", temp.dims().unwrap().get().clone());
+  let prediction = model.forward(&af::rows(&data, 0, batch_size - 1).unwrap(), false);
+  println!("prediction shape: {:?}", prediction.dims().unwrap().get().clone());
+  plot_array(&prediction, "Model Inference", 512, 512);
 }

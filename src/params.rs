@@ -1,4 +1,4 @@
-use af::{Array, Dim4};
+use af::{Array, Dim4, AfBackend, set_backend, set_device};
 use std::default::Default;
 //use itertools::Zip;
 
@@ -77,6 +77,7 @@ pub struct Input {
 #[derive(Clone)]
 pub struct Params {
   pub layer_type: String,
+  pub backend: AfBackend,
   pub weights: Vec<Array>,
   pub biases: Vec<Array>,
   pub activations: Vec<String>,
@@ -102,12 +103,19 @@ impl Default for ParamManager {
 impl ParamManager {
   pub fn add(&mut self
              , layer_type: &str
+             , backend: AfBackend
+             , device: i32
              , weight_params: Vec<(&str, (usize, usize))> //(init, (i, o))
              , biases_params: Vec<(&str, (usize, usize))> //(init, (i, o))
+             //, delta_params:  Vec<(&str, (usize, usize))>    //(init, (i, o))
              , activations: Vec<&str>
              , recurrence_dims: Option<Vec<(&str, (usize, usize))>>
              , optional_dims: Option<Vec<(&str, (usize, usize))>>)
   {
+    // set backend before creating params
+    set_backend(backend);
+    set_device(device);
+
     // generate the weights
     let mut weights: Vec<Array> = Vec::with_capacity(weight_params.len());
     for (w_init, w_dims) in weight_params {
@@ -118,6 +126,13 @@ impl ParamManager {
     for (b_init, b_dims) in biases_params {
       biases.push(self.generate(b_init, b_dims));
     }
+
+    // // generate the deltas
+    // let mut deltas: Vec<Array> = Vec::with_capacity(delta_params.len());
+    // for (d_init, d_dims) in delta_params {
+    //   deltas.push(self.generate(d_init, d_dims));
+    // }
+
 
     // generate recurrence vectors
     let mut recurrences: Vec<Array> = Vec::new();
@@ -138,6 +153,7 @@ impl ParamManager {
     let owned_activations = activations.iter().map(|x| x.to_string()).collect::<Vec<String>>();
     self.layer_storage.push(Params{
       layer_type: layer_type.to_string(),
+      backend: backend,
       weights: weights,
       biases: biases,
       activations: owned_activations,
@@ -291,6 +307,8 @@ impl ParamManager {
 /** Custom Layer Traits **/
 pub trait DenseGenerator {
   fn add_dense(&mut self
+               , backend: AfBackend
+               , device: i32
                , input_size: usize
                , output_size: usize
                , activation: &str
@@ -310,6 +328,8 @@ pub enum LSTMIndex {
 
 pub trait LSTMGenerator {
   fn add_lstm(&mut self
+              , backend: AfBackend
+              , device: i32
               , input_size: usize
               , output_size: usize
               , max_seq_size: usize
@@ -324,13 +344,15 @@ pub trait LSTMGenerator {
 /** Custom Layer Impls **/
 impl DenseGenerator for ParamManager {
   fn add_dense(&mut self
+               , backend: AfBackend
+               , device: i32
                , input_size: usize
                , output_size: usize
                , activation: &str
                , w_init: &str
                , b_init: &str)
   {
-    self.add("dense"
+    self.add("dense", backend, device
              , vec![(w_init, (output_size, input_size))]
              , vec![(b_init, (output_size, 1))]
              , vec![activation]
@@ -340,6 +362,8 @@ impl DenseGenerator for ParamManager {
 
 impl LSTMGenerator for ParamManager {
   fn add_lstm(&mut self
+              , backend: AfBackend
+              , device: i32
               , input_size: usize
               , output_size: usize
               , max_seq_size: usize
@@ -354,7 +378,7 @@ impl LSTMGenerator for ParamManager {
     let recurrent_dims = (output_size, output_size);
     let bias_dims = (output_size, 1);
     // W_i, W_f, W_o, W_ct, U_i, U_f, U_o, U_ct
-    self.add("lstm"
+    self.add("lstm", backend, device
              , vec![(w_init, input_dims)
                     , (w_init, input_dims)
                     , (w_init, input_dims)

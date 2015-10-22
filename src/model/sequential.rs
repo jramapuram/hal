@@ -56,7 +56,8 @@ impl Model for Sequential {
     let output_size = params.get("output_size").unwrap().parse::<u64>().unwrap() as usize;
     match layer {
       "dense" => {
-        self.param_manager.add_dense(input_size, output_size
+        self.param_manager.add_dense(self.backend, self.device
+                                     , input_size, output_size
                                      , params.get("activation").unwrap()
                                      , params.get("w_init").unwrap()
                                      , params.get("b_init").unwrap());
@@ -114,9 +115,8 @@ impl Model for Sequential {
   }
 
 
-  fn fit(&mut self, input: &mut Array, target: &mut Array
-         , batch_size: u64, return_predictions: bool
-         , shuffle: bool, verbose: bool) -> (Vec<f32>, Option<Vec<Array>>)
+  fn fit(&mut self, input: &mut Array, target: &mut Array, batch_size: u64
+         , shuffle: bool, verbose: bool) -> Vec<f32>
   {
     // some required data validity checks
     let idims = input.dims().unwrap().get().clone();
@@ -127,13 +127,10 @@ impl Model for Sequential {
     assert!(tdims[0] == idims[0]);
     assert!(idims[0] >= batch_size
             && idims[0] % batch_size == 0); //ease up later
-    self.optimizer.setup(self.param_manager.get_all_weight_dims()
-                         , self.param_manager.get_all_bias_dims());
 
     // create the container to hold the forward pass & loss results
     let mut a_t: Array;
     let mut loss: f32;
-    let mut a_t_vec = Vec::<Array>::new();
     let mut lossvec = Vec::<f32>::new();
 
     // randomly shuffle the data
@@ -154,49 +151,35 @@ impl Model for Sequential {
       }
 
       // extract part of the array onto the GPU
-      let batch_input  = utils::array_swap_backend(&utils::row_planes(input, i, i + batch_size - 1).unwrap()
-                                                   , AfBackend::AF_BACKEND_CPU
-                                                   , self.backend
-                                                   , 0
-                                                   , self.device);
-      println!("passed first one");
-      let batch_target = utils::array_swap_backend(&utils::row_planes(target, i, i+ batch_size - 1).unwrap()
-                                                   , AfBackend::AF_BACKEND_CPU
-                                                   , self.backend
-                                                   , 0
-                                                   , self.device);
+      let cpu_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
+      let cpu_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
+      let batch_input  = af::transpose(&utils::array_swap_backend(&cpu_batch_input
+                                                                  , AfBackend::AF_BACKEND_CPU
+                                                                  , self.backend
+                                                                  , 0, self.device), false).unwrap();
+      let batch_target = af::transpose(&utils::array_swap_backend(&cpu_batch_target
+                                                                  , AfBackend::AF_BACKEND_CPU
+                                                                  , self.backend
+                                                                  , 0, self.device), false).unwrap();
+      self.optimizer.setup(self.param_manager.get_all_weight_dims()
+                           , self.param_manager.get_all_bias_dims());
 
       // DEBUG:
-      println!("batched [input: {:?} | target: {:?}]"
-               , batch_input.dims().unwrap().get().clone()
-               , batch_target.dims().unwrap().get().clone());
+      // println!("batched [input: {:?} | target: {:?}]"
+      //          , batch_input.dims().unwrap().get().clone()
+      //          , batch_target.dims().unwrap().get().clone());
 
-      self.set_device(self.backend, self.device);
       a_t = self.forward(&batch_input, true);
-      println!("past forward");
       loss = self.backward(&a_t, &batch_target);
-      println!("past backward");
       self.optimizer.update(&mut self.param_manager, batch_size as u64);
-
       lossvec.push(loss);
       if verbose {
         print!("{} ", loss);
       }
-
-      if return_predictions {
-        a_t_vec.push(a_t);
-      }
     }
 
     utils::write_csv::<f32>("loss.csv", &lossvec);
-    match a_t_vec.len() {
-      0 => (lossvec, None),
-      _ => (lossvec
-            , Some(a_t_vec.iter().map(|x| utils::array_swap_backend(&x, self.backend
-                                                                , AfBackend::AF_BACKEND_CPU
-                                                                , self.device
-                                                                , 0)).collect::<Vec<_>>())),
-    }
+    lossvec
   }
 
   fn backward(&mut self, prediction: &Array, target: &Array) -> f32 {
