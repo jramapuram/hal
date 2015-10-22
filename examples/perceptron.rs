@@ -39,19 +39,16 @@ fn main() {
                                            , 0));                                   // device_id
 
   // Let's add a few layers why don't we?
-  let input_str: &str = &input_dims.to_string();
-  let hidden_str: &str = &hidden_dims.to_string();
-  let output_str: &str = &output_dims.to_string();
-  model.add("dense", hashmap!["activation"    => "tanh"
-                              , "input_size"  => input_str//&input_dims.to_string()
-                              , "output_size" => hidden_str//&hidden_dims.to_string()
-                              , "w_init"      => "glorot_uniform"
-                              , "b_init"      => "zeros"]);
-  model.add("dense", hashmap!["activation"    => "tanh"
-                              , "input_size"  => hidden_str//&hidden_dims.to_string()
-                              , "output_size" => output_str//&output_dims.to_string()
-                              , "w_init"      => "glorot_uniform"
-                              , "b_init"      => "zeros"]);
+  model.add("dense", hashmap!["activation"    => "tanh".to_string()
+                              , "input_size"  => input_dims.to_string()
+                              , "output_size" => hidden_dims.to_string()
+                              , "w_init"      => "glorot_uniform".to_string()
+                              , "b_init"      => "zeros".to_string()]);
+  model.add("dense", hashmap!["activation"    => "tanh".to_string()
+                              , "input_size"  => hidden_dims.to_string()
+                              , "output_size" => output_dims.to_string()
+                              , "w_init"      => "glorot_uniform".to_string()
+                              , "b_init"      => "zeros".to_string()]);
 
   // Get some nice information about our model
   model.info();

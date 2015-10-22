@@ -49,7 +49,7 @@ impl Model for Sequential {
   }
 
   fn add(&mut self, layer: &str
-         , params: HashMap<&str, &str>)
+         , params: HashMap<&str, String>)
   {
     //TODO: Error handling for hashmap
     let input_size = params.get("input_size").unwrap().parse::<u64>().unwrap() as usize;
