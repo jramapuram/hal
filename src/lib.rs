@@ -25,3 +25,4 @@ pub mod activations;
 pub mod initializations;
 pub mod plot;
 pub mod utils;
+pub mod device;
