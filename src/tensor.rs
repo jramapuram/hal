@@ -118,28 +118,28 @@ macro_rules! get_mut_param_vec_func {
 impl<'a> Add<Tensor<'a>> for Tensor<'a> {
   type Output = Tensor<'a>;
   fn add(self, other: Tensor) -> Tensor<'a> {
-    self.batch_add(&self, &other, false)
+    self.batch_add(&other, false)
   }
 }
 
 impl<'a> Sub<Tensor<'a>> for Tensor<'a> {
   type Output = Tensor<'a>;
   fn sub(self, other: Tensor) -> Tensor<'a> {
-    self.batch_sub(&self, &other, false)
+    self.batch_sub(&other, false)
   }
 }
 
 impl<'a> Mul<Tensor<'a>> for Tensor<'a> {
   type Output = Tensor<'a>;
   fn mul(self, other: Tensor) -> Tensor<'a> {
-    self.batch_mul(&self, &other, false)
+    self.batch_mul(&other, false)
   }
 }
 
 impl<'a> Div<Tensor<'a>> for Tensor<'a> {
   type Output = Tensor<'a>;
   fn div(self, other: Tensor) -> Tensor<'a> {
-    self.batch_div(&self, &other, false)
+    self.batch_div(&other, false)
   }
 }
 
@@ -155,15 +155,15 @@ macro_rules! algebra_impl (
                  , manager: self.manager }
       }
     }
-    impl<'a> $operand<Tensor<'a>> for $foo {
-      type Output = Tensor<'a>;
-      fn $fn_name(self, rhs : Tensor) -> Tensor<'a> {
-        let lhs_float = self as f32;
-        Tensor { array: af::$fn_name(&lhs_float, &rhs.array, false).unwrap()
-                 , device: rhs.device
-                 , manager: rhs.manager<'a> }
-      }
-    }
+    // impl<'a> $operand<Tensor<'a>> for $foo {
+    //   type Output = Tensor<'a>;
+    //   fn $fn_name(self, rhs : Tensor) -> Tensor<'a> {
+    //     let lhs_float = self as f32;
+    //     Tensor { array: af::$fn_name(&lhs_float, &rhs.array, false).unwrap()
+    //              , device: rhs.device
+    //              , manager: rhs.manager }
+    //   }
+    // }
     ));
 
 algebra_impl!(Mul, mul, i8);
