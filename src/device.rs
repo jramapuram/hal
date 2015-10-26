@@ -14,7 +14,7 @@ pub struct DeviceManager {
 }
 
 // toggle the backend and device
-pub fn set_device(backend: AfBackend, device_id: i32) {
+fn set_device(backend: AfBackend, device_id: i32) {
   match af::set_backend(backend) {
     Ok(_)  => {},
     Err(e) =>  panic!("could not set backend: {:?}", e),

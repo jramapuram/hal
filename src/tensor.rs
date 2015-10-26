@@ -1,144 +1,167 @@
 use af;
-use af::{Dim4, Array, AfBackend, MatProp};
+use af::{Array, AfBackend, MatProp};
 use std::fmt;
-use std::cell::RefCell;
-use std::ops::{Add, Sub, Mul, Div};
+use std::sync::{Arc, RwLock};
+use std::ops::{Add, Sub, Mul, Div, Deref, DerefMut};
 
 use device::{Device, DeviceManager};
 
-pub struct Tensor<'a> {
+pub struct Tensor {
   array: Array,
   device: Device,
-  manager: &'a DeviceManager,
+  manager: Arc<RwLock<DeviceManager>>,
 }
 
-impl<'a> Tensor<'a> {
-  fn new(array: Array, manager: &DeviceManager
+impl Tensor {
+  fn new(array: Array, manager: &Arc<RwLock<DeviceManager>>
          , backend: AfBackend, device: i32) -> Tensor {
-    Tensor { manager: manager
+    Tensor { manager: manager.clone()
              , array: array
              , device: Device{ backend: backend, id: device } }
   }
 
   fn get(&self) -> &Array {
-    self.manager.swap_device(self.device);
+    let m = self.manager.read().unwrap();
+    m.swap_device(self.device);
     &self.array
   }
 
   fn get_mut(&mut self) -> &mut Array {
-    self.manager.swap_device(self.device);
+    let m = self.manager.read().unwrap();
+    m.swap_device(self.device);
     &mut self.array
   }
 
   fn set(&mut self, update: &Array) {
-    self.manager.swap_device(self.device);
+    let m = self.manager.read().unwrap();
+    m.swap_device(self.device);
     self.array.clone_from(update);
   }
 
-  fn batch_add(&self, other: &Tensor, batch: bool) -> Tensor<'a> {
+  fn batch_add(&self, other: &Tensor, batch: bool) -> Tensor {
     if (other.device != self.device) {
       panic!("add: can't mix between two different devices");
     }
 
+    let m = self.manager.read().unwrap();
+    m.swap_device(self.device);
+
     Tensor { array: af::add(&self.array, &other.array, batch).unwrap()
-             , device: self.device
-             , manager: self.manager }
+             , manager: self.manager.clone()
+             , device: self.device }
   }
 
-  fn batch_sub(&self, other: &Tensor, batch: bool) -> Tensor<'a> {
-    if (other.device != self.device) {
+  fn batch_sub(&self, other: &Tensor, batch: bool) -> Tensor {
+    if other.device != self.device {
       panic!("sub: can't mix between two different devices");
     }
 
+    let m = self.manager.read().unwrap();
+    m.swap_device(self.device);
+
     Tensor { array: af::sub(&self.array, &other.array, batch).unwrap()
-             , device: self.device
-             , manager: self.manager }
+             , manager: self.manager.clone()
+             , device: self.device }
   }
 
-  fn batch_mul(&self, other: &Tensor, batch: bool) -> Tensor<'a> {
-    if (other.device != self.device) {
+  fn batch_mul(&self, other: &Tensor, batch: bool) -> Tensor {
+    if other.device != self.device {
       panic!("mul: can't mix between two different devices");
     }
 
+    let m = self.manager.read().unwrap();
+    m.swap_device(self.device);
+
     Tensor { array: af::mul(&self.array, &other.array, batch).unwrap()
-             , device: self.device
-             , manager: self.manager }
+             , manager: self.manager.clone()
+             , device: self.device }
   }
 
-  fn batch_div(&self, other: &Tensor, batch: bool) -> Tensor<'a> {
-    if (other.device != self.device) {
+  fn batch_div(&self, other: &Tensor, batch: bool) -> Tensor {
+    if other.device != self.device {
       panic!("div: can't mix between two different devices");
     }
+
+    let m = self.manager.read().unwrap();
+    m.swap_device(self.device);
 
     Tensor { array: af::div(&self.array, &other.array, batch).unwrap()
-             , device: self.device
-             , manager: self.manager }
+             , manager: self.manager.clone()
+             , device: self.device }
   }
 
-  fn matmul(&self, other: &Tensor, lhs_prop: MatProp, rhs_prop: MatProp) -> Tensor<'a>
+  fn matmul(&self, other: &Tensor, lhs_prop: MatProp, rhs_prop: MatProp) -> Tensor
   {
-    if (other.device != self.device) {
+    if other.device != self.device {
       panic!("div: can't mix between two different devices");
     }
 
+    let m = self.manager.read().unwrap();
+    m.swap_device(self.device);
+
     Tensor { array: af::matmul(&self.array, &other.array, lhs_prop, rhs_prop).unwrap()
-             , device: self.device
-             , manager: self.manager }
+             , manager: self.manager.clone()
+             , device: self.device }
   }
 }
 
-impl<'a> fmt::Debug for Tensor<'a> {
+impl Deref for Tensor {
+  type Target = Array;
+   fn deref<'a>(&'a self) -> &'a Array {
+     self.get()
+   }
+}
+
+impl DerefMut for Tensor {
+  fn deref_mut<'a>(&'a mut self) -> &'a mut Array {
+    self.get_mut()
+  }
+}
+
+impl fmt::Debug for Tensor {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "{:?}\nbackend: {:?}, device: {}", self.array.dims().unwrap().get().clone()
            , self.device.backend, self.device.id)
   }
 }
 
-impl<'a> Clone for Tensor<'a> {
-    fn clone(&self) -> Tensor<'a> {
-      self.manager.swap_device(self.device);
+impl Clone for Tensor {
+    fn clone(&self) -> Tensor {
+    let m = self.manager.read().unwrap();
+    m.swap_device(self.device);
+
       Tensor{
         array: self.array.clone(),
         device: self.device.clone(),
-        manager: self.manager,
+        manager: self.manager.clone(),
       }
     }
 }
 
-macro_rules! get_mut_param_vec_func {
-  ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
-    #[allow(unused_mut)]
-    pub fn $fn_name(&mut self, layer_index: usize) -> &mut Vec<$base_type> {
-      assert!(self.layer_storage.len() - 1 >= layer_index);
-      &mut self.layer_storage[layer_index].$vec_extension
-    }
-    )
-}
-
-impl<'a> Add<Tensor<'a>> for Tensor<'a> {
-  type Output = Tensor<'a>;
-  fn add(self, other: Tensor) -> Tensor<'a> {
+impl Add<Tensor> for Tensor {
+  type Output = Tensor;
+  fn add(self, other: Tensor) -> Tensor {
     self.batch_add(&other, false)
   }
 }
 
-impl<'a> Sub<Tensor<'a>> for Tensor<'a> {
-  type Output = Tensor<'a>;
-  fn sub(self, other: Tensor) -> Tensor<'a> {
+impl Sub<Tensor> for Tensor {
+  type Output = Tensor;
+  fn sub(self, other: Tensor) -> Tensor {
     self.batch_sub(&other, false)
   }
 }
 
-impl<'a> Mul<Tensor<'a>> for Tensor<'a> {
-  type Output = Tensor<'a>;
-  fn mul(self, other: Tensor) -> Tensor<'a> {
+impl Mul<Tensor> for Tensor {
+  type Output = Tensor;
+  fn mul(self, other: Tensor) -> Tensor {
     self.batch_mul(&other, false)
   }
 }
 
-impl<'a> Div<Tensor<'a>> for Tensor<'a> {
-  type Output = Tensor<'a>;
-  fn div(self, other: Tensor) -> Tensor<'a> {
+impl Div<Tensor> for Tensor {
+  type Output = Tensor;
+  fn div(self, other: Tensor) -> Tensor {
     self.batch_div(&other, false)
   }
 }
@@ -146,24 +169,24 @@ impl<'a> Div<Tensor<'a>> for Tensor<'a> {
 // TODO: Enable f64/u64, etc support separately
 macro_rules! algebra_impl (
   ($operand: ident, $fn_name: ident, $foo: ty) => (
-    impl<'a> $operand<$foo> for Tensor<'a> {
-      type Output = Tensor<'a>;
-      fn $fn_name(self, rhs: $foo) -> Tensor<'a> {
+    impl $operand<$foo> for Tensor {
+      type Output = Tensor;
+      fn $fn_name(self, rhs: $foo) -> Tensor {
         let rhs_float = rhs as f32;
         Tensor { array: af::$fn_name(&self.array, &rhs_float, false).unwrap()
                  , device: self.device
-                 , manager: self.manager }
+                 , manager: self.manager.clone() }
       }
     }
-    // impl<'a> $operand<Tensor<'a>> for $foo {
-    //   type Output = Tensor<'a>;
-    //   fn $fn_name(self, rhs : Tensor) -> Tensor<'a> {
-    //     let lhs_float = self as f32;
-    //     Tensor { array: af::$fn_name(&lhs_float, &rhs.array, false).unwrap()
-    //              , device: rhs.device
-    //              , manager: rhs.manager }
-    //   }
-    // }
+    impl $operand<Tensor> for $foo {
+      type Output = Tensor;
+      fn $fn_name(self, rhs : Tensor) -> Tensor {
+        let lhs_float = self as f32;
+        Tensor { array: af::$fn_name(&lhs_float, &rhs.array, false).unwrap()
+                 , device: rhs.device
+                 , manager: rhs.manager.clone() }
+      }
+    }
     ));
 
 algebra_impl!(Mul, mul, i8);
