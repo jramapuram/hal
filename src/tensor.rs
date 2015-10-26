@@ -1,7 +1,7 @@
 use af;
-use af::{Dim4, Array, AfBackend};
+use af::{Dim4, Array, AfBackend, MatProp};
 use std::fmt;
-use std::cell::Cell;
+use std::cell::RefCell;
 use std::ops::{Add, Sub, Mul, Div};
 
 use device::{Device, DeviceManager};
@@ -55,7 +55,7 @@ impl<'a> Tensor<'a> {
              , manager: self.manager }
   }
 
-  fn batch_mul(&self, other: &Tensor, batch: bool) -> Tensor {
+  fn batch_mul(&self, other: &Tensor, batch: bool) -> Tensor<'a> {
     if (other.device != self.device) {
       panic!("mul: can't mix between two different devices");
     }
@@ -65,12 +65,23 @@ impl<'a> Tensor<'a> {
              , manager: self.manager }
   }
 
-  fn batch_div(&self, other: &Tensor, batch: bool) -> Tensor {
+  fn batch_div(&self, other: &Tensor, batch: bool) -> Tensor<'a> {
     if (other.device != self.device) {
       panic!("div: can't mix between two different devices");
     }
 
     Tensor { array: af::div(&self.array, &other.array, batch).unwrap()
+             , device: self.device
+             , manager: self.manager }
+  }
+
+  fn matmul(&self, other: &Tensor, lhs_prop: MatProp, rhs_prop: MatProp) -> Tensor<'a>
+  {
+    if (other.device != self.device) {
+      panic!("div: can't mix between two different devices");
+    }
+
+    Tensor { array: af::matmul(&self.array, &other.array, lhs_prop, rhs_prop).unwrap()
              , device: self.device
              , manager: self.manager }
   }
@@ -104,39 +115,105 @@ macro_rules! get_mut_param_vec_func {
     )
 }
 
-macro_rules! scalar_impl (
-    ($operand: ident, $fn_name: ident, $foo:ty) => (
-      impl $operand<foo> for Tensor<'a> {
-        type Output = Tensor;
-        fn $fn_name(self, rhs: $foo) -> Tensor<'a> {
-          Tensor { array: af::$fn_name(&self.array, &rhs, false).unwrap()
-                   , device: self.device
-                   , manager: self.manager }
-        }
-      }
-      impl $fn_name<Tensor> for $foo {
-        type Output = Tensor;
-        fn $fn_name(self, rhs : Tensor) -> Tensor<'a> {
-          Tensor { array: af::$fn_name(&self.array, &rhs, false).unwrap()
-                   , device: self.device
-                   , manager: self.manager }
-        }
-      }
-      )
-    );
-
-impl Add for Tensor {
-  type Output = Tensor;
-
-  fn add(self, other: Tensor) -> Tensor {
-
+impl<'a> Add<Tensor<'a>> for Tensor<'a> {
+  type Output = Tensor<'a>;
+  fn add(self, other: Tensor) -> Tensor<'a> {
+    self.batch_add(&self, &other, false)
   }
 }
 
-impl Sub for Tensor {
-    type Output = Tensor;
-
-    fn sub(self, other: Tensor) -> Tensor {
-        Tensor {x: self.x - other.x, y: self.y - other.y}
-    }
+impl<'a> Sub<Tensor<'a>> for Tensor<'a> {
+  type Output = Tensor<'a>;
+  fn sub(self, other: Tensor) -> Tensor<'a> {
+    self.batch_sub(&self, &other, false)
+  }
 }
+
+impl<'a> Mul<Tensor<'a>> for Tensor<'a> {
+  type Output = Tensor<'a>;
+  fn mul(self, other: Tensor) -> Tensor<'a> {
+    self.batch_mul(&self, &other, false)
+  }
+}
+
+impl<'a> Div<Tensor<'a>> for Tensor<'a> {
+  type Output = Tensor<'a>;
+  fn div(self, other: Tensor) -> Tensor<'a> {
+    self.batch_div(&self, &other, false)
+  }
+}
+
+// TODO: Enable f64/u64, etc support separately
+macro_rules! algebra_impl (
+  ($operand: ident, $fn_name: ident, $foo: ty) => (
+    impl<'a> $operand<$foo> for Tensor<'a> {
+      type Output = Tensor<'a>;
+      fn $fn_name(self, rhs: $foo) -> Tensor<'a> {
+        let rhs_float = rhs as f32;
+        Tensor { array: af::$fn_name(&self.array, &rhs_float, false).unwrap()
+                 , device: self.device
+                 , manager: self.manager }
+      }
+    }
+    impl<'a> $operand<Tensor<'a>> for $foo {
+      type Output = Tensor<'a>;
+      fn $fn_name(self, rhs : Tensor) -> Tensor<'a> {
+        let lhs_float = self as f32;
+        Tensor { array: af::$fn_name(&lhs_float, &rhs.array, false).unwrap()
+                 , device: rhs.device
+                 , manager: rhs.manager<'a> }
+      }
+    }
+    ));
+
+algebra_impl!(Mul, mul, i8);
+algebra_impl!(Mul, mul, i16);
+algebra_impl!(Mul, mul, i32);
+algebra_impl!(Mul, mul, i64);
+algebra_impl!(Mul, mul, isize);
+algebra_impl!(Mul, mul, usize);
+algebra_impl!(Mul, mul, u8);
+algebra_impl!(Mul, mul, u16);
+algebra_impl!(Mul, mul, u32);
+algebra_impl!(Mul, mul, u64);
+algebra_impl!(Mul, mul, f32);
+algebra_impl!(Mul, mul, f64);
+
+algebra_impl!(Add, add, i8);
+algebra_impl!(Add, add, i16);
+algebra_impl!(Add, add, i32);
+algebra_impl!(Add, add, i64);
+algebra_impl!(Add, add, isize);
+algebra_impl!(Add, add, usize);
+algebra_impl!(Add, add, u8);
+algebra_impl!(Add, add, u16);
+algebra_impl!(Add, add, u32);
+algebra_impl!(Add, add, u64);
+algebra_impl!(Add, add, f32);
+algebra_impl!(Add, add, f64);
+
+algebra_impl!(Sub, sub, i8);
+algebra_impl!(Sub, sub, i16);
+algebra_impl!(Sub, sub, i32);
+algebra_impl!(Sub, sub, i64);
+algebra_impl!(Sub, sub, isize);
+algebra_impl!(Sub, sub, usize);
+algebra_impl!(Sub, sub, u8);
+algebra_impl!(Sub, sub, u16);
+algebra_impl!(Sub, sub, u32);
+algebra_impl!(Sub, sub, u64);
+algebra_impl!(Sub, sub, f32);
+algebra_impl!(Sub, sub, f64);
+
+algebra_impl!(Div, div, i8);
+algebra_impl!(Div, div, i16);
+algebra_impl!(Div, div, i32);
+algebra_impl!(Div, div, i64);
+algebra_impl!(Div, div, isize);
+algebra_impl!(Div, div, usize);
+algebra_impl!(Div, div, u8);
+algebra_impl!(Div, div, u16);
+algebra_impl!(Div, div, u32);
+algebra_impl!(Div, div, u64);
+algebra_impl!(Div, div, f32);
+algebra_impl!(Div, div, f64);
