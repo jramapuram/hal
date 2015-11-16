@@ -7,7 +7,7 @@ use std::path::Path;
 use std::ops::Sub;
 use num::traits::Float;
 use statistical::{standard_deviation, mean};
-use af::{Dim4, Array, Aftype, AfBackend, Seq, AfError};
+use af::{Dim4, Array, Aftype, Backend, Seq, AfError};
 use itertools::Zip;
 use rustc_serialize::Encodable;
 
@@ -62,8 +62,8 @@ pub fn rows_to_array(input: Vec<&Array>) -> Array {
 
 // Convert an array from one backend to the other
 pub fn array_swap_backend(input: &Array
-                          , from: af::AfBackend
-                          , to: af::AfBackend
+                          , from: af::Backend
+                          , to: af::Backend
                           , from_device_id: i32
                           , to_device_id: i32) -> Array
 {

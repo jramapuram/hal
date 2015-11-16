@@ -4,16 +4,17 @@
 pub use self::sequential::Sequential;
 mod sequential;
 
-use af::{Array, AfBackend};
+use af::{Array, Backend};
 use std::collections::HashMap;
 
+use device::{Device, DeviceManager};
 use optimizer::Optimizer;
 
 pub trait Model {
-  fn new(optimizer: Box<Optimizer>
+  fn new(manager: &'static DeviceManager
+         , optimizer: Box<Optimizer>
          , loss: &str
-         , backend: AfBackend
-         , device: i32) -> Self;
+         , device: Device) -> Self;
   fn fit(&mut self, input: &mut Array, target: &mut Array, batch_size: u64
          , shuffle: bool, verbose: bool) -> Vec<f32>;
   fn forward(&mut self, activation: &Array, train: bool) -> Array;

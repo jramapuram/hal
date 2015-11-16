@@ -10,7 +10,7 @@ csv = "*"
 num= "*"
 itertools = "*"
 statistical = "*"
-arrayfire = { path ="arrayfire-rust" }
+arrayfire = "*"
 
 [lib]
 name = "hal"

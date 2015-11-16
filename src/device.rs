@@ -1,10 +1,10 @@
 use af;
-use af::{AfBackend};
+use af::{Backend};
 use std::cell::Cell;
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct Device {
-  pub backend: AfBackend,
+  pub backend: Backend,
   pub id: i32,
 }
 
@@ -14,19 +14,19 @@ pub struct DeviceManager {
 }
 
 // toggle the backend and device
-fn set_device(backend: AfBackend, device_id: i32) {
-  match af::set_backend(backend) {
+fn set_device(device: Device) {
+  match af::set_backend(device.backend) {
     Ok(_)  => {},
     Err(e) =>  panic!("could not set backend: {:?}", e),
   };
 
-  match af::set_device(device_id) {
+  match af::set_device(device.id) {
     Ok(_)  => {},
     Err(e) =>  panic!("could not set device: {:?}", e),
   };
 }
 
-fn create_devices(backend: AfBackend) -> Vec<Device> {
+fn create_devices(backend: Backend) -> Vec<Device> {
   let mut buffer: Vec<Device> = Vec::new();
   af::set_backend(backend).unwrap();
   let num_devices: i32 = af::device_count().unwrap();
@@ -38,7 +38,7 @@ fn create_devices(backend: AfBackend) -> Vec<Device> {
 
 
 impl DeviceManager {
-  fn new() -> DeviceManager {
+  pub fn new() -> DeviceManager {
     let mut devices = Vec::new();
     let available = af::get_available_backends().unwrap();
     for backend in available {
@@ -47,7 +47,7 @@ impl DeviceManager {
 
     assert!(devices.len() > 0);
     let current = devices.last().unwrap().clone();
-    set_device(current.backend, current.id);
+    set_device(current);
 
     DeviceManager {
       devices: devices,
@@ -55,7 +55,7 @@ impl DeviceManager {
     }
   }
 
-  pub fn swap_device(&self, device: Device)
+  pub fn swap(&self, device: Device)
   {
     let c = self.current.get();
     if c != device
@@ -63,7 +63,7 @@ impl DeviceManager {
       assert!(self.devices.contains(&device));
       println!("Swapping {}/{} to {}/{}", c.backend, c.id
                , device.backend, device.id);
-      set_device(device.backend, device.id);
+      set_device(device);
       self.current.set(device);
     }
   }

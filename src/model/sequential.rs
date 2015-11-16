@@ -1,5 +1,5 @@
 use af;
-use af::{Array, AfBackend};
+use af::{Array, Backend};
 use std::cmp::max;
 use std::default::Default;
 use std::collections::HashMap;
@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use utils;
 use loss;
 use layer::{Layer, Dense};
+use device::{Device, DeviceManager};
 use model::Model;
 use optimizer::{Optimizer, SGD};
 use params::{ParamManager, DenseGenerator, LSTMGenerator, Input};
@@ -15,9 +16,9 @@ pub struct Sequential {
   layers: Vec<Box<Layer>>,
   param_manager: ParamManager,
   optimizer: Box<Optimizer>,
+  manager: Option<&'static DeviceManager>,
   loss: String,
-  device: i32,
-  backend: AfBackend,
+  device: Device,
 }
 
 impl Default for Sequential {
@@ -26,24 +27,24 @@ impl Default for Sequential {
       layers: Vec::new(),
       param_manager: ParamManager::default(),
       optimizer: Box::new(SGD::default()),
-      loss: "mse".to_string(),
-      backend: AfBackend::AF_BACKEND_CPU,
-      device: 0,
+      manager: None,
+      loss: "mes".to_string(),
+      device: Device{ backend: Backend::AF_BACKEND_DEFAULT, id: 0 },
     }
   }
 }
 
 impl Model for Sequential {
-  fn new(optimizer: Box<Optimizer>
+  fn new(manager: &'static DeviceManager
+         , optimizer: Box<Optimizer>
          , loss: &str
-         , backend: AfBackend
-         , device: i32) -> Sequential {
+         , device: Device) -> Sequential {
     Sequential {
       layers: Vec::new(),
       param_manager: ParamManager::default(),
+      manager: Some(manager),
       loss: loss.to_string(),
       optimizer: optimizer,
-      backend: backend,
       device: device,
     }
   }
@@ -56,7 +57,7 @@ impl Model for Sequential {
     let output_size = params.get("output_size").unwrap().parse::<u64>().unwrap() as usize;
     match layer {
       "dense" => {
-        self.param_manager.add_dense(self.backend, self.device
+        self.param_manager.add_dense(self.manager.unwrap(), self.device
                                      , input_size, output_size
                                      , params.get("activation").unwrap()
                                      , params.get("w_init").unwrap()
@@ -79,7 +80,7 @@ impl Model for Sequential {
     }
   }
 
-  //TODO: convert to log crate [or hashmap]
+  //TODO: convert to log crate w/ hashmap
   fn info(&self) {
     println!("");
     self.optimizer.info();
@@ -142,13 +143,13 @@ impl Model for Sequential {
       let cpu_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
       let cpu_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
       let batch_input  = af::transpose(&utils::array_swap_backend(&cpu_batch_input
-                                                                  , AfBackend::AF_BACKEND_CPU
-                                                                  , self.backend
-                                                                  , 0, self.device), false).unwrap();
+                                                                  , Backend::AF_BACKEND_CPU
+                                                                  , self.device.backend
+                                                                  , 0, self.device.id), false).unwrap();
       let batch_target = af::transpose(&utils::array_swap_backend(&cpu_batch_target
-                                                                  , AfBackend::AF_BACKEND_CPU
-                                                                  , self.backend
-                                                                  , 0, self.device), false).unwrap();
+                                                                  , Backend::AF_BACKEND_CPU
+                                                                  , self.device.backend
+                                                                  , 0, self.device.id), false).unwrap();
       self.optimizer.setup(self.param_manager.get_all_weight_dims()
                            , self.param_manager.get_all_bias_dims());
 
