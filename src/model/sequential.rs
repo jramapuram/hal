@@ -12,37 +12,37 @@ use model::Model;
 use optimizer::{Optimizer, SGD};
 use params::{ParamManager, DenseGenerator, LSTMGenerator, Input};
 
-pub struct Sequential {
+pub struct Sequential<'a> {
   layers: Vec<Box<Layer>>,
   param_manager: ParamManager,
   optimizer: Box<Optimizer>,
-  manager: Option<&'static DeviceManager>,
+  manager: &'a DeviceManager,
   loss: String,
   device: Device,
 }
 
-impl Default for Sequential {
-  fn default() -> Sequential {
+impl<'a> Default for Sequential<'a> {
+  fn default() -> Sequential<'a> {
     Sequential {
       layers: Vec::new(),
       param_manager: ParamManager::default(),
       optimizer: Box::new(SGD::default()),
-      manager: None,
+      manager: Box::new(DeviceManager::new()),
       loss: "mes".to_string(),
       device: Device{ backend: Backend::AF_BACKEND_DEFAULT, id: 0 },
     }
   }
 }
 
-impl Model for Sequential {
-  fn new(manager: &'static DeviceManager
+impl<'a> Model for Sequential<'a> {
+  fn new(manager: Box<DeviceManager>
          , optimizer: Box<Optimizer>
          , loss: &str
-         , device: Device) -> Sequential {
+         , device: Device) -> Sequential<'a> {
     Sequential {
       layers: Vec::new(),
       param_manager: ParamManager::default(),
-      manager: Some(manager),
+      manager: manager,
       loss: loss.to_string(),
       optimizer: optimizer,
       device: device,
@@ -57,7 +57,7 @@ impl Model for Sequential {
     let output_size = params.get("output_size").unwrap().parse::<u64>().unwrap() as usize;
     match layer {
       "dense" => {
-        self.param_manager.add_dense(self.manager.unwrap(), self.device
+        self.param_manager.add_dense(self.manager, self.device
                                      , input_size, output_size
                                      , params.get("activation").unwrap()
                                      , params.get("w_init").unwrap()
