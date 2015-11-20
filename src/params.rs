@@ -103,7 +103,7 @@ impl Default for ParamManager {
 
 impl ParamManager {
   pub fn add(&mut self
-             , manager: &'static DeviceManager
+             , manager: DeviceManager
              , device: Device
              , layer_type: &str
              , weight_params: Vec<(&str, (usize, usize))> //(init, (i, o))
@@ -307,7 +307,7 @@ impl ParamManager {
 /** Custom Layer Traits **/
 pub trait DenseGenerator {
   fn add_dense(&mut self
-               , manager: &'static DeviceManager
+               , manager: DeviceManager
                , device: Device
                , input_size: usize
                , output_size: usize
@@ -328,7 +328,7 @@ pub enum LSTMIndex {
 
 pub trait LSTMGenerator {
   fn add_lstm(&mut self
-              , manager: &'static DeviceManager
+              , manager: DeviceManager
               , device: Device
               , input_size: usize
               , output_size: usize
@@ -342,9 +342,9 @@ pub trait LSTMGenerator {
 }
 
 /** Custom Layer Impls **/
-impl DenseGenerator for ParamManager {
+impl<'a> DenseGenerator for ParamManager {
   fn add_dense(&mut self
-               , manager: &'static DeviceManager
+               , manager: DeviceManager
                , device: Device
                , input_size: usize
                , output_size: usize
@@ -362,7 +362,7 @@ impl DenseGenerator for ParamManager {
 
 impl LSTMGenerator for ParamManager {
   fn add_lstm(&mut self
-              , manager: &'static DeviceManager
+              , manager: DeviceManager
               , device: Device
               , input_size: usize
               , output_size: usize

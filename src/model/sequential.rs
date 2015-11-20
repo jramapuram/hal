@@ -7,38 +7,38 @@ use std::collections::HashMap;
 use utils;
 use loss;
 use layer::{Layer, Dense};
-use device::{Device, DeviceManager};
+use device::{Device, DeviceManager, DeviceManagerFactory};
 use model::Model;
 use optimizer::{Optimizer, SGD};
 use params::{ParamManager, DenseGenerator, LSTMGenerator, Input};
 
-pub struct Sequential<'a> {
+pub struct Sequential {
   layers: Vec<Box<Layer>>,
   param_manager: ParamManager,
   optimizer: Box<Optimizer>,
-  manager: &'a DeviceManager,
+  manager: DeviceManager,
   loss: String,
   device: Device,
 }
 
-impl<'a> Default for Sequential<'a> {
-  fn default() -> Sequential<'a> {
+impl Default for Sequential {
+  fn default() -> Sequential {
     Sequential {
       layers: Vec::new(),
       param_manager: ParamManager::default(),
       optimizer: Box::new(SGD::default()),
-      manager: Box::new(DeviceManager::new()),
+      manager: DeviceManagerFactory::new(),
       loss: "mes".to_string(),
       device: Device{ backend: Backend::AF_BACKEND_DEFAULT, id: 0 },
     }
   }
 }
 
-impl<'a> Model for Sequential<'a> {
-  fn new(manager: Box<DeviceManager>
+impl Model for Sequential {
+  fn new(manager: DeviceManager
          , optimizer: Box<Optimizer>
          , loss: &str
-         , device: Device) -> Sequential<'a> {
+         , device: Device) -> Sequential {
     Sequential {
       layers: Vec::new(),
       param_manager: ParamManager::default(),
@@ -57,7 +57,7 @@ impl<'a> Model for Sequential<'a> {
     let output_size = params.get("output_size").unwrap().parse::<u64>().unwrap() as usize;
     match layer {
       "dense" => {
-        self.param_manager.add_dense(self.manager, self.device
+        self.param_manager.add_dense(self.manager.clone(), self.device
                                      , input_size, output_size
                                      , params.get("activation").unwrap()
                                      , params.get("w_init").unwrap()

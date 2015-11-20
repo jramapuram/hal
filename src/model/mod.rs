@@ -11,7 +11,7 @@ use device::{Device, DeviceManager};
 use optimizer::Optimizer;
 
 pub trait Model {
-  fn new(manager: &'static DeviceManager
+  fn new(manager: DeviceManager
          , optimizer: Box<Optimizer>
          , loss: &str
          , device: Device) -> Self;

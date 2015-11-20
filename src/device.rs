@@ -1,6 +1,9 @@
 use af;
 use af::{Backend};
 use std::cell::Cell;
+use std::sync::Arc;
+
+pub type DeviceManager = Arc<DeviceManagerFactory>;
 
 #[derive(Clone, Copy, PartialEq)]
 pub struct Device {
@@ -8,7 +11,7 @@ pub struct Device {
   pub id: i32,
 }
 
-pub struct DeviceManager {
+pub struct DeviceManagerFactory {
   devices: Vec<Device>,
   current: Cell<Device>,
 }
@@ -37,8 +40,8 @@ fn create_devices(backend: Backend) -> Vec<Device> {
 }
 
 
-impl DeviceManager {
-  pub fn new() -> DeviceManager {
+impl DeviceManagerFactory {
+  pub fn new() -> Arc<DeviceManagerFactory> {
     let mut devices = Vec::new();
     let available = af::get_available_backends().unwrap();
     for backend in available {
@@ -49,10 +52,10 @@ impl DeviceManager {
     let current = devices.last().unwrap().clone();
     set_device(current);
 
-    DeviceManager {
+    Arc::new(DeviceManagerFactory {
       devices: devices,
       current: Cell::new(current),
-    }
+    })
   }
 
   pub fn swap(&self, device: Device)
