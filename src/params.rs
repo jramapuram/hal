@@ -114,7 +114,7 @@ impl ParamManager {
              , optional_dims: Option<Vec<(&str, (usize, usize))>>)
   {
     // toggle device to appropriate one
-    manager.swap(device);
+    manager.swap_device(device);
 
     // generate the weights
     let mut weights: Vec<Array> = Vec::with_capacity(weight_params.len());

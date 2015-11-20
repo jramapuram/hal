@@ -1,12 +1,14 @@
 #[macro_use] extern crate hal;
 extern crate arrayfire as af;
 
+use std::borrow::Borrow;
+//use std::sync::Arc;
 use hal::Model;
 use hal::optimizer::{Optimizer, SGD};
 use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::plot::{plot_vec, plot_array};
-use hal::device::{DeviceManager, Device};
+use hal::device::{DeviceManager, DeviceManagerFactory, Device};
 use af::{Array, Dim4, Aftype, Backend};
 
 fn build_optimizer(name: &str) -> Result<Box<Optimizer>, HALError> {
@@ -36,10 +38,10 @@ fn main() {
   // Now, let's build a model with an device manager on a specific device,
   // an optimizer and a loss function
   // DEFAULT is: OpenCL -> CUDA -> CPU
-  let manager = Box::new(DeviceManager::new());
+  let manager = DeviceManagerFactory::new();
   let gpu_device = Device{backend: Backend::AF_BACKEND_DEFAULT, id: 0};
   let cpu_device = Device{backend: Backend::AF_BACKEND_CPU, id: 0};
-  let mut model = Box::new(Sequential::new(manager
+  let mut model = Box::new(Sequential::new(manager.clone()
                                            , build_optimizer(optimizer_type).unwrap()   // optimizer
                                            , "mse"                                      // loss
                                            , gpu_device));                              // device for model
@@ -61,7 +63,7 @@ fn main() {
 
   // Temporarily set the backend to CPU so that we can load data into RAM
   // The model will automatically toggle to the desired backend during training
-  manager.swap(cpu_device);
+  manager.swap_device(cpu_device);
 
   // Test with learning to predict sin wave
   let mut data = generate_sin_wave(input_dims, num_train_samples);

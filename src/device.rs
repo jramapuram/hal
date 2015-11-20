@@ -58,7 +58,7 @@ impl DeviceManagerFactory {
     })
   }
 
-  pub fn swap(&self, device: Device)
+  pub fn swap_device(&self, device: Device)
   {
     let c = self.current.get();
     if c != device
