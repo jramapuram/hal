@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 pub type DeviceManager = Arc<DeviceManagerFactory>;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Device {
   pub backend: Backend,
   pub id: i32,
@@ -63,6 +63,7 @@ impl DeviceManagerFactory {
     let c = self.current.get();
     if c != device
     {
+      println!("{:?}", self.devices);
       assert!(self.devices.contains(&device));
       println!("Swapping {}/{} to {}/{}", c.backend, c.id
                , device.backend, device.id);
