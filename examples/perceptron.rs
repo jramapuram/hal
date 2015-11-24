@@ -1,14 +1,12 @@
 #[macro_use] extern crate hal;
 extern crate arrayfire as af;
 
-use std::borrow::Borrow;
-//use std::sync::Arc;
 use hal::Model;
 use hal::optimizer::{Optimizer, SGD};
 use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::plot::{plot_vec, plot_array};
-use hal::device::{DeviceManager, DeviceManagerFactory, Device};
+use hal::device::{DeviceManagerFactory, Device};
 use af::{Array, Dim4, Aftype, Backend};
 
 fn build_optimizer(name: &str) -> Result<Box<Optimizer>, HALError> {
@@ -39,7 +37,7 @@ fn main() {
   // an optimizer and a loss function
   // DEFAULT is: OpenCL -> CUDA -> CPU
   let manager = DeviceManagerFactory::new();
-  let gpu_device = Device{backend: Backend::AF_BACKEND_DEFAULT, id: 0};
+  let gpu_device = Device{backend: Backend::AF_BACKEND_CUDA, id: 0};
   let cpu_device = Device{backend: Backend::AF_BACKEND_CPU, id: 0};
   let mut model = Box::new(Sequential::new(manager.clone()
                                            , build_optimizer(optimizer_type).unwrap()   // optimizer

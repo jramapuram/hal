@@ -5,10 +5,22 @@ use std::sync::Arc;
 
 pub type DeviceManager = Arc<DeviceManagerFactory>;
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Device {
   pub backend: Backend,
   pub id: i32,
+}
+
+impl PartialEq for Device{
+  fn eq(&self, other: &Device) -> bool {
+    self.backend == other.backend
+      && self.id == other.id
+  }
+
+  fn ne(&self, other: &Device) -> bool {
+    self.backend != other.backend
+      && self.id != other.id
+  }
 }
 
 pub struct DeviceManagerFactory {

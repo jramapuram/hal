@@ -142,6 +142,7 @@ impl Model for Sequential {
       // extract part of the array onto the GPU
       let cpu_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
       let cpu_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
+
       let batch_input  = af::transpose(&utils::array_swap_backend(&cpu_batch_input
                                                                   , Backend::AF_BACKEND_CPU
                                                                   , self.device.backend
