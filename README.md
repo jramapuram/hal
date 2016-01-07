@@ -1,5 +1,5 @@
 # HAL : Hyper Adaptive Learning
-Rust based Cross-GPU Machine Learning. 
+Rust based Cross-GPU Machine Learning. [![Build Status](https://travis-ci.org/jramapuram/hal.svg?branch=feature%2Flstm)](https://travis-ci.org/jramapuram/hal)
 
 # Why Rust? 
 This project is for those that miss strongly typed compiled languages.                                                
