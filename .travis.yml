@@ -4,8 +4,7 @@ before_install:
     - sudo apt-get update -qq
     - sudo apt-get -y install unzip build-essential git subversion cmake libfreeimage-dev libatlas3gf-base libatlas-dev libfftw3-dev liblapacke-dev libboost1.55-all-dev libglew-dev libglewmx-dev
     - wget https://github.com/glfw/glfw/releases/download/3.1.2/glfw-3.1.2.zip
-    - unzip glfw-3.1.2.zip -d glfw && cd glfw && cmake . && sudo make install
-    - echo $TRAVIS_BUILD_DIR
+    - unzip glfw-3.1.2.zip -d . && cd glfw-3.1.2 && cmake . && sudo make install
 
 language: rust
 script: cargo build --verbose
@@ -17,4 +16,4 @@ rust:
     - 1.4.0
     - 1.5.0
 env:
-    - AF_PATH=$(TRAVIS_BUILD_DIR)/arrayfire-rust/arrayfire/build/package/lib
+    - AF_PATH=$HOME/hal/arrayfire-rust/arrayfire/build/package/lib
