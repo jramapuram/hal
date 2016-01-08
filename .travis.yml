@@ -5,6 +5,7 @@ before_install:
     - sudo apt-get -y install unzip build-essential git subversion cmake libfreeimage-dev libatlas3gf-base libatlas-dev libfftw3-dev liblapacke-dev libboost1.55-all-dev libglew-dev libglewmx-dev xorg-dev libglu1-mesa-dev
     - wget https://github.com/glfw/glfw/releases/download/3.1.2/glfw-3.1.2.zip
     - unzip glfw-3.1.2.zip -d . && cd glfw-3.1.2 && cmake . && sudo make install
+    - cd .. && git submodule update --init --recursive
 
 language: rust
 script:
