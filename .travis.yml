@@ -11,6 +11,7 @@ language: rust
 script:
     - sed -i -- 's/true/false/g' /home/travis/build/jramapuram/hal/arrayfire-rust/build.conf
     - cargo build --verbose
+    - cargo run --example perceptron
 rust:
     - 1.0.0
     - 1.1.0
