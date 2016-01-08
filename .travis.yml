@@ -7,7 +7,9 @@ before_install:
     - unzip glfw-3.1.2.zip -d . && cd glfw-3.1.2 && cmake . && sudo make install
 
 language: rust
-script: cargo build --verbose
+script:
+    - sed -i -- 's/true/false/g' $HOME/hal/arrayfire-rust/build.conf
+    - cargo build --verbose
 rust:
     - 1.0.0
     - 1.1.0
