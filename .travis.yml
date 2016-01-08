@@ -8,7 +8,7 @@ before_install:
 
 language: rust
 script:
-    - sed -i -- 's/true/false/g' $HOME/hal/arrayfire-rust/build.conf
+    - sed -i -- 's/true/false/g' /home/travis/build/jramapuram/hal/arrayfire-rust/build.conf
     - cargo build --verbose
 rust:
     - 1.0.0
@@ -18,4 +18,4 @@ rust:
     - 1.4.0
     - 1.5.0
 env:
-    - AF_PATH=$HOME/hal/arrayfire-rust/arrayfire/build/package/lib
+    - AF_PATH=/home/travis/build/jramapuram/hal/arrayfire-rust/arrayfire/build/package/lib
