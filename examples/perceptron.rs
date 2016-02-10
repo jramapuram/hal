@@ -26,9 +26,9 @@ fn generate_sin_wave(input_dims: u64, num_rows: u64) -> Array {
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 64;
+  let input_dims = 128;
   let hidden_dims = 32;
-  let output_dims = 64;
+  let output_dims = 128;
   let num_train_samples = 65536;
   let batch_size = 32;
   let optimizer_type = "SGD";
@@ -64,22 +64,22 @@ fn main() {
   manager.swap_device(cpu_device);
 
   // Test with learning to predict sin wave
-  let mut data = generate_sin_wave(input_dims, num_train_samples);
-  let mut target = data.clone();
+  let mut train = generate_sin_wave(input_dims, num_train_samples);
+  let mut test = af::rows(&train, 0, batch_size - 1).unwrap();
+  let mut target = train.clone();
 
   // iterate our model in Verbose mode (printing loss)
-  let loss = model.fit(&mut data, &mut target, batch_size
+  let loss = model.fit(&mut train, &mut target
+                       , cpu_device, batch_size
                        , false  // shuffle
                        , true); // verbose
-
 
   // plot our loss
   plot_vec(loss, "Loss vs. Iterations", 512, 512);
 
   // infer on one of our samples
-  let temp = af::rows(&data, 0, batch_size - 1).unwrap();
-  println!("temp shape= {:?}", temp.dims().unwrap().get().clone());
-  let prediction = model.forward(&af::rows(&data, 0, batch_size - 1).unwrap(), false);
+  println!("test shape= {:?}", test.dims().unwrap().get().clone());
+  let prediction = model.forward(&test, cpu_device, false);
   println!("prediction shape: {:?}", prediction.dims().unwrap().get().clone());
   plot_array(&prediction, "Model Inference", 512, 512);
 }

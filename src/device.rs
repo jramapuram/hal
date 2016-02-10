@@ -1,26 +1,14 @@
 use af;
-use af::{Backend};
+use af::{Backend, Array, Aftype};
 use std::cell::Cell;
 use std::sync::Arc;
 
 pub type DeviceManager = Arc<DeviceManagerFactory>;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 pub struct Device {
   pub backend: Backend,
   pub id: i32,
-}
-
-impl PartialEq for Device{
-  fn eq(&self, other: &Device) -> bool {
-    self.backend == other.backend
-      && self.id == other.id
-  }
-
-  fn ne(&self, other: &Device) -> bool {
-    self.backend != other.backend
-      && self.id != other.id
-  }
 }
 
 pub struct DeviceManagerFactory {
@@ -73,14 +61,30 @@ impl DeviceManagerFactory {
   pub fn swap_device(&self, device: Device)
   {
     let c = self.current.get();
-    if c != device
+    if c.backend != device.backend && c.id != device.id
     {
-      println!("{:?}", self.devices);
       assert!(self.devices.contains(&device));
-      println!("Swapping {}/{} to {}/{}", c.backend, c.id
-               , device.backend, device.id);
+      // println!("Swapping {}/{} to {}/{}", c.backend, c.id
+      //          , device.backend, device.id);
       set_device(device);
       self.current.set(device);
     }
+  }
+
+  pub fn swap_array_backend(&self, input: &Array
+                            , input_device: Device
+                            , target_device: Device) -> Array
+  {
+    // ensure we are on the old device
+    self.swap_device(input_device);
+
+    // copy data to the host
+    let dims = input.dims().unwrap();
+    let mut buffer: Vec<f32> = vec![0.0f32; dims.elements() as usize];
+    input.host(&mut buffer).unwrap();
+
+    // swap to the new device
+    self.swap_device(target_device);
+    Array::new(dims, &buffer, Aftype::F32).unwrap()//input.get_type().unwrap()).unwrap()
   }
 }

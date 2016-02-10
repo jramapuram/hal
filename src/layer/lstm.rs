@@ -9,6 +9,7 @@ use params::{LSTMIndex, GatedRecurrence, Input, Params};
 pub struct LSTM {
   pub input_size: usize,
   pub output_size: usize,
+  pub bptt_interval: usize,
   pub return_sequences: bool,
 }
 
@@ -95,6 +96,7 @@ impl Layer for LSTM {
                               , &params.biases[LSTMIndex::Forget]
                               , &params.biases[LSTMIndex::Output]
                               , &params.biases[LSTMIndex::CellTilda]];
+
     // [z(i,f,o,ct)_t] = W*x + U*h_tm1 + b
     let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), inputs.data).unwrap()
                                , &af::matmul(&af::join_many(0, recurrents_ref).unwrap(), &h_tm1).unwrap(), false).unwrap()

@@ -15,7 +15,7 @@ impl Layer for Dense
   fn forward(&self, params: &mut Params, inputs: &Input, train: bool)-> Input
   {
     // z_t = Wx + b [the bias is added in parallel for batch]
-    let z_t = af::add(&af::matmul( &params.weights[0]
+    let z_t = af::add(&af::matmul(&params.weights[0]
                                     , &inputs.data//activated_input
                                     , MatProp::NONE
                                     , MatProp::NONE).unwrap()
@@ -34,6 +34,8 @@ impl Layer for Dense
     a_t.clone() // clone just increases the ref count
   }
 
+  // delta_b = delta
+  // delta_w = matmul(delta, activations_previous)
   fn backward(&self, params: &mut Params, delta: &Array) -> Array {
     // delta_t     = (transpose(W_{t+1}) * d_{l+1}) .* dActivation(z)
     // delta_{t-1} = (transpose(W_{t}) * d_{l})

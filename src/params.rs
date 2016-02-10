@@ -124,6 +124,7 @@ impl ParamManager {
     // generate the biases
     let mut biases: Vec<Array> = Vec::with_capacity(biases_params.len());
     for (b_init, b_dims) in biases_params {
+      //println!("orig bias size: {:?}", b_dims);
       biases.push(self.generate(b_init, b_dims));
     }
 

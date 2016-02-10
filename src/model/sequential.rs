@@ -74,6 +74,7 @@ impl Model for Sequential {
       //                               , params.get("forget_b_init").unwrap(),
       //                               , params.get("b_init").unwrap());
       //   self.layers.push(Box::new(LSTM{input_size: input_size
+
       //                                   , output_size: output_size}));
       // },
       _  => panic!("Error unknown layer type"),
@@ -87,7 +88,12 @@ impl Model for Sequential {
     println!("loss:           {}\nnum_layers:     {}", self.loss, self.layers.len());
   }
 
-  fn forward(&mut self, activation: &Array, train: bool) -> Array {
+  fn forward(&mut self, activation: &Array
+             , src_device: Device
+             , train: bool) -> Array {
+    // check & swap if the backend matches to runtime one (if not already)
+    self.manager.swap_array_backend(&activation, src_device, self.device);
+
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
     let bptt_unroll = max(activation.dims().unwrap()[2], 1);
@@ -100,12 +106,13 @@ impl Model for Sequential {
                                           , &activate, train);
       }
     }
+
     activate.data
   }
 
 
-  fn fit(&mut self, input: &mut Array, target: &mut Array, batch_size: u64
-         , shuffle: bool, verbose: bool) -> Vec<f32>
+  fn fit(&mut self, input: &mut Array, target: &mut Array, src_device: Device
+         , batch_size: u64,  shuffle: bool, verbose: bool) -> Vec<f32>
   {
     // some required data validity checks
     let idims = input.dims().unwrap().get().clone();
@@ -133,6 +140,7 @@ impl Model for Sequential {
 
     // over every batch
     let mut current_iteration = 0;
+    let current_device = self.device.clone();
     for i in (0..idims[0]).filter(|&x| x % batch_size == 0) {
       if verbose {
         print!("\n[iter: {}] ", current_iteration);
@@ -140,17 +148,15 @@ impl Model for Sequential {
       }
 
       // extract part of the array onto the GPU
-      let cpu_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
-      let cpu_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
+      let src_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
+      let src_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
+      let batch_input  = af::transpose(&self.manager.swap_array_backend(&src_batch_input
+                                                                        , src_device
+                                                                        , current_device), false).unwrap();
+      let batch_target = af::transpose(&self.manager.swap_array_backend(&src_batch_target
+                                                                        , src_device
+                                                                        , current_device), false).unwrap();
 
-      let batch_input  = af::transpose(&utils::array_swap_backend(&cpu_batch_input
-                                                                  , Backend::AF_BACKEND_CPU
-                                                                  , self.device.backend
-                                                                  , 0, self.device.id), false).unwrap();
-      let batch_target = af::transpose(&utils::array_swap_backend(&cpu_batch_target
-                                                                  , Backend::AF_BACKEND_CPU
-                                                                  , self.device.backend
-                                                                  , 0, self.device.id), false).unwrap();
       self.optimizer.setup(self.param_manager.get_all_weight_dims()
                            , self.param_manager.get_all_bias_dims());
 
@@ -159,7 +165,7 @@ impl Model for Sequential {
       //          , batch_input.dims().unwrap().get().clone()
       //          , batch_target.dims().unwrap().get().clone());
 
-      a_t = self.forward(&batch_input, true);
+      a_t = self.forward(&batch_input, current_device, true);
       loss = self.backward(&a_t, &batch_target);
       self.optimizer.update(&mut self.param_manager, batch_size as u64);
       lossvec.push(loss);

@@ -60,29 +60,6 @@ pub fn rows_to_array(input: Vec<&Array>) -> Array {
   af::join_many(0, input).unwrap()
 }
 
-// Convert an array from one backend to the other
-pub fn array_swap_backend(input: &Array
-                          , from: af::Backend
-                          , to: af::Backend
-                          , from_device_id: i32
-                          , to_device_id: i32) -> Array
-{
-  // swap to the old buffer
-  af::set_backend(from).unwrap();
-  af::set_device(from_device_id).unwrap();
-
-  let dims = input.dims().unwrap();
-  let mut buffer: Vec<f32> = vec![0.0f32; dims.elements() as usize];
-  input.host(&mut buffer).unwrap();
-
-  // swap to the new buffer
-  af::set_backend(to).unwrap();
-  af::set_device(to_device_id).unwrap();
-
-  let converted = Array::new(dims, &buffer, Aftype::F32).unwrap();
-  converted
-}
-
 // Helper to swap rows (row major order) in a generic type [non GPU]
 pub fn swap_row<T>(matrix: &mut [T], row_src: usize, row_dest: usize, cols: usize){
   assert!(matrix.len() % cols == 0);
