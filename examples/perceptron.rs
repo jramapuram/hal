@@ -26,11 +26,11 @@ fn generate_sin_wave(input_dims: u64, num_rows: u64) -> Array {
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 128;
+  let input_dims = 64;
   let hidden_dims = 32;
-  let output_dims = 128;
+  let output_dims = 64;
   let num_train_samples = 65536;
-  let batch_size = 32;
+  let batch_size = 128;
   let optimizer_type = "SGD";
 
   // Now, let's build a model with an device manager on a specific device,
@@ -65,7 +65,7 @@ fn main() {
 
   // Test with learning to predict sin wave
   let mut train = generate_sin_wave(input_dims, num_train_samples);
-  let mut test = af::rows(&train, 0, batch_size - 1).unwrap();
+  let mut test = generate_sin_wave(input_dims, batch_size);
   let mut target = train.clone();
 
   // iterate our model in Verbose mode (printing loss)
@@ -79,7 +79,8 @@ fn main() {
 
   // infer on one of our samples
   println!("test shape= {:?}", test.dims().unwrap().get().clone());
+  println!("train shape= {:?}", train.dims().unwrap().get().clone());
   let prediction = model.forward(&test, cpu_device, false);
   println!("prediction shape: {:?}", prediction.dims().unwrap().get().clone());
-  plot_array(&prediction, "Model Inference", 512, 512);
+  plot_array(&af::flat(&af::rows(&prediction, 0, 1).unwrap()).unwrap(), "Model Inference", 512, 512);
 }

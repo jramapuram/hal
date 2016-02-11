@@ -150,12 +150,12 @@ impl Model for Sequential {
       // extract part of the array onto the GPU
       let src_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
       let src_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
-      let batch_input  = af::transpose(&self.manager.swap_array_backend(&src_batch_input
-                                                                        , src_device
-                                                                        , current_device), false).unwrap();
-      let batch_target = af::transpose(&self.manager.swap_array_backend(&src_batch_target
-                                                                        , src_device
-                                                                        , current_device), false).unwrap();
+      let batch_input  = self.manager.swap_array_backend(&src_batch_input
+                                                         , src_device
+                                                         , current_device);
+      let batch_target = self.manager.swap_array_backend(&src_batch_target
+                                                         , src_device
+                                                         , current_device);
 
       self.optimizer.setup(self.param_manager.get_all_weight_dims()
                            , self.param_manager.get_all_bias_dims());
@@ -184,7 +184,6 @@ impl Model for Sequential {
                                      , target
                                      , &self.loss
                                      , &self.param_manager.get_activation(last_index, 0));
-
     for i in (0..last_index + 1).rev() {
       delta = self.layers[i].backward(self.param_manager.get_mut_params(i), &delta);
     }

@@ -76,9 +76,10 @@ impl Optimizer for SGD {
       for weight_num in (0..weights.len()) {
         let delta = parameter_manager.get_delta(layer_num, weight_num);
         let activ = parameter_manager.get_input(layer_num, weight_num).data;
-        let w_update = af::div(&af::matmul(&delta, &activ
-                                          , af::MatProp::NONE, af::MatProp::TRANS).unwrap()
-                               , &delta.dims().unwrap()[1], false).unwrap(); // the minibatch size
+        let w_update = af::div(&af::matmul(&activ, &delta
+                                           , af::MatProp::TRANS
+                                           , af::MatProp::NONE).unwrap()
+                               , &batch_size, false).unwrap(); // divide by the batch size
         self.velocity_W[velocity_index[0]] = af::mul(&self.momemtum, &self.velocity_W[velocity_index[0]], false).unwrap();
         self.velocity_W[velocity_index[0]] = af::sub(&self.velocity_W[velocity_index[0]]
                                                      , &af::mul(&alpha, &w_update, true).unwrap(), false).unwrap();
@@ -93,7 +94,7 @@ impl Optimizer for SGD {
       let biases = parameter_manager.get_biases(layer_num);
       for bias_num in (0..biases.len()) {
         let delta = parameter_manager.get_delta(layer_num, bias_num);
-        let b_update = af::div(&af::sum(&delta, 1).unwrap(), &delta.dims().unwrap()[1], true).unwrap(); //minibatch size
+        let b_update = af::transpose(&af::div(&af::sum(&delta, 0).unwrap(), &batch_size, true).unwrap(), false).unwrap(); // divide by the batch size
         self.velocity_b[velocity_index[1]] = af::mul(&self.momemtum, &self.velocity_b[velocity_index[1]], false).unwrap();
         self.velocity_b[velocity_index[1]] = af::sub(&self.velocity_b[velocity_index[1]]
                                                      , &af::mul(&alpha, &b_update, false).unwrap(), true).unwrap();

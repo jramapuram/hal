@@ -354,7 +354,7 @@ impl<'a> DenseGenerator for ParamManager {
                , b_init: &str)
   {
     self.add(manager, device, "dense"
-             , vec![(w_init, (output_size, input_size))]
+             , vec![(w_init, (input_size, output_size))]
              , vec![(b_init, (output_size, 1))]
              , vec![activation]
              , None, None);
@@ -375,7 +375,7 @@ impl LSTMGenerator for ParamManager {
               , forget_b_init: &str
               , b_init: &str)
   {
-    let input_dims = (output_size, input_size);
+    let input_dims = (input_size, output_size);
     let recurrent_dims = (output_size, output_size);
     let bias_dims = (output_size, 1);
     // W_i, W_f, W_o, W_ct, U_i, U_f, U_o, U_ct
