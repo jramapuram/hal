@@ -61,11 +61,11 @@ impl DeviceManagerFactory {
   pub fn swap_device(&self, device: Device)
   {
     let c = self.current.get();
-    if c.backend != device.backend && c.id != device.id
+    if c.backend != device.backend || c.id != device.id
     {
       assert!(self.devices.contains(&device));
-      // println!("Swapping {}/{} to {}/{}", c.backend, c.id
-      //          , device.backend, device.id);
+      println!("Swapping {}/{} to {}/{}", c.backend, c.id
+               , device.backend, device.id);
       set_device(device);
       self.current.set(device);
     }
@@ -75,6 +75,13 @@ impl DeviceManagerFactory {
                             , input_device: Device
                             , target_device: Device) -> Array
   {
+    // return if the devices match
+    if input_device.id == target_device.id
+      && input_device.backend == target_device.backend
+    {
+      return input.clone() // increases the ref count
+    }
+
     // ensure we are on the old device
     self.swap_device(input_device);
 
@@ -85,6 +92,6 @@ impl DeviceManagerFactory {
 
     // swap to the new device
     self.swap_device(target_device);
-    Array::new(dims, &buffer, Aftype::F32).unwrap()//input.get_type().unwrap()).unwrap()
+    Array::new(dims, &buffer, Aftype::F32).unwrap()
   }
 }

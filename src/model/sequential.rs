@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use utils;
 use loss;
-use layer::{Layer, Dense};
+use layer::{Layer, Dense};//, LSTM};
 use device::{Device, DeviceManager, DeviceManagerFactory};
 use model::Model;
 use optimizer::{Optimizer, SGD};
@@ -66,16 +66,19 @@ impl Model for Sequential {
                                         , output_size: output_size}));
       },
       // "lstm"  => {
-      //   self.param_manager.add_lstm(input_size, output_size
+      //   self.param_manager.add_lstm(self.manager.clone(), self.device
+      //                               , input_size, output_size
+      //                               , params.get("max_seq_size").unwrap()
       //                               , params.get("input_activation").unwrap()
       //                               , params.get("outer_activation").unwrap()
       //                               , params.get("w_init").unwrap()
       //                               , params.get("w_recurrent_init").unwrap()
-      //                               , params.get("forget_b_init").unwrap(),
+      //                               , params.get("forget_b_init").unwrap()
       //                               , params.get("b_init").unwrap());
       //   self.layers.push(Box::new(LSTM{input_size: input_size
-
-      //                                   , output_size: output_size}));
+      //                                  , output_size: output_size
+      //                                  , max_seq_size: params.get("max_seq_size").unwrap()
+      //                                  , return_sequences: params.get("return_sequences").unwrap()}));
       // },
       _  => panic!("Error unknown layer type"),
     }
@@ -91,16 +94,19 @@ impl Model for Sequential {
   fn forward(&mut self, activation: &Array
              , src_device: Device
              , train: bool) -> Array {
+    println!("prefwd");
     // check & swap if the backend matches to runtime one (if not already)
-    self.manager.swap_array_backend(&activation, src_device, self.device);
+    let activ = self.manager.swap_array_backend(&activation, src_device, self.device);
+    println!("prefwd1");
 
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
-    let bptt_unroll = max(activation.dims().unwrap()[2], 1);
-    let mut activate = Input {data: af::slice(activation, 0).unwrap()
+    let bptt_unroll = max(activ.dims().unwrap()[2], 1);
+    let mut activate = Input {data: af::slice(&activ, 0).unwrap()
                               , activation: "ones".to_string()};
+
     for t in 0..bptt_unroll {
-      activate.data = af::slice(activation, t).unwrap();
+      activate.data = af::slice(&activ, t).unwrap();
       for i in 0..self.layers.len() {
         activate = self.layers[i].forward(self.param_manager.get_mut_params(i)
                                           , &activate, train);
@@ -124,8 +130,9 @@ impl Model for Sequential {
     assert!(idims[0] >= batch_size
             && idims[0] % batch_size == 0); //ease up later
 
-    // create the container to hold the forward pass & loss results
-    let mut a_t: Array;
+    // create the container to hold the batched values & loss results
+    let mut src_batch_input: Array;
+    let mut src_batch_target: Array;
     let mut loss: f32;
     let mut lossvec = Vec::<f32>::new();
 
@@ -140,22 +147,26 @@ impl Model for Sequential {
 
     // over every batch
     let mut current_iteration = 0;
-    let current_device = self.device.clone();
+    let compute_device = self.device.clone();
+
     for i in (0..idims[0]).filter(|&x| x % batch_size == 0) {
+            println!("here...");
       if verbose {
         print!("\n[iter: {}] ", current_iteration);
         current_iteration += 1;
       }
 
       // extract part of the array onto the GPU
-      let src_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
-      let src_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
-      let batch_input  = self.manager.swap_array_backend(&src_batch_input
+      self.manager.swap_device(src_device);
+      src_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
+      src_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
+      let batch_input = self.manager.swap_array_backend(&src_batch_input
                                                          , src_device
-                                                         , current_device);
+                                                         , compute_device);
       let batch_target = self.manager.swap_array_backend(&src_batch_target
                                                          , src_device
-                                                         , current_device);
+                                                         , compute_device);
+      println!("here1");
 
       self.optimizer.setup(self.param_manager.get_all_weight_dims()
                            , self.param_manager.get_all_bias_dims());
@@ -165,14 +176,24 @@ impl Model for Sequential {
       //          , batch_input.dims().unwrap().get().clone()
       //          , batch_target.dims().unwrap().get().clone());
 
-      a_t = self.forward(&batch_input, current_device, true);
+      println!("pre fwd");
+      let a_t = self.forward(&batch_input, compute_device, true);
+      println!("post fwd");
       loss = self.backward(&a_t, &batch_target);
+      println!("post bkwd");
       self.optimizer.update(&mut self.param_manager, batch_size as u64);
+      println!("post optimize {}", loss);
       lossvec.push(loss);
+
       if verbose {
         print!("{} ", loss);
       }
     }
+
+    // let k = af::mul(&src_batch_target, &1.0, false).unwrap();
+    // let j = af::mul(&src_batch_input, &1.0, false).unwrap();
+    self.manager.swap_device(src_device);
+    println!("heressssss");
 
     utils::write_csv::<f32>("loss.csv", &lossvec);
     lossvec

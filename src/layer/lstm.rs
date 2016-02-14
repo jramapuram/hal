@@ -4,12 +4,12 @@ use af::MatProp;
 
 use activations;
 use initializations;
-use params::{LSTMIndex, GatedRecurrence, Input, Params};
+use params::{LSTMIndex, Input, Params};
 
 pub struct LSTM {
   pub input_size: usize,
   pub output_size: usize,
-  pub bptt_interval: usize,
+  pub max_seq_size: usize,
   pub return_sequences: bool,
 }
 
@@ -43,12 +43,12 @@ impl RTRL for LSTM {
     // compute their derivatives [diff(z_i), diff(z_f), diff(z_ct)]
     let dz = vec![&activations::get_activation_derivative(inner_activation, &i_t).unwrap()
                   , &activations::get_activation_derivative(inner_activation, &f_t).unwrap()
-                  , &activations::get_activation_derivative(.outer_activation, &ct_t).unwrap()];
+                  , &activations::get_activation_derivative(outer_activation, &ct_t).unwrap()];
     let ct_ctm1_it = vec![&ct_t, &c_tm1, &i_t];
 
     // [Ct_t; C_{t-1}; i_t] * dz
     let dzprod = af::mul(&af::join_many(0, ct_ctm1_it).unwrap()
-                         , af::join_many(0, dzvec).unwrap(), false).unwrap();
+                         , af::join_many(0, dz).unwrap(), false).unwrap();
 
     // dC_t/dWi  = (dC_{t-1}/dWi  * f_t) + ct_t  * inner_activation(z_i) * x_t
     // dC_t/dWf  = (dC_{t-1}/dWf  * f_t) + c_tm1 * inner_activation(z_f) * x_t

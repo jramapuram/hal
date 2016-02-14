@@ -12,8 +12,10 @@ pub fn mse(pred: &Array, target: &Array) -> f32 {
 pub fn cross_entropy(pred: &Array, target: &Array) -> f32 {
   // y: true target, x: prediction
   // E = sum(-ylnx - [1-y]ln[1-x])
-  let pos = af::mul(&af::mul(&-1.0, target, false).unwrap(), &af::log(&pred).unwrap(), false).unwrap(); // -ylnx
-  let neg = af::mul(&af::sub(&1.0, target, false).unwrap(), &af::log(&(af::sub(&1.0, pred, false).unwrap())).unwrap(), false).unwrap(); //[1-y]ln[1-x]
+  let pos = af::mul(&af::mul(&-1.0, target, false).unwrap()
+                    , &af::log(&pred).unwrap(), false).unwrap(); // -ylnx
+  let neg = af::mul(&af::sub(&1.0, target, false).unwrap()
+                    , &af::log(&(af::sub(&1.0, pred, false).unwrap())).unwrap(), false).unwrap(); //[1-y]ln[1-x]
   let e = af::sub(&pos, &neg, false).unwrap();
   af::sum_all(&e).unwrap().0 as f32
 }
