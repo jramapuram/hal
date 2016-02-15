@@ -34,6 +34,12 @@ impl Default for Sequential {
   }
 }
 
+impl Drop for Sequential {
+  fn drop(&mut self) {
+    self.manager.swap_device(self.device);
+  }
+}
+
 impl Model for Sequential {
   fn new(manager: DeviceManager
          , optimizer: Box<Optimizer>
@@ -94,10 +100,8 @@ impl Model for Sequential {
   fn forward(&mut self, activation: &Array
              , src_device: Device
              , train: bool) -> Array {
-    println!("prefwd");
     // check & swap if the backend matches to runtime one (if not already)
     let activ = self.manager.swap_array_backend(&activation, src_device, self.device);
-    println!("prefwd1");
 
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
@@ -130,9 +134,7 @@ impl Model for Sequential {
     assert!(idims[0] >= batch_size
             && idims[0] % batch_size == 0); //ease up later
 
-    // create the container to hold the batched values & loss results
-    let mut src_batch_input: Array;
-    let mut src_batch_target: Array;
+    // loss vector current loss
     let mut loss: f32;
     let mut lossvec = Vec::<f32>::new();
 
@@ -150,7 +152,6 @@ impl Model for Sequential {
     let compute_device = self.device.clone();
 
     for i in (0..idims[0]).filter(|&x| x % batch_size == 0) {
-            println!("here...");
       if verbose {
         print!("\n[iter: {}] ", current_iteration);
         current_iteration += 1;
@@ -158,15 +159,14 @@ impl Model for Sequential {
 
       // extract part of the array onto the GPU
       self.manager.swap_device(src_device);
-      src_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
-      src_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
+      let src_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
+      let src_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
       let batch_input = self.manager.swap_array_backend(&src_batch_input
                                                          , src_device
                                                          , compute_device);
       let batch_target = self.manager.swap_array_backend(&src_batch_target
                                                          , src_device
                                                          , compute_device);
-      println!("here1");
 
       self.optimizer.setup(self.param_manager.get_all_weight_dims()
                            , self.param_manager.get_all_bias_dims());
@@ -176,24 +176,15 @@ impl Model for Sequential {
       //          , batch_input.dims().unwrap().get().clone()
       //          , batch_target.dims().unwrap().get().clone());
 
-      println!("pre fwd");
       let a_t = self.forward(&batch_input, compute_device, true);
-      println!("post fwd");
       loss = self.backward(&a_t, &batch_target);
-      println!("post bkwd");
       self.optimizer.update(&mut self.param_manager, batch_size as u64);
-      println!("post optimize {}", loss);
       lossvec.push(loss);
 
       if verbose {
         print!("{} ", loss);
       }
     }
-
-    // let k = af::mul(&src_batch_target, &1.0, false).unwrap();
-    // let j = af::mul(&src_batch_input, &1.0, false).unwrap();
-    self.manager.swap_device(src_device);
-    println!("heressssss");
 
     utils::write_csv::<f32>("loss.csv", &lossvec);
     lossvec

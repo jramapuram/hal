@@ -64,8 +64,8 @@ impl DeviceManagerFactory {
     if c.backend != device.backend || c.id != device.id
     {
       assert!(self.devices.contains(&device));
-      println!("Swapping {}/{} to {}/{}", c.backend, c.id
-               , device.backend, device.id);
+      // println!("Swapping {}/{} to {}/{}", c.backend, c.id
+      //          , device.backend, device.id);
       set_device(device);
       self.current.set(device);
     }

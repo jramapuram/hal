@@ -67,8 +67,8 @@ fn main() {
   let mut train = generate_sin_wave(input_dims, num_train_samples);
   let mut test = generate_sin_wave(input_dims, batch_size);
   let mut target = train.clone();
-  println!("test shape= {:?}", test.dims().unwrap().get().clone());
-  println!("train shape= {:?}", train.dims().unwrap().get().clone());
+  println!("test shape:  {:?}", test.dims().unwrap().get().clone());
+  println!("train shape: {:?}", train.dims().unwrap().get().clone());
 
   // iterate our model in Verbose mode (printing loss)
   let loss = model.fit(&mut train, &mut target
@@ -76,20 +76,11 @@ fn main() {
                        , false  // shuffle
                        , true); // verbose
 
-  println!("finished fit");
   // plot our loss
   plot_vec(loss, "Loss vs. Iterations", 512, 512);
-  println!("past plotter");
 
-
-  {
-    // infer on one of our samples and return values to CPU
-    //let mut prediction = model.forward(&test, cpu_device, false);
-    //let prediction = manager.swap_array_backend(&model.forward(&test, cpu_device, false), gpu_device, cpu_device);
-    //manager.swap_device(cpu_device);
-    //println!("prediction shape: {:?}", prediction.dims().unwrap().get().clone());
-    //plot_array(&af::flat(&af::rows(&prediction, 0, 1).unwrap()).unwrap(), "Model Inference", 512, 512);
-  }
-  println!("herekk");
-  //manager.swap_device(cpu_device);
+  // infer on one test and plot the first sample (row) of the predictions
+  let prediction = model.forward(&test, cpu_device, false);
+  println!("\nprediction shape: {:?}", prediction.dims().unwrap().get().clone());
+  plot_array(&af::flat(&af::rows(&prediction, 0, 1).unwrap()).unwrap(), "Model Inference", 512, 512);
 }
