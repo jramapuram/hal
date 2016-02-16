@@ -49,6 +49,7 @@ impl DeviceManagerFactory {
     }
 
     assert!(devices.len() > 0);
+    devices.push(Device{ backend: Backend::AF_BACKEND_DEFAULT, id:0 });
     let current = devices.last().unwrap().clone();
     set_device(current);
 
@@ -63,7 +64,9 @@ impl DeviceManagerFactory {
     let c = self.current.get();
     if c.backend != device.backend || c.id != device.id
     {
-      assert!(self.devices.contains(&device));
+      assert!(self.devices.contains(&device)
+              , "device backend = {} | available = {:?}"
+              , device.backend, self.devices);
       // println!("Swapping {}/{} to {}/{}", c.backend, c.id
       //          , device.backend, device.id);
       set_device(device);

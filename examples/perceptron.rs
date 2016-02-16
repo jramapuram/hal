@@ -37,7 +37,7 @@ fn main() {
   // an optimizer and a loss function
   // DEFAULT is: OpenCL -> CUDA -> CPU
   let manager = DeviceManagerFactory::new();
-  let gpu_device = Device{backend: Backend::AF_BACKEND_CUDA, id: 0};
+  let gpu_device = Device{backend: Backend::AF_BACKEND_DEFAULT, id: 0};
   let cpu_device = Device{backend: Backend::AF_BACKEND_CPU, id: 0};
   let mut model = Box::new(Sequential::new(manager.clone()
                                            , build_optimizer(optimizer_type).unwrap()   // optimizer
