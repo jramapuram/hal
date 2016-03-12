@@ -5,7 +5,6 @@ mod dense;
 // mod lstm;
 
 use af::Array;
-
 use params::{Input, Params};
 
 pub trait Layer {

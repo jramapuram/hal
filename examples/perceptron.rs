@@ -37,7 +37,7 @@ fn main() {
   // an optimizer and a loss function
   // DEFAULT is: OpenCL -> CUDA -> CPU
   let manager = DeviceManagerFactory::new();
-  let gpu_device = Device{backend: Backend::AF_BACKEND_CUDA, id: 0};
+  let gpu_device = Device{backend: Backend::AF_BACKEND_DEFAULT, id: 0};
   let cpu_device = Device{backend: Backend::AF_BACKEND_CPU, id: 0};
   let mut model = Box::new(Sequential::new(manager.clone()
                                            , build_optimizer(optimizer_type).unwrap()   // optimizer
@@ -67,6 +67,8 @@ fn main() {
   let mut train = generate_sin_wave(input_dims, num_train_samples);
   let mut test = generate_sin_wave(input_dims, batch_size);
   let mut target = train.clone();
+  println!("test shape:  {:?}", test.dims().unwrap().get().clone());
+  println!("train shape: {:?}", train.dims().unwrap().get().clone());
 
   // iterate our model in Verbose mode (printing loss)
   let loss = model.fit(&mut train, &mut target
@@ -77,10 +79,8 @@ fn main() {
   // plot our loss
   plot_vec(loss, "Loss vs. Iterations", 512, 512);
 
-  // infer on one of our samples
-  println!("test shape= {:?}", test.dims().unwrap().get().clone());
-  println!("train shape= {:?}", train.dims().unwrap().get().clone());
+  // infer on one test and plot the first sample (row) of the predictions
   let prediction = model.forward(&test, cpu_device, false);
-  println!("prediction shape: {:?}", prediction.dims().unwrap().get().clone());
+  println!("\nprediction shape: {:?}", prediction.dims().unwrap().get().clone());
   plot_array(&af::flat(&af::rows(&prediction, 0, 1).unwrap()).unwrap(), "Model Inference", 512, 512);
 }
