@@ -62,12 +62,10 @@ impl Optimizer for SGD {
     self.iter += 1;
     self.learning_rate *= 1.0 / (1.0 + self.decay * (self.iter as f32));
     let alpha = self.learning_rate / batch_size as f32;
-    //let mut velocity_index = [0, 0];
 
     // all arrays are returned as [W0, b0, .. WN, bN, ..] (note this is per layer)
     // deltas are returned in the same way
     let num_params = self.velocity.len();
-    // let mut updates: Vec<Array> = Vec::with_capacity(num_params);
     for (arr, delta, velocity, ind) in Zip::new((parameter_manager.get_all_arrays().iter()   // weights + biases
                                                  , parameter_manager.get_all_deltas().iter() // deltas of above
                                                  , self.velocity.iter_mut()                  // velocity of above
@@ -80,14 +78,7 @@ impl Optimizer for SGD {
 
       assert!(velocity.dims().unwrap().get() == arr.dims().unwrap().get());
       parameter_manager.set_array_from_index(af::sub(arr, velocity, false).unwrap(), ind);
-
-      // if updates.len() < num_params {
-      //   updates.push(af::sub(arr, velocity, false).unwrap());
-      // } else{
-      //   updates[ind] = af::sub(arr, velocity, false).unwrap();
-      // }
     }
-    //parameter_manager.set_all_arrays(updates);
   }
 
   fn info(&self){
