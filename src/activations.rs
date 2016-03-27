@@ -1,5 +1,5 @@
 use af;
-use af::Array;
+use af::{Array, Aftype};
 use error::HALError;
 
 pub fn tanh(x: &Array) -> Array {
@@ -19,6 +19,33 @@ pub fn softmax(x: &Array) -> Array {
   // let smax = exponentiated.map(|elem| af::div(elem, exponentialted_sum)).unwrap();
   // smax
   af::div(&exponentiated, &af::sum_all(&exponentiated).unwrap().0, false).unwrap()
+}
+
+pub fn lrelu(x: &Array) -> Array {
+  let scaled = af::mul(x, &0.0f32, false).unwrap();
+  af::select(&scaled                                  // return 0.01x
+             , &af::lt(x, &0.0f32, true).unwrap()     // if x > 0.0
+             , x).unwrap().cast(Aftype::F32).unwrap() // else x
+}
+
+pub fn lrelu_derivative(x: &Array) -> Array {
+  let remove_negatives = af::selectl(0.01, &af::lt(x, &0.0f32, true).unwrap(), x).unwrap();
+  af::selectl(1.0, &af::gt(x, &0.0f32, true).unwrap(), &remove_negatives).unwrap()
+                                                                            .cast(Aftype::F32)
+                                                                            .unwrap()
+}
+
+pub fn relu(x: &Array) -> Array {
+  af::selectl(0.0, &af::lt(x, &0.0f32, true).unwrap(), x).unwrap()
+                                                         .cast(Aftype::F32)
+                                                         .unwrap()
+}
+
+pub fn relu_derivative(x: &Array) -> Array {
+  let remove_negatives = af::selectl(0.0, &af::lt(x, &0.0f32, true).unwrap(), x).unwrap();
+  af::selectl(1.0, &af::gt(x, &0.0f32, true).unwrap(), &remove_negatives).unwrap()
+                                                                            .cast(Aftype::F32)
+                                                                            .unwrap()
 }
 
 pub fn tanh_derivative(x: &Array) -> Array {
@@ -51,18 +78,24 @@ pub fn get_activation(name: &str, x: &Array) -> Result<Array, HALError> {
   match name {
     "softmax" => Ok(softmax(x)),
     "sigmoid" => Ok(sigmoid(x)),
+    "relu"    => Ok(relu(x)),
+    "lrelu"   => Ok(lrelu(x)),
     "tanh"    => Ok(tanh(x)),
     "ones"    => Ok(ones(x)),
+    "linear"  => Ok(ones(x)),
     _         => Err(HALError::UNKNOWN),
   }
 }
 
-pub fn get_activation_derivative(name: &str, x: &Array) -> Result<Array, HALError> {
+pub fn get_derivative(name: &str, x: &Array) -> Result<Array, HALError> {
   match name {
     "softmax" => Ok(softmax_derivative(x)),
     "sigmoid" => Ok(sigmoid_derivative(x)),
+    "relu"    => Ok(relu_derivative(x)),
+    "lrelu"   => Ok(lrelu_derivative(x)),
     "tanh"    => Ok(tanh_derivative(x)),
     "ones"    => Ok(ones(x)),
+    "linear"  => Ok(ones(x)),
     _         => Err(HALError::UNKNOWN),
   }
 }

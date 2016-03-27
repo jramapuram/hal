@@ -9,7 +9,8 @@ use params::ParamManager;
 
 pub trait Optimizer {
   fn new(params: &HashMap<&str, &str>) -> Self where Self: Sized;
-  fn setup(&mut self, w_dim: Vec<Dim4>, b_dim: Vec<Dim4>);
+  //fn setup(&mut self, w_dim: Vec<Dim4>, b_dim: Vec<Dim4>);
+  fn setup(&mut self, dims: Vec<Dim4>);
   fn update(&mut self, parameter_manager: &mut ParamManager, batch_size: u64);
   fn info(&self);
 }

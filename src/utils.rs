@@ -7,7 +7,7 @@ use std::path::Path;
 use std::ops::Sub;
 use num::traits::Float;
 use statistical::{standard_deviation, mean};
-use af::{Dim4, Array, Aftype, Backend, Seq, AfError};
+use af::{Dim4, Array, Aftype, Seq, AfError};
 use itertools::Zip;
 use rustc_serialize::Encodable;
 
@@ -38,7 +38,7 @@ pub fn raw_to_array<T>(raw_values: &[T], rows: usize, cols: usize) -> Array {
 // convert an array into a vector of rows
 pub fn array_to_rows(input: &Array) -> Vec<Array> {
   let mut rows = Vec::new();
-  for r in (0..input.dims().unwrap()[0]) {
+  for r in 0..input.dims().unwrap()[0] {
     rows.push(af::row(input, r as u64).unwrap());
   }
   rows
@@ -90,7 +90,7 @@ pub fn shuffle_matrix<T>(v: &mut[&mut [T]], cols: &[usize], row_major: bool) {
   let row_count = total_length / cols[0];
 
   let mut rng = rand::thread_rng();
-  for row in (0..row_count) {
+  for row in 0..row_count {
     let rnd_row = rng.gen_range(0, row_count - row);
     for (mat, col) in Zip::new((v.iter_mut(), cols.iter())) { //swap all matrices similarly
       assert!(mat.len() % col == 0);
@@ -106,7 +106,7 @@ pub fn shuffle_matrix<T>(v: &mut[&mut [T]], cols: &[usize], row_major: bool) {
 // SLOOOOOOW
 pub fn shuffle_array(v: &mut[&mut Array], rows: u64) {
   let mut rng = rand::thread_rng();
-  for row in (0..rows) {
+  for row in 0..rows {
     let rnd_row = rng.gen_range(0, rows - row);
     for mat in v.iter_mut() { //swap all tensors similarly
       let dims = mat.dims().unwrap();

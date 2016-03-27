@@ -34,7 +34,7 @@ pub fn loss_delta(prediction: &Array, target: &Array
   // d_L = d_loss * d(z) where z = activation w/out non-linearity (& in this case the predictions)
   let activated_prediction = activations::get_activation(activation_type, prediction).unwrap();
   let d_loss = get_loss_derivative(loss, &activated_prediction, target).unwrap();
-  let d_z = activations::get_activation_derivative(activation_type, &activated_prediction).unwrap();
+  let d_z = activations::get_derivative(activation_type, &activated_prediction).unwrap();
   //af::sum(&af::mul(&d_loss, &d_z, false).unwrap(), 1).unwrap()
   af::mul(&d_loss, &d_z, false).unwrap()
 }

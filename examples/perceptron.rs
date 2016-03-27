@@ -32,6 +32,7 @@ fn main() {
   let num_train_samples = 65536;
   let batch_size = 128;
   let optimizer_type = "SGD";
+  let epochs = 5;
 
   // Now, let's build a model with an device manager on a specific device,
   // an optimizer and a loss function
@@ -72,7 +73,7 @@ fn main() {
 
   // iterate our model in Verbose mode (printing loss)
   let loss = model.fit(&mut train, &mut target
-                       , cpu_device, batch_size
+                       , cpu_device, epochs, batch_size
                        , false  // shuffle
                        , true); // verbose
 

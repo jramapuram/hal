@@ -19,7 +19,7 @@ macro_rules! set_param_vec_func {
 macro_rules! get_param_vec_func {
   ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
     #[allow(unused_mut)]
-    pub fn $fn_name(&mut self, layer_index: usize) -> Vec<$base_type> {
+    pub fn $fn_name(&self, layer_index: usize) -> Vec<$base_type> {
       assert!(self.layer_storage.len() - 1 >= layer_index);
       self.layer_storage[layer_index].$vec_extension.clone()
     }
@@ -86,6 +86,7 @@ pub struct Params {
   pub inputs: Vec<Input>,
   pub outputs: Vec<Input>,
   pub recurrences: Vec<Array>,
+  pub current_unroll: usize,
   pub optional: Vec<Array>,
 }
 
@@ -115,17 +116,23 @@ impl ParamManager {
   {
     // toggle device to appropriate one
     manager.swap_device(device);
+    let num_params = weight_params.len() + biases_params.len();
+
+    // allocate deltas here so that they can be pushed in at each W/b add
+    let mut deltas: Vec<Array> = Vec::with_capacity(num_params);
 
     // generate the weights
     let mut weights: Vec<Array> = Vec::with_capacity(weight_params.len());
     for (w_init, w_dims) in weight_params {
       weights.push(self.generate(w_init, w_dims));
+      deltas.push(self.generate("zeros", w_dims));
     }
     // generate the biases
     let mut biases: Vec<Array> = Vec::with_capacity(biases_params.len());
     for (b_init, b_dims) in biases_params {
       //println!("orig bias size: {:?}", b_dims);
       biases.push(self.generate(b_init, b_dims));
+      deltas.push(self.generate("zeros", b_dims));
     }
 
     // // generate the deltas
@@ -158,10 +165,11 @@ impl ParamManager {
       weights: weights,
       biases: biases,
       activations: owned_activations,
-      deltas: Vec::new(),
+      deltas: deltas,
       inputs: Vec::new(),
       outputs: Vec::new(),
       recurrences: recurrences,
+      current_unroll: 0,
       optional: optional,
     });
   }
@@ -175,6 +183,21 @@ impl ParamManager {
     self.layer_storage.len()
   }
 
+  pub fn num_weights(&self, layer_index: usize) -> usize {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    self.layer_storage[layer_index].weights.len()
+  }
+
+  pub fn num_biases(&self, layer_index: usize) -> usize {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    self.layer_storage[layer_index].biases.len()
+  }
+
+  pub fn num_arrays(&self, layer_index: usize) -> usize {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    self.num_biases(layer_index) + self.num_weights(layer_index)
+  }
+
   pub fn get_params(&self, layer_index: usize) -> Params {
     assert!(self.layer_storage.len() - 1 >= layer_index);
     self.layer_storage[layer_index].clone()
@@ -183,6 +206,75 @@ impl ParamManager {
   pub fn get_mut_params(&mut self, layer_index: usize) -> &mut Params {
     assert!(self.layer_storage.len() - 1 >= layer_index);
     &mut self.layer_storage[layer_index]
+  }
+
+  pub fn get_all_arrays(&self) -> Vec<Array> {
+    let mut p = Vec::new();
+    for layer_num in 0..self.num_layers() {
+      p.extend(self.get_weights(layer_num));
+      p.extend(self.get_biases(layer_num));
+    }
+    p
+  }
+
+  // assumes params are coming in layer wise
+  // eg: [W0, b0, .. , WN, bN]
+  pub fn set_array_from_index(&mut self, arr: Array, ind: usize) {
+    let mut current: usize = 0;
+    for layer_num in 0..self.num_layers() {
+      let n_weights = self.num_weights(layer_num);
+      let n_biases = self.num_biases(layer_num);
+
+      if current + n_weights > ind { // we are a weight
+        let w_index = ind - current;
+        self.set_weight(layer_num, w_index, arr);
+        break;
+      }
+
+      current += n_weights;
+      if current + n_biases > ind { // we are a bias
+        let b_index = ind - current;
+        self.set_bias(layer_num, b_index, arr);
+        break;
+      }
+      current += n_biases;
+    }
+  }
+
+  // TODO:
+  // pub fn get_mut_all_arrays(&mut self) -> Vec<&mut Array> {
+  //   let mut p = Vec::new();
+  //   for layer_num in 0..self.num_layers() {
+  //     // p.extend(self.get_mut_weights(layer_num));
+  //     // p.extend(self.get_mut_biases(layer_num));
+  //     let mut storage = self.layer_storage[layer_num];
+  //     p.push_all(&mut storage.weights[..]);
+  //     p.push_all(&mut storage.biases[..]);
+  //   }
+  //   p
+  // }
+
+
+  // assumes params are coming in layer wise
+  // eg: [W0, b0, .. , WN, bN]
+  pub fn set_all_arrays(&mut self, params: Vec<Array>) {
+    let mut index: usize = 0;
+    for layer_num in 0..self.num_layers() {
+      let n_weights = self.num_weights(layer_num);
+      let n_biases = self.num_biases(layer_num);
+      self.set_weights(layer_num, params[index..index+n_weights].to_vec());
+      index += n_weights;
+      self.set_biases(layer_num, params[index..index+n_biases].to_vec());
+      index += n_biases;
+    }
+  }
+
+  pub fn get_all_deltas(&self) -> Vec<Array> {
+    let mut d = Vec::new();
+    for layer_num in 0..self.num_layers() {
+      d.extend(self.get_deltas(layer_num));
+    }
+    d
   }
 
   get_param_func!(get_weight, weights, Array);
@@ -212,14 +304,14 @@ impl ParamManager {
   get_param_vec_func!(get_recurrences, recurrences, Array);
   get_param_vec_func!(get_optionals, optional, Array);
 
-  get_param_vec_func!(get_mut_weights, weights, Array);
-  get_param_vec_func!(get_mut_biases, biases, Array);
-  get_param_vec_func!(get_mut_activations, activations, String);
-  get_param_vec_func!(get_mut_deltas, deltas, Array);
-  get_param_vec_func!(get_mut_inputs, inputs, Input);
-  get_param_vec_func!(get_mut_outputs, outputs, Input);
-  get_param_vec_func!(get_mut_recurrences, recurrences, Array);
-  get_param_vec_func!(get_mut_optionals, optional, Array);
+  get_mut_param_vec_func!(get_mut_weights, weights, Array);
+  get_mut_param_vec_func!(get_mut_biases, biases, Array);
+  get_mut_param_vec_func!(get_mut_activations, activations, String);
+  get_mut_param_vec_func!(get_mut_deltas, deltas, Array);
+  get_mut_param_vec_func!(get_mut_inputs, inputs, Input);
+  get_mut_param_vec_func!(get_mut_outputs, outputs, Input);
+  get_mut_param_vec_func!(get_mut_recurrences, recurrences, Array);
+  get_mut_param_vec_func!(get_mut_optionals, optional, Array);
 
   set_param_func!(set_weight, weights, Array);
   set_param_func!(set_bias, biases, Array);
@@ -266,6 +358,20 @@ impl ParamManager {
     }
     dims
   }
+
+  pub fn get_all_dims(&self) -> Vec<Dim4> {
+    let mut dims = Vec::new();
+    for layer in &self.layer_storage {
+      for w in &layer.weights {
+        dims.push(w.dims().unwrap().clone());
+      }
+      for b in &layer.biases {
+        dims.push(b.dims().unwrap().clone());
+      }
+    }
+    dims
+  }
+
 
   pub fn get_weight_dims(&self, layer_index: usize) -> Vec<Dim4> {
     let mut dims = Vec::new();
@@ -318,6 +424,19 @@ pub trait DenseGenerator {
 
 }
 
+pub trait RNNGenerator {
+  fn add_rnn(&mut self
+             , manager: DeviceManager
+             , device: Device
+             , input_size: usize
+             , output_size: usize
+             , max_seq_size: usize
+             , activation: &str
+             , w_init: &str
+             , w_recurrent_init: &str
+             , b_init: &str);
+}
+
 pub enum LSTMIndex {
   Input,      // i_t
   Forget,     // f_t
@@ -358,6 +477,35 @@ impl<'a> DenseGenerator for ParamManager {
              , vec![(b_init, (output_size, 1))]
              , vec![activation]
              , None, None);
+  }
+}
+
+impl<'a> RNNGenerator for ParamManager {
+  fn add_rnn(&mut self
+             , manager: DeviceManager
+             , device: Device
+             , input_size: usize
+             , output_size: usize
+             , max_seq_size: usize
+             , activation: &str
+             , w_init: &str
+             , w_recurrent_init: &str
+             , b_init: &str)
+  {
+    let recurrent_weight_dims = (output_size, output_size);
+    let input_dims = (input_size, output_size);
+    let bias_dims = (output_size, 1);
+
+    let mut weights = vec![(w_init, input_dims); max_seq_size]; //clone this max_seq_size times
+    let recurrent_weights = vec![(w_recurrent_init, recurrent_weight_dims); max_seq_size]; // ^
+    weights.extend(recurrent_weights); // all weights are passed as one to the add func
+
+    self.add(manager, device, "rnn"
+             , weights                                        // houses weights & recurrent weights
+             , vec![(b_init, bias_dims); max_seq_size]        // need max_seq_size clones
+             , vec![activation]                               // std rnn has only one activation
+             , Some(vec![("zeros", bias_dims); max_seq_size]) // h_tm1 = sizeof(bias)
+             , None);
   }
 }
 

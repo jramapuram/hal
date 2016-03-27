@@ -122,7 +122,7 @@ impl Model for Sequential {
 
 
   fn fit(&mut self, input: &mut Array, target: &mut Array, src_device: Device
-         , batch_size: u64,  shuffle: bool, verbose: bool) -> Vec<f32>
+         , epochs: u64, batch_size: u64,  shuffle: bool, verbose: bool) -> Vec<f32>
   {
     // some required data validity checks
     let idims = input.dims().unwrap().get().clone();
@@ -138,51 +138,54 @@ impl Model for Sequential {
     let mut loss: f32;
     let mut lossvec = Vec::<f32>::new();
 
-    // randomly shuffle the data
-    if shuffle {
-      utils::shuffle_array(&mut[input, target], idims[0]);
-    }
-
     // normalize the data by mean and 3 std deviations
+    // TODO: This needs to be a parameter of fit
     *input = utils::normalize_array(input, 3.0f32);
     *target = utils::normalize_array(target, 3.0f32);
 
-    // over every batch
-    let mut current_iteration = 0;
-    let compute_device = self.device.clone();
+    for epoch in 0..epochs {
+      // ensure we are on the original device device
+      self.manager.swap_device(src_device);
 
-    for i in (0..idims[0]).filter(|&x| x % batch_size == 0) {
-      if verbose {
-        print!("\n[iter: {}] ", current_iteration);
-        current_iteration += 1;
+      // randomly shuffle the data
+      if shuffle {
+        utils::shuffle_array(&mut[input, target], idims[0]);
       }
 
-      // extract part of the array onto the GPU
-      self.manager.swap_device(src_device);
-      let src_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
-      let src_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
-      let batch_input = self.manager.swap_array_backend(&src_batch_input
-                                                         , src_device
-                                                         , compute_device);
-      let batch_target = self.manager.swap_array_backend(&src_batch_target
-                                                         , src_device
-                                                         , compute_device);
+      // over every batch
+      let mut current_iteration = 0;
+      let compute_device = self.device.clone();
 
-      self.optimizer.setup(self.param_manager.get_all_weight_dims()
-                           , self.param_manager.get_all_bias_dims());
+      for i in (0..idims[0]).filter(|&x| x % batch_size == 0) {
+        if verbose {
+          print!("\n[epoch: {}][iter: {}] ", epoch, current_iteration);
+          current_iteration += 1;
+        }
 
-      // DEBUG:
-      // println!("batched [input: {:?} | target: {:?}]"
-      //          , batch_input.dims().unwrap().get().clone()
-      //          , batch_target.dims().unwrap().get().clone());
+        // extract part of the array onto the GPU
+        self.manager.swap_device(src_device);
+        let src_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
+        let src_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
+        let batch_input = self.manager.swap_array_backend(&src_batch_input
+                                                           , src_device
+                                                           , compute_device);
+        let batch_target = self.manager.swap_array_backend(&src_batch_target
+                                                           , src_device
+                                                           , compute_device);
 
-      let a_t = self.forward(&batch_input, compute_device, true);
-      loss = self.backward(&a_t, &batch_target);
-      self.optimizer.update(&mut self.param_manager, batch_size as u64);
-      lossvec.push(loss);
+        // DEBUG:
+        // println!("batched [input: {:?} | target: {:?}]"
+        //          , batch_input.dims().unwrap().get().clone()
+        //          , batch_target.dims().unwrap().get().clone());
 
-      if verbose {
-        print!("{} ", loss);
+        let a_t = self.forward(&batch_input, compute_device, true);
+        loss = self.backward(&a_t, &batch_target);
+        self.optimizer.update(&mut self.param_manager, batch_size as u64);
+        lossvec.push(loss);
+
+        if verbose {
+          print!("{} ", loss);
+        }
       }
     }
 
@@ -191,6 +194,11 @@ impl Model for Sequential {
   }
 
   fn backward(&mut self, prediction: &Array, target: &Array) -> f32 {
+    // setup the optimizer parameters (if not already setup)
+    // self.optimizer.setup(self.param_manager.get_all_weight_dims()
+    //                      , self.param_manager.get_all_bias_dims());
+    self.optimizer.setup(self.param_manager.get_all_dims());
+
     let last_index = self.layers.len() - 1;
     let mut delta = loss::loss_delta(prediction
                                      , target

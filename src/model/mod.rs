@@ -16,7 +16,7 @@ pub trait Model {
          , loss: &str
          , device: Device) -> Self;
   fn fit(&mut self, input: &mut Array, target: &mut Array, device: Device
-         , batch_size: u64, shuffle: bool, verbose: bool) -> Vec<f32>;
+         , epochs: u64, batch_size: u64, shuffle: bool, verbose: bool) -> Vec<f32>;
   fn forward(&mut self, activation: &Array, src_device: Device, train: bool) -> Array;
   fn backward(&mut self, prediction: &Array, target: &Array) -> f32;
   fn add(&mut self, layer: &str

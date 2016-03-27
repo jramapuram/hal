@@ -37,13 +37,13 @@ impl RTRL for LSTM {
     let mut db_tm1 = derivatives[2];
 
     // e_t = o_t * outer_activation'(c_t) * delta
-    let e_t = af::mul(&af::mul(&o_t, &activations::get_activation_derivative(outer_activation, &c_t).unwrap()).unwrap()
+    let e_t = af::mul(&af::mul(&o_t, &activations::get_derivative(outer_activation, &c_t).unwrap()).unwrap()
                                , delta).unwrap();
 
     // compute their derivatives [diff(z_i), diff(z_f), diff(z_ct)]
-    let dz = vec![&activations::get_activation_derivative(inner_activation, &i_t).unwrap()
-                  , &activations::get_activation_derivative(inner_activation, &f_t).unwrap()
-                  , &activations::get_activation_derivative(outer_activation, &ct_t).unwrap()];
+    let dz = vec![&activations::get_derivative(inner_activation, &i_t).unwrap()
+                  , &activations::get_derivative(inner_activation, &f_t).unwrap()
+                  , &activations::get_derivative(outer_activation, &ct_t).unwrap()];
     let ct_ctm1_it = vec![&ct_t, &c_tm1, &i_t];
 
     // [Ct_t; C_{t-1}; i_t] * dz
@@ -141,12 +141,12 @@ impl Layer for LSTM {
 
     // delta_t     = (transpose(W_{t+1}) * d_{l+1}) .* dActivation(z)
     // delta_{t-1} = (transpose(W_{t}) * d_{l})
-    params.deltas = vec![af::mul(delta, &activations::get_activation_derivative(&params.activations[0]
+    params.deltas = vec![af::mul(delta, &activations::get_derivative(&params.activations[0]
                                                                                 , &params.outputs[0].data).unwrap(), false).unwrap()];
 
     //TODO: redundant?
     // d_h = inner_activation'(z_o)  * outer_activation(c_t) * delta
-    let d_h = af::mul(&af::mul(&activations::get_activation_derivative(inner_activation, &o_t).unwrap()
+    let d_h = af::mul(&af::mul(&activations::get_derivative(inner_activation, &o_t).unwrap()
                                , &activations::get_activation(outer_activation, &c_t).unwrap()).unwrap()
                       , delta).unwrap();
     let d_i = self.rtrl(delta, &d_h, &mut params); // input gate delta is returned
@@ -160,7 +160,7 @@ impl Layer for LSTM {
     params.recurrences[LSTMIndex::Output].pop();
 
     let activation_prev = activations::get_activation(self.inputs.activation[0], &self.inputs.data[DataIndex::Input]).unwrap();
-    let d_activation_prev = activations::get_activation_derivative(self.inputs.activation[0], &activation_prev).unwrap();
+    let d_activation_prev = activations::get_derivative(self.inputs.activation[0], &activation_prev).unwrap();
     let delta_prev = af::mul(&af::matmul(&params.weights[0], delta, af::MatProp::TRANS, af::MatProp::NONE).unwrap()
                              , &d_activation_prev, false).unwrap();
     delta_prev
