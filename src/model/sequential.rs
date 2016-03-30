@@ -138,14 +138,13 @@ impl Model for Sequential {
     // loss vector current loss
     let mut loss: f32;
     let mut lossvec = Vec::<f32>::new();
-
+    let compute_device = self.device.clone();
 
     // iterate epoch times over the number of batch iterations
     for epoch in 0..epochs {
       for iter in 0..iters {
         // ensure we are on the original device device
         self.manager.swap_device(src_device);
-        let compute_device = self.device.clone();
 
         if verbose {
           print!("\n[epoch: {}][iter: {}] ", epoch, iter);
@@ -154,12 +153,17 @@ impl Model for Sequential {
         // extract part of the array onto the GPU
         self.manager.swap_device(src_device);
         let minibatch = source.get_train_iter(batch_size);
+        assert!(minibatch.input.borrow().dims().unwrap()[0] == batch_size
+                , "Ensure that input dims are of batch rows");
+        assert!(minibatch.target.borrow().dims().unwrap()[0] == batch_size
+                , "Ensure that target dims are of batch rows");
         let batch_input = self.manager.swap_array_backend(&minibatch.input.into_inner()
                                                           , src_device
                                                           , compute_device);
         let batch_target = self.manager.swap_array_backend(&minibatch.target.into_inner()
                                                            , src_device
                                                            , compute_device);
+
         // DEBUG:
         // println!("batched [input: {:?} | target: {:?}]"
         //          , batch_input.dims().unwrap().get().clone()
