@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use utils;
 use loss;
 use layer::{Layer, Dense};//, LSTM};
+use data::{DataSource};
 use device::{Device, DeviceManager, DeviceManagerFactory};
 use model::Model;
 use optimizer::{Optimizer, SGD};
@@ -28,7 +29,7 @@ impl Default for Sequential {
       param_manager: ParamManager::default(),
       optimizer: Box::new(SGD::default()),
       manager: DeviceManagerFactory::new(),
-      loss: "mes".to_string(),
+      loss: "mse".to_string(),
       device: Device{ backend: Backend::AF_BACKEND_DEFAULT, id: 0 },
     }
   }
@@ -99,6 +100,7 @@ impl Model for Sequential {
 
   fn forward(&mut self, activation: &Array
              , src_device: Device
+             , dest_device: Device
              , train: bool) -> Array {
     // check & swap if the backend matches to runtime one (if not already)
     let activ = self.manager.swap_array_backend(&activation, src_device, self.device);
@@ -108,7 +110,6 @@ impl Model for Sequential {
     let bptt_unroll = max(activ.dims().unwrap()[2], 1);
     let mut activate = Input {data: af::slice(&activ, 0).unwrap()
                               , activation: "ones".to_string()};
-
     for t in 0..bptt_unroll {
       activate.data = af::slice(&activ, t).unwrap();
       for i in 0..self.layers.len() {
@@ -117,68 +118,54 @@ impl Model for Sequential {
       }
     }
 
-    activate.data
+    // return to the dest device
+    self.manager.swap_array_backend(&activate.data, self.device, dest_device)
   }
 
-
-  fn fit(&mut self, input: &mut Array, target: &mut Array, src_device: Device
-         , epochs: u64, batch_size: u64,  shuffle: bool, verbose: bool) -> Vec<f32>
+  fn fit<T: DataSource>(&mut self, source: &T, src_device: Device
+         , epochs: u64, batch_size: u64, verbose: bool) -> Vec<f32>
   {
-    // some required data validity checks
-    let idims = input.dims().unwrap().get().clone();
-    let tdims = target.dims().unwrap().get().clone();
-    let iter =  idims[0] as u64 / batch_size as u64;
-    println!("\ntrain samples: {:?} | target samples: {:?} | batch size: {} | iterations: {}"
-             , idims, tdims, batch_size, iter);
-    assert!(tdims[0] == idims[0]);
-    assert!(idims[0] >= batch_size
-            && idims[0] % batch_size == 0); //ease up later
+    // some simple data validity checks
+    let data_params = source.info();
+    let idims = data_params.input_dims;
+    let tdims = data_params.target_dims;
+    let iters =  data_params.num_samples as u64 / batch_size as u64;
+    println!("\ntrain samples: {:?} | target samples: {:?} | batch size: {}"
+             , idims, tdims, batch_size);
+    println!("epochs: {} | iterations[per epoch]: {}", epochs, iters);
+    assert!(tdims[0] == idims[0]);          // batches are of equal size
 
     // loss vector current loss
     let mut loss: f32;
     let mut lossvec = Vec::<f32>::new();
 
-    // normalize the data by mean and 3 std deviations
-    // TODO: This needs to be a parameter of fit
-    *input = utils::normalize_array(input, 3.0f32);
-    *target = utils::normalize_array(target, 3.0f32);
 
+    // iterate epoch times over the number of batch iterations
     for epoch in 0..epochs {
-      // ensure we are on the original device device
-      self.manager.swap_device(src_device);
+      for iter in 0..iters {
+        // ensure we are on the original device device
+        self.manager.swap_device(src_device);
+        let compute_device = self.device.clone();
 
-      // randomly shuffle the data
-      if shuffle {
-        utils::shuffle_array(&mut[input, target], idims[0]);
-      }
-
-      // over every batch
-      let mut current_iteration = 0;
-      let compute_device = self.device.clone();
-
-      for i in (0..idims[0]).filter(|&x| x % batch_size == 0) {
         if verbose {
-          print!("\n[epoch: {}][iter: {}] ", epoch, current_iteration);
-          current_iteration += 1;
+          print!("\n[epoch: {}][iter: {}] ", epoch, iter);
         }
 
         // extract part of the array onto the GPU
         self.manager.swap_device(src_device);
-        let src_batch_input  = utils::row_planes(input, i, i + batch_size - 1).unwrap();
-        let src_batch_target = utils::row_planes(target, i, i+ batch_size - 1).unwrap();
-        let batch_input = self.manager.swap_array_backend(&src_batch_input
+        let minibatch = source.get_train_iter(batch_size);
+        let batch_input = self.manager.swap_array_backend(&minibatch.input.into_inner()
+                                                          , src_device
+                                                          , compute_device);
+        let batch_target = self.manager.swap_array_backend(&minibatch.target.into_inner()
                                                            , src_device
                                                            , compute_device);
-        let batch_target = self.manager.swap_array_backend(&src_batch_target
-                                                           , src_device
-                                                           , compute_device);
-
         // DEBUG:
         // println!("batched [input: {:?} | target: {:?}]"
         //          , batch_input.dims().unwrap().get().clone()
         //          , batch_target.dims().unwrap().get().clone());
 
-        let a_t = self.forward(&batch_input, compute_device, true);
+        let a_t = self.forward(&batch_input, compute_device, compute_device, true);
         loss = self.backward(&a_t, &batch_target);
         self.optimizer.update(&mut self.param_manager, batch_size as u64);
         lossvec.push(loss);
@@ -190,6 +177,7 @@ impl Model for Sequential {
     }
 
     utils::write_csv::<f32>("loss.csv", &lossvec);
+    self.manager.swap_device(src_device); // return to src device
     lossvec
   }
 

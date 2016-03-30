@@ -80,9 +80,18 @@ impl DeviceManagerFactory {
   {
     // return if the devices match
     if input_device.id == target_device.id
-      && input_device.backend == target_device.backend
+        && input_device.backend == target_device.backend
     {
       return input.clone() // increases the ref count
+    }
+
+    // we have done something bad if the following triggers
+    let ib = input.get_backend();
+    if input_device.backend != Backend::AF_BACKEND_DEFAULT {
+      assert!(ib == input_device.backend
+              , "provide src was {:?}, but actually {:?}"
+              , input_device.backend
+              , ib);
     }
 
     // ensure we are on the old device

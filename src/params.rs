@@ -227,6 +227,8 @@ impl ParamManager {
 
       if current + n_weights > ind { // we are a weight
         let w_index = ind - current;
+        assert!(self.get_weight(layer_num, w_index).dims().unwrap()
+                == arr.dims().unwrap());
         self.set_weight(layer_num, w_index, arr);
         break;
       }
@@ -234,6 +236,8 @@ impl ParamManager {
       current += n_weights;
       if current + n_biases > ind { // we are a bias
         let b_index = ind - current;
+        assert!(self.get_bias(layer_num, b_index).dims().unwrap()
+                == arr.dims().unwrap());
         self.set_bias(layer_num, b_index, arr);
         break;
       }

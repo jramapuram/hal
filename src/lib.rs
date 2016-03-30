@@ -15,6 +15,9 @@ pub mod model;
 pub use optimizer::{Optimizer};
 pub mod optimizer;
 
+pub use data::{DataSource, Data, DataParams, Normalize, Shuffle};
+pub mod data;
+
 pub mod params;
 pub mod error;
 pub mod loss;

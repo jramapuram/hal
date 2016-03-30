@@ -1,27 +1,97 @@
 #[macro_use] extern crate hal;
 extern crate arrayfire as af;
 
+use std::cell::{RefCell, Cell};
+
 use hal::Model;
 use hal::optimizer::{Optimizer, SGD};
+use hal::data::{Data, DataSource, DataParams, Normalize, Shuffle};
 use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::plot::{plot_vec, plot_array};
 use hal::device::{DeviceManagerFactory, Device};
 use af::{Array, Dim4, Aftype, Backend};
 
+
+/********* Build a custom data source that returns [x, y] tuples *******/
+pub struct SinSource {
+  pub params: DataParams,
+  pub iter: Cell<u64>
+}
+
+impl SinSource {
+  fn new(input_size: u64, batch_size: u64
+         , max_samples: u64, is_normalized: bool
+         , is_shuffled: bool) -> SinSource
+  {
+    let dims = Dim4::new(&[batch_size, input_size, 1, 1]);
+    let train_samples = 0.7 * max_samples as f32;
+    let test_samples = 0.2 * max_samples as f32;
+    let validation_samples = 0.1 * max_samples as f32;
+    SinSource {
+      params: DataParams {
+        input_dims: dims,   // input is the same size as the output
+        target_dims: dims,  // ^
+        normalize: is_normalized,
+        shuffle: is_shuffled,
+        current_epoch: Cell::new(0),
+        num_samples: max_samples,
+        num_train: train_samples as u64,
+        num_test: test_samples as u64,
+        num_validation: Some(validation_samples as u64),
+      },
+      iter: Cell::new(0),
+    }
+  }
+
+  fn generate_sin_wave(&self, input_dims: u64, num_rows: u64) -> Array {
+    let dims = Dim4::new(&[input_dims * num_rows, 1, 1, 1]);
+    let x = af::div(&af::sin(&af::range(dims, 0, Aftype::F32).unwrap()).unwrap()
+                    , &input_dims, false).unwrap();
+    let wave = af::sin(&x).unwrap();
+    af::moddims(&wave, Dim4::new(&[num_rows, input_dims, 1, 1])).unwrap()
+  }
+}
+
+impl DataSource for SinSource
+{
+  fn get_train_iter(&self, num_batch: u64) -> Data {
+    let inp = self.generate_sin_wave(self.params.input_dims[1], num_batch);
+    let mut batch = Data {
+      input: RefCell::new(Box::new(inp.clone())),
+      target: RefCell::new(Box::new(inp.copy().unwrap())),
+    };
+
+    if self.params.normalize { batch.normalize(3.0); }
+    if self.params.shuffle   {  batch.shuffle(); }
+    let current_iter = self.params.current_epoch.get();
+    if self.iter.get()  == self.params.num_samples as u64/ num_batch as u64 {
+      self.params.current_epoch.set(current_iter + 1);
+    }
+    self.iter.set(self.iter.get() + 1);
+    batch
+  }
+
+  fn info(&self) -> DataParams {
+    self.params.clone()
+  }
+
+  fn get_test_iter(&self, num_batch: u64) -> Data {
+    self.get_train_iter(num_batch)
+  }
+
+  fn get_validation_iter(&self, num_batch: u64) -> Option<Data> {
+    Some(self.get_train_iter(num_batch))
+  }
+}
+/****************** End Data Source Definition ********************/
+
+
 fn build_optimizer(name: &str) -> Result<Box<Optimizer>, HALError> {
   match name{
     "SGD" => Ok(Box::new(SGD::default())),
     _     => Err(HALError::UNKNOWN),
   }
-}
-
-fn generate_sin_wave(input_dims: u64, num_rows: u64) -> Array {
-  let dims = Dim4::new(&[input_dims * num_rows, 1, 1, 1]);
-  let x = af::div(&af::sin(&af::range(dims, 0, Aftype::F32).unwrap()).unwrap()
-                  , &input_dims, false).unwrap();
-  let wave = af::sin(&x).unwrap();
-  af::moddims(&wave, Dim4::new(&[num_rows, input_dims, 1, 1])).unwrap()
 }
 
 fn main() {
@@ -34,9 +104,9 @@ fn main() {
   let optimizer_type = "SGD";
   let epochs = 5;
 
-  // Now, let's build a model with an device manager on a specific device,
-  // an optimizer and a loss function
-  // DEFAULT is: OpenCL -> CUDA -> CPU
+  // Now, let's build a model with an device manager on a specific device
+  // an optimizer and a loss function. For this example we demonstrate a simple autoencoder
+  // AF_BACKEND_DEFAULT is: OpenCL -> CUDA -> CPU
   let manager = DeviceManagerFactory::new();
   let gpu_device = Device{backend: Backend::AF_BACKEND_DEFAULT, id: 0};
   let cpu_device = Device{backend: Backend::AF_BACKEND_CPU, id: 0};
@@ -64,24 +134,34 @@ fn main() {
   // The model will automatically toggle to the desired backend during training
   manager.swap_device(cpu_device);
 
-  // Test with learning to predict sin wave
-  let mut train = generate_sin_wave(input_dims, num_train_samples);
-  let mut test = generate_sin_wave(input_dims, batch_size);
-  let mut target = train.clone();
-  println!("test shape:  {:?}", test.dims().unwrap().get().clone());
-  println!("train shape: {:?}", train.dims().unwrap().get().clone());
+  // Build our sin wave source
+  let sin_generator = SinSource::new(input_dims, batch_size
+                                     , num_train_samples
+                                     , false   // normalized
+                                     , false); // shuffled
+
+  // Pull a sample to verify sizing
+  let test_sample = sin_generator.get_train_iter(batch_size);
+  println!("test sample shape: {:?}", test_sample.input.borrow().dims().unwrap().get().clone());
 
   // iterate our model in Verbose mode (printing loss)
-  let loss = model.fit(&mut train, &mut target
-                       , cpu_device, epochs, batch_size
-                       , false  // shuffle
-                       , true); // verbose
+  // Note: more manual control can be enacted by directly calling
+  //       forward/backward & optimizer update
+  let loss = model.fit(&sin_generator        // what data source to pull from
+                       , cpu_device          // source device
+                       , epochs, batch_size  // self explanatory :)
+                       , true);              // verbose
 
-  // plot our loss
+  // plot our loss on a 512x512 grid with the provided title
   plot_vec(loss, "Loss vs. Iterations", 512, 512);
 
   // infer on one test and plot the first sample (row) of the predictions
-  let prediction = model.forward(&test, cpu_device, false);
-  println!("\nprediction shape: {:?}", prediction.dims().unwrap().get().clone());
-  plot_array(&af::flat(&af::rows(&prediction, 0, 1).unwrap()).unwrap(), "Model Inference", 512, 512);
+  let test_sample = sin_generator.get_test_iter(1).input.into_inner();
+  let prediction = model.forward(&test_sample
+                                 , cpu_device // source device
+                                 , cpu_device // destination device
+                                 , false);    // not training
+  println!("\nprediction shape: {:?} | backend = {:?}"
+           , prediction.dims().unwrap(), prediction.get_backend());
+  plot_array(&af::flat(&prediction).unwrap(), "Model Inference", 512, 512);
 }
