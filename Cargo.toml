@@ -18,5 +18,5 @@ path = "src/lib.rs"
 plugin = true
 
 [[example]]
-name = "perceptron"
-path = "examples/perceptron.rs"
+name = "autoencoder"
+path = "examples/autoencoder.rs"
