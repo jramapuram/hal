@@ -4,7 +4,7 @@ extern crate arrayfire as af;
 use std::cell::{RefCell, Cell};
 
 use hal::Model;
-use hal::optimizer::{Optimizer, SGD};
+use hal::optimizer::{Optimizer, SGD, get_optimizer_with_defaults};
 use hal::data::{Data, DataSource, DataParams, Normalize, Shuffle};
 use hal::error::HALError;
 use hal::model::{Sequential};
@@ -86,14 +86,6 @@ impl DataSource for SinSource
 }
 /****************** End Data Source Definition ********************/
 
-
-fn build_optimizer(name: &str) -> Result<Box<Optimizer>, HALError> {
-  match name{
-    "SGD" => Ok(Box::new(SGD::default())),
-    _     => Err(HALError::UNKNOWN),
-  }
-}
-
 fn main() {
   // First we need to parameterize our network
   let input_dims = 64;
@@ -110,10 +102,11 @@ fn main() {
   let manager = DeviceManagerFactory::new();
   let gpu_device = Device{backend: Backend::AF_BACKEND_DEFAULT, id: 0};
   let cpu_device = Device{backend: Backend::AF_BACKEND_CPU, id: 0};
+  let optimizer = get_optimizer_with_defaults(optimizer_type).unwrap();
   let mut model = Box::new(Sequential::new(manager.clone()
-                                           , build_optimizer(optimizer_type).unwrap()   // optimizer
-                                           , "mse"                                      // loss
-                                           , gpu_device));                              // device for model
+                                           , optimizer         // optimizer
+                                           , "mse"             // loss
+                                           , gpu_device));     // device for model
 
   // Let's add a few layers why don't we?
   model.add("dense", hashmap!["activation"    => "tanh".to_string()

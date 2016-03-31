@@ -109,7 +109,6 @@ impl ParamManager {
              , layer_type: &str
              , weight_params: Vec<(&str, (usize, usize))> //(init, (i, o))
              , biases_params: Vec<(&str, (usize, usize))> //(init, (i, o))
-             //, delta_params:  Vec<(&str, (usize, usize))>    //(init, (i, o))
              , activations: Vec<&str>
              , recurrence_dims: Option<Vec<(&str, (usize, usize))>>
              , optional_dims: Option<Vec<(&str, (usize, usize))>>)
@@ -134,13 +133,6 @@ impl ParamManager {
       biases.push(self.generate(b_init, b_dims));
       deltas.push(self.generate("zeros", b_dims));
     }
-
-    // // generate the deltas
-    // let mut deltas: Vec<Array> = Vec::with_capacity(delta_params.len());
-    // for (d_init, d_dims) in delta_params {
-    //   deltas.push(self.generate(d_init, d_dims));
-    // }
-
 
     // generate recurrence vectors
     let mut recurrences: Vec<Array> = Vec::new();

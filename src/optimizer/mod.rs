@@ -16,14 +16,14 @@ pub trait Optimizer {
 }
 
 pub fn get_optimizer(name: &str, params: &HashMap<&str, &str>) -> Result<Box<Optimizer>, HALError>{
-  match name{
+  match name.to_lowercase().as_str() {
     "sgd" => Ok(Box::new(SGD::new(params))),
     _     => Err(HALError::UNKNOWN),
   }
 }
 
-pub fn get_default_optimizer(name: &str) -> Result<Box<Optimizer>, HALError>{
-  match name{
+pub fn get_optimizer_with_defaults(name: &str) -> Result<Box<Optimizer>, HALError>{
+  match name.to_lowercase().as_str() {
     "sgd" => Ok(Box::new(SGD::default())),
     _     => Err(HALError::UNKNOWN),
   }
