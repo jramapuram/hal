@@ -16,7 +16,8 @@ use af::{Array, Dim4, Aftype, Backend};
 /********* Build a custom data source that returns [x, y] tuples *******/
 pub struct SinSource {
   pub params: DataParams,
-  pub iter: Cell<u64>
+  pub iter: Cell<u64>,
+  pub offset: Cell<f32>,
 }
 
 impl SinSource {
@@ -41,14 +42,16 @@ impl SinSource {
         num_validation: Some(validation_samples as u64),
       },
       iter: Cell::new(0),
+      offset: Cell::new(0.0f32),
     }
   }
 
   fn generate_sin_wave(&self, input_dims: u64, num_rows: u64) -> Array {
     let dims = Dim4::new(&[input_dims * num_rows, 1, 1, 1]);
-    let x = af::div(&af::sin(&af::range(dims, 0, Aftype::F32).unwrap()).unwrap()
-                    , &input_dims, false).unwrap();
+    let x = af::add(&self.offset.get(), &af::div(&af::range(dims, 0, Aftype::F32).unwrap()
+                    , &input_dims, false).unwrap(), false).unwrap();
     let wave = af::sin(&x).unwrap();
+    self.offset.set(self.offset.get() + 1.0/input_dims as f32);
     af::moddims(&wave, Dim4::new(&[num_rows, input_dims, 1, 1])).unwrap()
   }
 }
@@ -91,7 +94,7 @@ fn main() {
   let input_dims = 64;
   let hidden_dims = 32;
   let output_dims = 64;
-  let num_train_samples = 65536;
+  let num_train_samples = 65536 * 5;
   let batch_size = 128;
   let optimizer_type = "SGD";
   let epochs = 5;

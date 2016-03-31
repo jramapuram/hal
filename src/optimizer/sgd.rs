@@ -15,7 +15,7 @@ pub struct SGD {
   pub momemtum: f32,
   pub decay: f32,
   pub nesterov: bool,
-  pub clip_grad: u64,
+  pub clip_grad: f32,
   pub iter: u64,
   velocity: Vec<Array>,
 }
@@ -24,11 +24,11 @@ impl Default for SGD {
   fn default() -> SGD {
     SGD {
       name: "SGD".to_string(),
-      learning_rate: 0.001,
+      learning_rate: 1e-3,
       momemtum: 0.0,
       decay: 0.0,
       nesterov: false,
-      clip_grad: 0,
+      clip_grad: 0.0,
       iter: 0,
       velocity: Vec::new(),
     }
@@ -43,7 +43,7 @@ impl Optimizer for SGD {
       momemtum: params.get("momemtum").unwrap().parse::<f32>().unwrap(),
       decay: params.get("decay").unwrap().parse::<f32>().unwrap(),
       nesterov: params.get("nesterov").unwrap().parse::<bool>().unwrap(),
-      clip_grad: params.get("clip_grad").unwrap().parse::<u64>().unwrap(),
+      clip_grad: params.get("clip_grad").unwrap().parse::<f32>().unwrap(),
       iter: 0,
       velocity: Vec::new(),
     }
