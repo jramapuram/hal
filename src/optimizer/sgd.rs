@@ -25,7 +25,7 @@ impl Default for SGD {
     SGD {
       name: "SGD".to_string(),
       learning_rate: 0.001,
-      momemtum: 0.1,
+      momemtum: 0.0,
       decay: 0.0,
       nesterov: false,
       clip_grad: 0,
@@ -60,8 +60,8 @@ impl Optimizer for SGD {
   fn update(&mut self, parameter_manager: &mut ParamManager, batch_size: u64)
   {
     self.iter += 1;
-    self.learning_rate *= 1.0 / (1.0 + self.decay * (self.iter as f32));
-    let alpha = self.learning_rate / batch_size as f32;
+    let lr = self.learning_rate * (1.0 / (1.0 + self.decay * (self.iter as f32)));
+    let alpha = lr / batch_size as f32;
 
     // all arrays are returned as [W0, b0, .. WN, bN, ..] (note this is per layer)
     // deltas are returned in the same way
@@ -75,7 +75,6 @@ impl Optimizer for SGD {
       // p   = p - v
       *velocity = af::add(&af::mul(&self.momemtum, velocity, false).unwrap(),
                           &af::mul(&alpha, delta, false).unwrap(), false).unwrap();
-
       assert!(velocity.dims().unwrap().get() == arr.dims().unwrap().get());
       parameter_manager.set_array_from_index(af::sub(arr, velocity, false).unwrap(), ind);
     }

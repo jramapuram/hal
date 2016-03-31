@@ -6,7 +6,8 @@ use error::HALError;
 
 pub fn mse(pred: &Array, target: &Array) -> f32 {
   let diff = af::sub(pred, target, false).unwrap();
-  (af::mean_all(&af::mul(&diff, &diff, false).unwrap()).unwrap()).0 as f32
+  0.5f32 * (af::mean_all(&af::mul(&diff, &diff, false)
+                         .unwrap()).unwrap()).0 as f32
 }
 
 pub fn cross_entropy(pred: &Array, target: &Array) -> f32 {

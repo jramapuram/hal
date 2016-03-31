@@ -49,9 +49,6 @@ impl Layer for Dense
     params.deltas[0] = af::add(&params.deltas[0], &dw, false).unwrap();
     params.deltas[1] = af::add(&params.deltas[1], &db, false).unwrap();
 
-    // params.deltas = vec![af::mul(delta, &activations::get_derivative(&params.activations[0]
-    //                                                                             , &params.outputs[0].data).unwrap(), false).unwrap()];
-    // af::matmul(&params.deltas[0], &params.weights[0], af::MatProp::NONE, af::MatProp::TRANS).unwrap()
     af::matmul(&delta_t, &params.weights[0], af::MatProp::NONE, af::MatProp::TRANS).unwrap()
   }
 }

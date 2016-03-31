@@ -164,11 +164,6 @@ impl Model for Sequential {
                                                            , src_device
                                                            , compute_device);
 
-        // DEBUG:
-        // println!("batched [input: {:?} | target: {:?}]"
-        //          , batch_input.dims().unwrap().get().clone()
-        //          , batch_target.dims().unwrap().get().clone());
-
         let a_t = self.forward(&batch_input, compute_device, compute_device, true);
         loss = self.backward(&a_t, &batch_target);
         self.optimizer.update(&mut self.param_manager, batch_size as u64);
@@ -187,15 +182,17 @@ impl Model for Sequential {
 
   fn backward(&mut self, prediction: &Array, target: &Array) -> f32 {
     // setup the optimizer parameters (if not already setup)
-    // self.optimizer.setup(self.param_manager.get_all_weight_dims()
-    //                      , self.param_manager.get_all_bias_dims());
     self.optimizer.setup(self.param_manager.get_all_dims());
 
+    // Note: a requirement here is that the output activation is
+    // the last element of the activation's vector of the last layer
     let last_index = self.layers.len() - 1;
+    let last_layer_activations = self.param_manager.get_activations(last_index);
+    let final_activation_index = last_layer_activations.len();
     let mut delta = loss::loss_delta(prediction
                                      , target
                                      , &self.loss
-                                     , &self.param_manager.get_activation(last_index, 0));
+                                     , &last_layer_activations[final_activation_index - 1]);
     for i in (0..last_index + 1).rev() {
       delta = self.layers[i].backward(self.param_manager.get_mut_params(i), &delta);
     }
