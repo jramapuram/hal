@@ -47,12 +47,15 @@ impl SinSource {
   }
 
   fn generate_sin_wave(&self, input_dims: u64, num_rows: u64) -> Array {
-    let dims = Dim4::new(&[input_dims * num_rows, 1, 1, 1]);
-    let x = af::add(&self.offset.get(), &af::div(&af::range(dims, 0, Aftype::F32).unwrap()
-                    , &input_dims, false).unwrap(), false).unwrap();
-    let wave = af::sin(&x).unwrap();
+    let tdims = Dim4::new(&[input_dims, num_rows, 1, 1]);
+    let dims = Dim4::new(&[1, num_rows * input_dims, 1, 1]);
+    let x = af::transpose(&af::moddims(&af::range(dims, 1, Aftype::F32).unwrap()
+                                       , tdims).unwrap(), false).unwrap();
+    let x_shifted = af::add(&self.offset.get()
+                            , &af::div(&x, &(input_dims*num_rows), false).unwrap()
+                            , true).unwrap();
     self.offset.set(self.offset.get() + 1.0/input_dims as f32);
-    af::moddims(&wave, Dim4::new(&[num_rows, input_dims, 1, 1])).unwrap()
+    af::sin(&x_shifted).unwrap()
   }
 }
 
@@ -94,7 +97,7 @@ fn main() {
   let input_dims = 64;
   let hidden_dims = 32;
   let output_dims = 64;
-  let num_train_samples = 65536 * 5;
+  let num_train_samples = 65536;
   let batch_size = 128;
   let optimizer_type = "SGD";
   let epochs = 5;
@@ -138,7 +141,8 @@ fn main() {
 
   // Pull a sample to verify sizing
   let test_sample = sin_generator.get_train_iter(batch_size);
-  println!("test sample shape: {:?}", test_sample.input.borrow().dims().unwrap().get().clone());
+  println!("test sample shape: {:?}"
+           , test_sample.input.into_inner().dims().unwrap());
 
   // iterate our model in Verbose mode (printing loss)
   // Note: more manual control can be enacted by directly calling

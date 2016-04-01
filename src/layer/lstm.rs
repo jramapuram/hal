@@ -101,10 +101,10 @@ impl Layer for LSTM {
     let z_t = af::add(&af::add(&af::matmul(&af::join_many(0, weights_ref).unwrap(), inputs.data).unwrap()
                                , &af::matmul(&af::join_many(0, recurrents_ref).unwrap(), &h_tm1).unwrap(), false).unwrap()
                       , &af::join_many(0, bias_ref).unwrap(), true).unwrap();
-    let i_t   = activations::get_activation(inner_activation, &af::rows(&z_t, 0, 1).unwrap());
-    let f_t   = activations::get_activation(inner_activation, &af::rows(&z_t, 1, 2).unwrap());
-    let o_t   = activations::get_activation(inner_activation, &af::rows(&z_t, 2, 3).unwrap());
-    let ct_t  = activations::get_activation(inner_activation, &af::rows(&z_t, 3, 4).unwrap());
+    let i_t   = activations::get_activation(inner_activation, &af::rows(&z_t, 0, 0).unwrap());
+    let f_t   = activations::get_activation(inner_activation, &af::rows(&z_t, 1, 1).unwrap());
+    let o_t   = activations::get_activation(inner_activation, &af::rows(&z_t, 2, 2).unwrap());
+    let ct_t  = activations::get_activation(inner_activation, &af::rows(&z_t, 3, 3).unwrap());
 
     // C_{t} = i_{t} * Ct_{t} + f_{t} * C_{t-1}
     // h_{t} = o_{t} * outer_activation(C_{t})
