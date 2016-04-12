@@ -2,7 +2,7 @@ sudo: required
 dist: trusty
 before_install:
     - sudo apt-get update -qq
-    - sudo apt-get -y install unzip build-essential git subversion cmake libfreeimage-dev libatlas3gf-base libatlas-dev libfftw3-dev liblapacke-dev libboost1.55-all-dev libglew-dev libglewmx-dev xorg-dev libglu1-mesa-dev
+    - sudo apt-get -y install unzip build-essential libtool git subversion cmake libfreeimage-dev libatlas3gf-base libatlas-dev libfftw3-dev liblapacke-dev libboost1.55-all-dev libglew-dev libglewmx-dev xorg-dev libglu1-mesa-dev
     - wget https://github.com/glfw/glfw/releases/download/3.1.2/glfw-3.1.2.zip
     - unzip glfw-3.1.2.zip -d . && cd glfw-3.1.2 && cmake . && sudo make install
     - cd .. && git submodule update --init --recursive
@@ -10,6 +10,7 @@ before_install:
 language: rust
 script:
     - sed -i -- 's/true/false/g' /home/travis/build/jramapuram/hal/arrayfire-rust/build.conf
+    - cargo update
     - cargo build --verbose
     - cargo run --example perceptron
 rust:
@@ -17,6 +18,8 @@ rust:
     - 1.3.0
     - 1.4.0
     - 1.5.0
+    - 1.6.0
+    - 1.7.0
 env:
   global:
     - AF_PATH=/home/travis/build/jramapuram/hal/arrayfire-rust/arrayfire/build/package/lib
