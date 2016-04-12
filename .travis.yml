@@ -10,7 +10,6 @@ before_install:
 language: rust
 script:
     - sed -i -- 's/true/false/g' /home/travis/build/jramapuram/hal/arrayfire-rust/build.conf
-    - cargo update
     - cargo build --verbose
     - cargo run --example autoencoder
 rust:
