@@ -1,23 +1,24 @@
 # HAL : Hyper Adaptive Learning
 Rust based Cross-GPU Machine Learning. [![Build Status](https://travis-ci.org/jramapuram/hal.svg?branch=feature%2Flstm)](https://travis-ci.org/jramapuram/hal)
 
-# Why Rust? 
-This project is for those that miss strongly typed compiled languages.                                                
+# Why Rust?
+This project is for those that miss strongly typed compiled languages.
 Rust was chosen specifically because of [this](http://www.oreilly.com/programming/free/files/why-rust.pdf)
 
 # Features
-  
+
   - Multi GPU [model based] support
   - **OpenCL + CUDA + CPU build support**
-  - **LSTM's with internal RTRL**
+  - **LSTM's with internal RTRL [Work in Progress]**
+  - **RNN's [Work in Progress]**
   - Perceptron's
   - Activations:     [Sigmoid, Tanh, Softmax]
   - Initializations: [Lecun Uniform, Glorot Normal, Glorot Uniform]
   - Loss Functions:  [MSE, Cross-Entropy]
   - OpenGL based plotting
-  - AutoEncoder's **[Work in Progress]**
+  - AutoEncoders
   - Multi GPU [horizontal] support **[TODO]**
-  
+
 # Installation
 See [here](docs/installation.md)
 
