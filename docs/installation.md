@@ -1,14 +1,16 @@
 ## Installation
+In general you can just install the arrayfire binaries and build this entire project.
+This is **only** if you want to build the entire arrayfire coupled with arrayfire-rust and hal.
 The following will be for Ubuntu 14.10+.
 For other OS's please install all the required dependencies[[linux](https://github.com/arrayfire/arrayfire/wiki/Build-Instructions-for-Linux) /[osx](https://github.com/arrayfire/arrayfire/wiki/Build-Instructions-for-OSX)]
 
-  1. Install Rust if you haven't already [currently only tested on rustc 1.3+] :
-   
+  1. Install Rust if you haven't already [currently only tested on rustc 1.7+] :
+
   ```bash
   $ curl -sSf https://static.rust-lang.org/rustup.sh | sh
   ```
   2. Install the dependencies:
-  
+
   ```bash
   $ sudo apt-get install -y build-essential git subversion cmake libfreeimage-dev libatlas3gf-base libatlas-dev libfftw3-dev liblapacke-dev libboost1.55-all-dev libglew-dev libglewmx-dev libglfw3-dev
   ```
@@ -19,7 +21,7 @@ For other OS's please install all the required dependencies[[linux](https://gith
   ```
   4. Modify `build.conf` (located at `arrayfire-rust/build.conf`) to suit your compute device backend (eg: CUDA or openCL, etc).
   5. Build & run example:
-  
+
   ```bash
   $ cargo build
   $ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:<path to libaf(cuda/cl/cpu).(so/dylib)>
