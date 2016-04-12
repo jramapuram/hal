@@ -16,11 +16,11 @@ pub fn get_fans(dims: Dim4) -> (f32, f32){
 }
 
 pub fn normal(dims: Dim4, scale: f32) -> Array {
-  af::mul(&af::randn(dims, af::Aftype::F32).unwrap(), &scale, false).unwrap()
+  af::mul(&af::randn::<f32>(dims).unwrap(), &scale, false).unwrap()
 }
 
 pub fn uniform(dims: Dim4, scale: f32) -> Array{
-  af::sub(&af::mul(&af::randu(dims, af::Aftype::F32).unwrap(), &scale, false).unwrap()
+  af::sub(&af::mul(&af::randu::<f32>(dims).unwrap(), &scale, false).unwrap()
           , &(scale / 2.0f32), false).unwrap()
 }
 

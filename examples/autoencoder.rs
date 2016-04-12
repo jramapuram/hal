@@ -49,7 +49,7 @@ impl SinSource {
   fn generate_sin_wave(&self, input_dims: u64, num_rows: u64) -> Array {
     let tdims = Dim4::new(&[input_dims, num_rows, 1, 1]);
     let dims = Dim4::new(&[1, num_rows * input_dims, 1, 1]);
-    let x = af::transpose(&af::moddims(&af::range(dims, 1, Aftype::F32).unwrap()
+    let x = af::transpose(&af::moddims(&af::range::<f32>(dims, 1).unwrap()
                                        , tdims).unwrap(), false).unwrap();
     let x_shifted = af::add(&self.offset.get()
                             , &af::div(&x, &(input_dims*num_rows), false).unwrap()
@@ -100,14 +100,14 @@ fn main() {
   let num_train_samples = 65536;
   let batch_size = 128;
   let optimizer_type = "SGD";
-  let epochs = 5;
+  let epochs = 1;
 
   // Now, let's build a model with an device manager on a specific device
   // an optimizer and a loss function. For this example we demonstrate a simple autoencoder
   // AF_BACKEND_DEFAULT is: OpenCL -> CUDA -> CPU
   let manager = DeviceManagerFactory::new();
-  let gpu_device = Device{backend: Backend::AF_BACKEND_DEFAULT, id: 0};
-  let cpu_device = Device{backend: Backend::AF_BACKEND_CPU, id: 0};
+  let gpu_device = Device{backend: Backend::DEFAULT, id: 0};
+  let cpu_device = Device{backend: Backend::CPU, id: 0};
   let optimizer = get_optimizer_with_defaults(optimizer_type).unwrap();
   let mut model = Box::new(Sequential::new(manager.clone()
                                            , optimizer         // optimizer

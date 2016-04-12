@@ -49,7 +49,7 @@ impl DeviceManagerFactory {
     }
 
     assert!(devices.len() > 0);
-    devices.push(Device{ backend: Backend::AF_BACKEND_DEFAULT, id:0 });
+    devices.push(Device{ backend: Backend::DEFAULT, id:0 });
     let current = devices.last().unwrap().clone();
     set_device(current);
 
@@ -86,8 +86,8 @@ impl DeviceManagerFactory {
     }
 
     // we have done something bad if the following triggers
-    let ib = input.get_backend();
-    if input_device.backend != Backend::AF_BACKEND_DEFAULT {
+    let ib = input.get_backend().unwrap();
+    if input_device.backend != Backend::DEFAULT {
       assert!(ib == input_device.backend
               , "provide src was {:?}, but actually {:?}"
               , input_device.backend
@@ -104,6 +104,6 @@ impl DeviceManagerFactory {
 
     // swap to the new device
     self.swap_device(target_device);
-    Array::new(dims, &buffer, Aftype::F32).unwrap()
+    Array::new::<f32>(&buffer, dims).unwrap()
   }
 }

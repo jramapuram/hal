@@ -1,5 +1,5 @@
 use af;
-use af::Array;
+use af::{Array, HasAfEnum};
 
 use utils;
 //use error::HALError;
@@ -16,13 +16,13 @@ pub fn plot_array(values: &Array, title: &str, window_x: u16, window_y: u16) {
 
   // display till closed
   loop {
-    wnd.draw_plot(&af::range(values.dims().unwrap().clone()
-                             , 0, af::Aftype::F32).unwrap(), &values, None);
+    wnd.draw_plot(&af::range::<f32>(values.dims().unwrap().clone()
+                                    , 0).unwrap(), &values, None);
     if wnd.is_closed().unwrap() == true { break; }
   }
 }
 
-pub fn plot_vec<T>(raw_values: Vec<T>, title: &str, window_x: u16, window_y: u16) {
+pub fn plot_vec<T: HasAfEnum>(raw_values: Vec<T>, title: &str, window_x: u16, window_y: u16) {
   // copy from float vector to Array
   let num_rows = raw_values.len();
   let values = utils::vec_to_array(raw_values, num_rows, 1);

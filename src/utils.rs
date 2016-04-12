@@ -5,11 +5,21 @@ use rand;
 use rand::Rng;
 use std::path::Path;
 use std::ops::Sub;
+use std::str;
+use std::io::{Read, Write};
+use tar::Archive;
+use flate2::read::GzDecoder;
+use flate2::GzHeader;
+use std::fs::File;
 use num::traits::Float;
 use statistical::{standard_deviation, mean};
-use af::{Dim4, Array, Aftype, Seq, AfError};
+use af::{Dim4, Array, Aftype, Seq, AfError, HasAfEnum};
 use itertools::Zip;
 use rustc_serialize::Encodable;
+
+use hyper::Client;
+use hyper::header::Connection;
+
 
 //use error::HALError;
 
@@ -25,14 +35,14 @@ macro_rules! hashmap {
 }
 
 // Convert a vector of elements to a vector of Array
-pub fn vec_to_array<T>(vec_values: Vec<T>, rows: usize, cols: usize) -> Array {
+pub fn vec_to_array<T: HasAfEnum>(vec_values: Vec<T>, rows: usize, cols: usize) -> Array {
   raw_to_array(vec_values.as_ref(), rows, cols)
 }
 
 // Convert a generic vector to an Array
-pub fn raw_to_array<T>(raw_values: &[T], rows: usize, cols: usize) -> Array {
+pub fn raw_to_array<T: HasAfEnum>(raw_values: &[T], rows: usize, cols: usize) -> Array {
   let dims = Dim4::new(&[rows as u64, cols as u64, 1, 1]);
-  Array::new(dims, &raw_values, Aftype::F32).unwrap()
+  Array::new::<T>(raw_values, dims).unwrap()
 }
 
 // convert an array into a vector of rows
@@ -233,4 +243,81 @@ pub fn scale(src: &Array, low: f32, high: f32) -> Array {
   af::add(&af::div(&af::mul(&(high - low), &af::sub(src, &min, false).unwrap(), false).unwrap()
                    , &(max - min), false).unwrap()
           , &low, false).unwrap()
+}
+
+fn _read_gzip_filename(entire_file: &Vec<u8>) -> String {
+  let d = match GzDecoder::new(&entire_file[..]) {
+    Err(e) => panic!("Could not read gzip header: {}", e),
+    Ok(dc) => dc,
+  };
+  str::from_utf8(d.header().filename().unwrap())
+    .unwrap().to_owned()
+}
+
+fn _ungzip_to_file(dest: &str, entire_file: &Vec<u8>) -> bool{
+  let mut d = match GzDecoder::new(&entire_file[..]) {
+    Err(e) => panic!("Could not read gzip {}: {}", dest, e),
+    Ok(dc) => dc,
+  };
+
+  let mut body = Vec::new();
+  d.read_to_end(&mut body);
+  let mut f = match File::create(dest){
+    Err(e) => panic!("cannot create file {}", dest),
+    Ok(f)  => f,
+  };
+  f.write_all(&body[..]);
+  true
+}
+
+pub fn ungzip(src: &str) {
+  let mut file = match File::open(src){
+    Err(e) => panic!("could not open {}, {}", src, e),
+    Ok(f)  => f,
+  };
+  let mut entire_file = Vec::new();
+  file.read_to_end(&mut entire_file);
+
+  // get the filename
+  let name = _read_gzip_filename(&entire_file);
+  print!("ungzip'ing {} from {}...", name, src);
+
+  // write to dest
+  _ungzip_to_file(&name, &entire_file);
+  println!("...completed");
+}
+
+pub fn untar(src: &str, dest: &str){
+  print!("Untarring {}...", src);
+  let mut ar = Archive::new(File::open(src).unwrap());
+  ar.unpack(dest).unwrap();
+  println!("...complete");
+}
+
+pub fn download(url: &str, dest: &str) {
+  print!("Downloading {} to {}...", url, dest);
+  let mut client = Client::new();
+  let mut res = client.get(url)
+                      .header(Connection::close())
+                      .send().unwrap();
+  let mut body = Vec::new();
+  res.read_to_end(&mut body).unwrap();
+
+  let mut f = match File::create(dest){
+    Err(e) => panic!("cannot open file {}", dest),
+    Ok(f)  => f,
+  };
+  f.write_all(&body[..]);
+  println!("...complete: read {} Mb"
+           , body.len() as f32/(1024.0*1024.0));
+}
+
+pub fn file_exists(path: &str) -> bool{
+  let path = Path::new(path);
+  path.exists() & path.is_file()
+}
+
+pub fn dir_exists(path: &str) -> bool{
+  let path = Path::new(path);
+  path.exists() & path.is_dir()
 }

@@ -23,28 +23,28 @@ pub fn softmax(x: &Array) -> Array {
 
 pub fn lrelu(x: &Array) -> Array {
   let scaled = af::mul(x, &0.0f32, false).unwrap();
-  af::select(&scaled                                  // return 0.01x
-             , &af::lt(x, &0.0f32, true).unwrap()     // if x > 0.0
-             , x).unwrap().cast(Aftype::F32).unwrap() // else x
+  af::select(&scaled                                      // return 0.01x
+             , &af::lt(x, &0.0f32, true).unwrap()         // if x > 0.0
+             , x).unwrap().cast::<f32>().unwrap() // else x
 }
 
 pub fn lrelu_derivative(x: &Array) -> Array {
   let remove_negatives = af::selectl(0.01, &af::lt(x, &0.0f32, true).unwrap(), x).unwrap();
   af::selectl(1.0, &af::gt(x, &0.0f32, true).unwrap(), &remove_negatives).unwrap()
-                                                                            .cast(Aftype::F32)
+                                                                            .cast::<f32>()
                                                                             .unwrap()
 }
 
 pub fn relu(x: &Array) -> Array {
   af::selectl(0.0, &af::lt(x, &0.0f32, true).unwrap(), x).unwrap()
-                                                         .cast(Aftype::F32)
+                                                         .cast::<f32>()
                                                          .unwrap()
 }
 
 pub fn relu_derivative(x: &Array) -> Array {
   let remove_negatives = af::selectl(0.0, &af::lt(x, &0.0f32, true).unwrap(), x).unwrap();
   af::selectl(1.0, &af::gt(x, &0.0f32, true).unwrap(), &remove_negatives).unwrap()
-                                                                            .cast(Aftype::F32)
+                                                                            .cast::<f32>()
                                                                             .unwrap()
 }
 

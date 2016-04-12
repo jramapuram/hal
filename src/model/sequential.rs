@@ -30,7 +30,7 @@ impl Default for Sequential {
       optimizer: Box::new(SGD::default()),
       manager: DeviceManagerFactory::new(),
       loss: "mse".to_string(),
-      device: Device{ backend: Backend::AF_BACKEND_DEFAULT, id: 0 },
+      device: Device{ backend: Backend::DEFAULT, id: 0 },
     }
   }
 }
