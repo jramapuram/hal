@@ -1,3 +1,6 @@
+pub use self::sin::SinSource;
+mod sin;
+
 use af::{Dim4, Array};
 use std::cell::{RefCell, Cell};
 

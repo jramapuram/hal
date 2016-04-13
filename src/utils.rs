@@ -4,8 +4,9 @@ use csv;
 use rand;
 use rand::Rng;
 use std::path::Path;
-use std::ops::Sub;
-use std::str;
+use std::ops::{Sub, Div};
+use std::{str, cmp};
+use std::cmp::Ordering;
 use std::io::{Read, Write};
 use tar::Archive;
 use flate2::read::GzDecoder;
@@ -21,7 +22,7 @@ use hyper::Client;
 use hyper::header::Connection;
 
 
-//use error::HALError;
+use error::HALError;
 
 // allows for let a = hashmap!['key1' => value1, ...];
 // http://stackoverflow.com/questions/28392008/more-concise-hashmap-initialization
@@ -32,6 +33,27 @@ macro_rules! hashmap {
          $( map.insert($key, $val); )*
          map
     }}
+}
+
+#[derive(PartialEq,PartialOrd)]
+struct NonNan(f64);
+
+impl NonNan {
+  fn new(val: f64) -> Option<NonNan> {
+    if val.is_nan() {
+      None
+    } else {
+      Some(NonNan(val))
+    }
+  }
+}
+
+impl Eq for NonNan {}
+
+impl Ord for NonNan {
+  fn cmp(&self, other: &NonNan) -> Ordering {
+    self.partial_cmp(other).unwrap()
+  }
 }
 
 // Convert a vector of elements to a vector of Array
@@ -294,6 +316,11 @@ pub fn untar(src: &str, dest: &str){
   println!("...complete");
 }
 
+/// Pull a file from URL to a location destination
+///
+/// # Parameters
+/// - `url` is the location to pull data from
+/// - `dest` is the destination file location
 pub fn download(url: &str, dest: &str) {
   print!("Downloading {} to {}...", url, dest);
   let mut client = Client::new();
@@ -312,12 +339,83 @@ pub fn download(url: &str, dest: &str) {
            , body.len() as f32/(1024.0*1024.0));
 }
 
+/// Returns true if the file exists (and is a file)
 pub fn file_exists(path: &str) -> bool{
   let path = Path::new(path);
   path.exists() & path.is_file()
 }
 
+/// Returns true if the directory exists (and is a dir)
 pub fn dir_exists(path: &str) -> bool{
   let path = Path::new(path);
   path.exists() & path.is_dir()
+}
+
+/// Gradient checking helper for smooth functions like :
+/// tanh / sigmoid / softmax
+///
+/// # Parameters
+/// - `F` is the function whose gradient we will evaluate
+/// - `input` is the input data array
+/// - `eps` is a very small number (Generally 1e-5)
+/// - `grad` is your evaluated gradient
+pub fn verify_gradient_smooth<F>(fn_closure: F, input: &Array, eps: f64, grad: &Array) -> Result<f64, HALError>
+  where F : Fn(&Array) -> Array
+{
+  let rel = gradient_check(fn_closure, input, eps, grad);
+  println!("Relative error = {}", rel);
+  match rel {
+    n if n > 1e-2             => Err(HALError::GRADIENT_ERROR),
+    n if n < 1e-2 && n > 1e-4 => Err(HALError::GRADIENT_ERROR),
+    _                         => Ok(rel),
+  }
+}
+
+/// Gradient checking helper for objective with 'kinks' like:
+/// relu, lrelu, etc
+///
+/// # Parameters
+/// - `F` is the function whose gradient we will evaluate
+/// - `input` is the input data array
+/// - `eps` is a very small number (Generally 1e-5)
+/// - `grad` is your evaluated gradient
+pub fn verify_gradient_kinks<F>(fn_closure: F, input: &Array, eps: f64, grad: &Array) -> Result<f64, HALError>
+  where F : Fn(&Array) -> Array
+{
+  let rel = gradient_check(fn_closure, input, eps, grad);
+  println!("Relative error = {}", rel);
+  match rel {
+    n if n > 1e-2 => Err(HALError::GRADIENT_ERROR),
+    n if n < 1e-4 => Ok(rel),
+    _             => Ok(rel),
+  }
+}
+
+
+/// Gradient checking helper
+///
+/// df(input)/dinput = ((f(input + eps)- f(input - eps))/(2*eps)
+/// everything is tabulated in double precision
+///
+/// # Parameters
+/// - `F` is the function whose gradient we will evaluate
+/// - `input` is the input data array
+/// - `eps` is a very small number (Generally 1e-5)
+/// - `grad` is your evaluated gradient
+pub fn gradient_check<F>(fn_closure: F, input: &Array, eps: f64, grad: &Array) -> f64
+  where F : Fn(&Array) -> Array
+{
+  // calculate the numerical gradient
+  let f_input_plus_eps = fn_closure(&af::add(&input.cast::<f64>().unwrap(), &eps, false).unwrap());
+  let f_input_minus_eps = fn_closure(&af::sub(&input.cast::<f64>().unwrap(), &eps, false).unwrap());
+  // assert!(f_input_minus_eps.get_type().unwrap() == f_input_plus_eps.get_type().unwrap(),
+  //         "Gradient checking failed to typecast input to a double array");
+  let num_grad = af::div(&af::sub(&f_input_plus_eps, &f_input_minus_eps, false).unwrap()
+                         , &(2.0f64 * eps), false).unwrap();
+
+  // now calculate the relative error
+  let abs_diff_grads = af::abs(&af::sub(&grad.cast::<f64>().unwrap(), &num_grad, false).unwrap()).unwrap();
+  let abs_num_grad = NonNan::new(af::sum_all(&af::abs(&num_grad).unwrap()).unwrap().0).unwrap();
+  let abs_grad = NonNan::new(af::sum_all(&af::abs(&grad.cast::<f64>().unwrap()).unwrap()).unwrap().0).unwrap();
+  af::sum_all(&abs_diff_grads).unwrap().0 / cmp::max(abs_grad, abs_num_grad).0
 }

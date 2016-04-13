@@ -4,10 +4,14 @@ use af::Array;
 use activations;
 use error::HALError;
 
-pub fn mse(pred: &Array, target: &Array) -> f32 {
+pub fn l2(pred: &Array, target: &Array) -> f32 {
   let diff = af::sub(pred, target, false).unwrap();
-  0.5f32 * (af::mean_all(&af::mul(&diff, &diff, false)
-                         .unwrap()).unwrap()).0 as f32
+  af::mean_all(&af::mul(&diff, &diff, false)
+               .unwrap()).unwrap().0 as f32
+}
+
+pub fn mse(pred: &Array, target: &Array) -> f32 {
+  0.5f32 * l2(pred, target)
 }
 
 pub fn cross_entropy(pred: &Array, target: &Array) -> f32 {
@@ -23,6 +27,10 @@ pub fn cross_entropy(pred: &Array, target: &Array) -> f32 {
 
 pub fn mse_derivative(pred: &Array, target: &Array) -> Array {
   af::sub(pred, target, false).unwrap()
+}
+
+pub fn l2_derivative(pred: &Array, target: &Array) -> Array {
+  af::mul(&af::sub(pred, target, false).unwrap(), &2.0f32, false).unwrap()
 }
 
 pub fn cross_entropy_derivative(pred: &Array, target: &Array) -> Array {
@@ -42,6 +50,7 @@ pub fn loss_delta(prediction: &Array, target: &Array
 
 pub fn get_loss(name: &str, pred: &Array, target: &Array) -> Result<f32, HALError> {
   match name {
+    "l2"            => Ok(l2(pred, target)),
     "mse"           => Ok(mse(pred, target)),
     "cross_entropy" => Ok(cross_entropy(pred, target)),
     _               => Err(HALError::UNKNOWN),
@@ -50,6 +59,7 @@ pub fn get_loss(name: &str, pred: &Array, target: &Array) -> Result<f32, HALErro
 
 pub fn get_loss_derivative(name: &str, pred: &Array, target: &Array) -> Result<Array, HALError> {
   match name {
+    "l2"            => Ok(l2_derivative(pred, target)),
     "mse"           => Ok(mse_derivative(pred, target)),
     "cross_entropy" => Ok(cross_entropy_derivative(pred, target)),
     _               => Err(HALError::UNKNOWN),

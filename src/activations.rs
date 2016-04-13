@@ -28,6 +28,7 @@ pub fn lrelu(x: &Array) -> Array {
              , x).unwrap().cast::<f32>().unwrap() // else x
 }
 
+/// Provides the derivative of lrelu
 pub fn lrelu_derivative(x: &Array) -> Array {
   let remove_negatives = af::selectl(0.01, &af::lt(x, &0.0f32, true).unwrap(), x).unwrap();
   af::selectl(1.0, &af::gt(x, &0.0f32, true).unwrap(), &remove_negatives).unwrap()
@@ -48,8 +49,11 @@ pub fn relu_derivative(x: &Array) -> Array {
                                                                             .unwrap()
 }
 
+/// Return the derivative of tanh [assumes that tanh has already been applied]
+/// 1 - tanh(x)*tanh(x)
+///
 pub fn tanh_derivative(x: &Array) -> Array {
-  // 1 - tanh(x)*tanh(x)
+
   // let t = tanh(x);
   // af::sub(&1.0f32, &af::mul(&t, &t, false).unwrap(), false).unwrap()
   af::sub(&1.0f32, &af::mul(x, x, false).unwrap(), false).unwrap()
