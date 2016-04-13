@@ -33,6 +33,8 @@ fn verify_func<F>(ufunc: F, name: &str, truth: &[f32])
 }
 
 
+/// test derivatives
+
 #[test]
 fn lrelu_gradient() {
   verify_derivative(activations::lrelu
@@ -119,4 +121,23 @@ fn ones(){
   verify_func(activations::ones
               , "ones"
               , &[-1.0, 0.0, 1.0, 2.0, 3.0]);
+}
+
+
+/// test losses
+#[test]
+fn cross_entropy_softmax(){
+  println!("\nTesting Cross-Entropy Softmax...");
+  let dims = Dim4::new(&[5, 1, 1, 1]);
+  let x = Array::new(&[-0.01, 0.00, 1.10, 2.20, 3.15], dims).unwrap();
+  let target = Array::new(&[1.0, 0.00, 0.00, 0.00, 0.00], dims).unwrap();
+  let x_t = 4.9980f32;
+
+  let x_pred = loss::get_loss("cross_entropy"
+                              , &activations::softmax(&x)
+                              , &target).unwrap();
+  let l2 = x_t * x_t - x_pred * x_pred;
+  assert!(l2 < 1e-7
+          , "cross-entropy-softmax loss is more than expected {} vs {} => {}"
+          , x_t, x_pred, l2);
 }
