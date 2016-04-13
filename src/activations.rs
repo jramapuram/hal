@@ -77,6 +77,9 @@ pub fn ones(x: &Array) -> Array {
   x.clone()
 }
 
+pub fn ones_derivative(x: &Array) -> Array {
+  af::constant(1.0f32, x.dims().unwrap()).unwrap()
+}
 
 pub fn get_activation(name: &str, x: &Array) -> Result<Array, HALError> {
   match name {
@@ -98,8 +101,8 @@ pub fn get_derivative(name: &str, x: &Array) -> Result<Array, HALError> {
     "relu"    => Ok(relu_derivative(x)),
     "lrelu"   => Ok(lrelu_derivative(x)),
     "tanh"    => Ok(tanh_derivative(x)),
-    "ones"    => Ok(ones(x)),
-    "linear"  => Ok(ones(x)),
+    "ones"    => Ok(ones_derivative(x)),
+    "linear"  => Ok(ones_derivative(x)),
     _         => Err(HALError::UNKNOWN),
   }
 }
