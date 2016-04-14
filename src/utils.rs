@@ -391,6 +391,29 @@ pub fn verify_gradient_kinks<F>(fn_closure: F, input: &Array, eps: f64, grad: &A
   }
 }
 
+/// Gradient checking helper that accepts perturbations
+///
+/// df(input)/dinput = ((f(input + eps)- f(input - eps))/(2*eps)
+/// everything is tabulated in double precision
+///
+/// # Parameters
+/// - `fi_plus_eps` is f(input + eps)
+/// - `fi_minus_eps` is f(input - eps)
+/// - `input` is the input data array
+/// - `eps` is a very small number (Generally 1e-5)
+/// - `grad` is your evaluated gradient
+pub fn gradient_check_with_perturbations(fi_plus_eps: &Array, fi_minus_eps: &Array, eps: f64, grad: &Array) -> f64
+{
+  let num_grad = af::div(&af::sub(fi_plus_eps, fi_minus_eps, false).unwrap()
+                         , &(2.0f64 * eps), false).unwrap();
+
+  // now calculate the relative error
+  let abs_diff_grads = af::abs(&af::sub(&grad.cast::<f64>().unwrap(), &num_grad, false).unwrap()).unwrap();
+  let abs_num_grad = NonNan::new(af::sum_all(&af::abs(&num_grad).unwrap()).unwrap().0).unwrap();
+  let abs_grad = NonNan::new(af::sum_all(&af::abs(&grad.cast::<f64>().unwrap()).unwrap()).unwrap().0).unwrap();
+  af::sum_all(&abs_diff_grads).unwrap().0 / cmp::max(abs_grad, abs_num_grad).0
+}
+
 
 /// Gradient checking helper
 ///
@@ -406,16 +429,9 @@ pub fn gradient_check<F>(fn_closure: F, input: &Array, eps: f64, grad: &Array) -
   where F : Fn(&Array) -> Array
 {
   // calculate the numerical gradient
-  let f_input_plus_eps = fn_closure(&af::add(&input.cast::<f64>().unwrap(), &eps, false).unwrap());
-  let f_input_minus_eps = fn_closure(&af::sub(&input.cast::<f64>().unwrap(), &eps, false).unwrap());
+  let fi_plus_eps = fn_closure(&af::add(&input.cast::<f64>().unwrap(), &eps, false).unwrap());
+  let fi_minus_eps = fn_closure(&af::sub(&input.cast::<f64>().unwrap(), &eps, false).unwrap());
   // assert!(f_input_minus_eps.get_type().unwrap() == f_input_plus_eps.get_type().unwrap(),
   //         "Gradient checking failed to typecast input to a double array");
-  let num_grad = af::div(&af::sub(&f_input_plus_eps, &f_input_minus_eps, false).unwrap()
-                         , &(2.0f64 * eps), false).unwrap();
-
-  // now calculate the relative error
-  let abs_diff_grads = af::abs(&af::sub(&grad.cast::<f64>().unwrap(), &num_grad, false).unwrap()).unwrap();
-  let abs_num_grad = NonNan::new(af::sum_all(&af::abs(&num_grad).unwrap()).unwrap().0).unwrap();
-  let abs_grad = NonNan::new(af::sum_all(&af::abs(&grad.cast::<f64>().unwrap()).unwrap()).unwrap().0).unwrap();
-  af::sum_all(&abs_diff_grads).unwrap().0 / cmp::max(abs_grad, abs_num_grad).0
+  gradient_check_with_perturbations(&fi_plus_eps, &fi_minus_eps, eps, grad)
 }

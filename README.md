@@ -4,23 +4,35 @@ Rust based Cross-GPU Machine Learning. [![Build Status](https://travis-ci.org/jr
 # Why Rust?
 This project is for those that miss strongly typed compiled languages.
 Rust was chosen specifically because of [this](http://www.oreilly.com/programming/free/files/why-rust.pdf)
+Furthermore, we can offer fine grained control of your operations.
+This means being able to grab dimensions of tensors at any stage, none of that unknown shape nonsense.
+We can also micro-control steps. An example of this working with each individual forward timesteps on say an LSTM. Usually these are controlled by inner loops [Theano/Tensorflow, etc].
 
 # Features
-
   - Multi GPU [model based] support
-  - **OpenCL + CUDA + CPU build support**
+  - **OpenCL + CUDA + Parallel CPU support**
   - **LSTM's with internal RTRL [Work in Progress]**
   - **RNN's [Work in Progress]**
-  - Perceptron's
-  - Activations:     [Sigmoid, Tanh, Softmax]
-  - Initializations: [Lecun Uniform, Glorot Normal, Glorot Uniform]
-  - Loss Functions:  [MSE, Cross-Entropy]
-  - OpenGL based plotting
-  - AutoEncoders
+  - Perceptrons, AutoEncoders, ConvNets [TODO]
+  - Optimizers:      [SGD, Adam[TODO], AdaGrad[TODO]]
+  - Activations:     [Linear, Sigmoid, Tanh, ReLU, LReLU, Softmax]
+  - Initializations: [Lecun Uniform, Glorot Normal, Glorot Uniform, Normal, Uniform]
+  - Data Gatherers:  [SinSource, MNIST[TODO], CIFAR10[TODO]]
+  - Loss Functions:  [MSE, L2, Cross-Entropy]
+  - OpenGL based plotting and image loading, see [here](https://www.accelereyes.com/arrayfire/c/page_gfx.htm) for more info
   - Multi GPU [horizontal] support **[TODO]**
 
 # Installation
 See [here](docs/installation.md)
+
+# Testing
+HAL utilizes RUST's test framework to test all of our modules.
+We employ gradient checking on individual functions as well as layers.
+Testing needs to run on one thread due to our device probing methods.
+```bash
+export RUST_TEST_THREADS=1
+cargo test
+```
 
 # Credits
   - Thanks to the [arrayfire](http://arrayfire.com/) team for working with me to get the [rust bindings](https://github.com/arrayfire/arrayfire-rust) up.

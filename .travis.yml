@@ -19,3 +19,4 @@ env:
   global:
     - AF_PATH=/home/travis/build/jramapuram/hal/arrayfire-rust/arrayfire/build/package/lib
     - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AF_PATH
+    - RUST_TEST_THREADS=1
