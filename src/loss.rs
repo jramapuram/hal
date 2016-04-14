@@ -65,9 +65,8 @@ pub fn cross_entropy_derivative(pred: &Array, target: &Array) -> Array {
 pub fn loss_delta(prediction: &Array, target: &Array
                   , loss: &str, activation_type: &str) -> Array
 {
-  let activated_prediction = activations::get_activation(activation_type, prediction).unwrap();
-  let d_loss = get_loss_derivative(loss, &activated_prediction, target).unwrap();
-  let d_z = activations::get_derivative(activation_type, &activated_prediction).unwrap();
+  let d_loss = get_loss_derivative(loss, &prediction, target).unwrap();
+  let d_z = activations::get_derivative(activation_type, &prediction).unwrap();
   af::mul(&d_loss, &d_z, false).unwrap()
 }
 

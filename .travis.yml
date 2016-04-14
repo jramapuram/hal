@@ -11,8 +11,8 @@ language: rust
 script:
     - sed -i -- 's/true/false/g' /home/travis/build/jramapuram/hal/arrayfire-rust/build.conf
     - cargo build --verbose
-    - cargo test
     - cargo run --example autoencoder
+    - cargo test
 rust:
     - 1.7.0
 env:

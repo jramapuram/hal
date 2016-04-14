@@ -1,4 +1,4 @@
-use af::{Array, Dim4};
+use af::{Array, Dim4, HasAfEnum};
 use std::default::Default;
 //use itertools::Zip;
 
@@ -103,7 +103,7 @@ impl Default for ParamManager {
 }
 
 impl ParamManager {
-  pub fn add(&mut self
+  pub fn add<T: HasAfEnum>(&mut self
              , manager: DeviceManager
              , device: Device
              , layer_type: &str
@@ -123,22 +123,22 @@ impl ParamManager {
     // generate the weights
     let mut weights: Vec<Array> = Vec::with_capacity(weight_params.len());
     for (w_init, w_dims) in weight_params {
-      weights.push(self.generate(w_init, w_dims));
-      deltas.push(self.generate("zeros", w_dims));
+      weights.push(self.generate::<T>(w_init, w_dims));
+      deltas.push(self.generate::<T>("zeros", w_dims));
     }
     // generate the biases
     let mut biases: Vec<Array> = Vec::with_capacity(biases_params.len());
     for (b_init, b_dims) in biases_params {
       //println!("orig bias size: {:?}", b_dims);
-      biases.push(self.generate(b_init, b_dims));
-      deltas.push(self.generate("zeros", b_dims));
+      biases.push(self.generate::<T>(b_init, b_dims));
+      deltas.push(self.generate::<T>("zeros", b_dims));
     }
 
     // generate recurrence vectors
     let mut recurrences: Vec<Array> = Vec::new();
     if let Some(r) = recurrence_dims{
       for (r_init, r_dims) in r {
-        recurrences.push(self.generate(r_init, r_dims));
+        recurrences.push(self.generate::<T>(r_init, r_dims));
       }
     }
 
@@ -146,7 +146,7 @@ impl ParamManager {
     let mut optional: Vec<Array> = Vec::new();
     if let Some(o) = optional_dims {
       for (o_init, o_dims) in o {
-        optional.push(self.generate(o_init, o_dims));
+        optional.push(self.generate::<T>(o_init, o_dims));
       }
     }
 
@@ -166,9 +166,9 @@ impl ParamManager {
     });
   }
 
-  fn generate(&self, init: &str, dims: (usize, usize)) -> Array {
+  fn generate<T: HasAfEnum>(&self, init: &str, dims: (usize, usize)) -> Array {
     let dims = Dim4::new(&[dims.0 as u64, dims.1 as u64, 1, 1]);
-    initializations::get_initialization(init, dims).unwrap()
+    initializations::get_initialization::<T>(init, dims).unwrap()
   }
 
   pub fn num_layers(&self) -> usize {
@@ -409,7 +409,7 @@ impl ParamManager {
 
 /** Custom Layer Traits **/
 pub trait DenseGenerator {
-  fn add_dense(&mut self
+  fn add_dense<T: HasAfEnum>(&mut self
                , manager: DeviceManager
                , device: Device
                , input_size: usize
@@ -421,7 +421,7 @@ pub trait DenseGenerator {
 }
 
 pub trait RNNGenerator {
-  fn add_rnn(&mut self
+  fn add_rnn<T: HasAfEnum>(&mut self
              , manager: DeviceManager
              , device: Device
              , input_size: usize
@@ -443,7 +443,7 @@ pub enum LSTMIndex {
 }
 
 pub trait LSTMGenerator {
-  fn add_lstm(&mut self
+  fn add_lstm<T: HasAfEnum>(&mut self
               , manager: DeviceManager
               , device: Device
               , input_size: usize
@@ -459,7 +459,7 @@ pub trait LSTMGenerator {
 
 /** Custom Layer Impls **/
 impl<'a> DenseGenerator for ParamManager {
-  fn add_dense(&mut self
+  fn add_dense<T: HasAfEnum>(&mut self
                , manager: DeviceManager
                , device: Device
                , input_size: usize
@@ -468,7 +468,7 @@ impl<'a> DenseGenerator for ParamManager {
                , w_init: &str
                , b_init: &str)
   {
-    self.add(manager, device, "dense"
+    self.add::<T>(manager, device, "dense"
              , vec![(w_init, (input_size, output_size))]
              , vec![(b_init, (output_size, 1))]
              , vec![activation]
@@ -477,7 +477,7 @@ impl<'a> DenseGenerator for ParamManager {
 }
 
 impl<'a> RNNGenerator for ParamManager {
-  fn add_rnn(&mut self
+  fn add_rnn<T: HasAfEnum>(&mut self
              , manager: DeviceManager
              , device: Device
              , input_size: usize
@@ -496,7 +496,7 @@ impl<'a> RNNGenerator for ParamManager {
     let recurrent_weights = vec![(w_recurrent_init, recurrent_weight_dims); max_seq_size]; // ^
     weights.extend(recurrent_weights); // all weights are passed as one to the add func
 
-    self.add(manager, device, "rnn"
+    self.add::<T>(manager, device, "rnn"
              , weights                                        // houses weights & recurrent weights
              , vec![(b_init, bias_dims); max_seq_size]        // need max_seq_size clones
              , vec![activation]                               // std rnn has only one activation
@@ -506,7 +506,7 @@ impl<'a> RNNGenerator for ParamManager {
 }
 
 impl LSTMGenerator for ParamManager {
-  fn add_lstm(&mut self
+  fn add_lstm<T: HasAfEnum>(&mut self
               , manager: DeviceManager
               , device: Device
               , input_size: usize
@@ -523,7 +523,7 @@ impl LSTMGenerator for ParamManager {
     let recurrent_dims = (output_size, output_size);
     let bias_dims = (output_size, 1);
     // W_i, W_f, W_o, W_ct, U_i, U_f, U_o, U_ct
-    self.add(manager, device, "lstm"
+    self.add::<T>(manager, device, "lstm"
              , vec![(w_init, input_dims)
                     , (w_init, input_dims)
                     , (w_init, input_dims)

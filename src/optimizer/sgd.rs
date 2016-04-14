@@ -52,7 +52,7 @@ impl Optimizer for SGD {
   fn setup(&mut self, dims: Vec<Dim4>) {  //, w_dims: Vec<Dim4>, b_dims: Vec<Dim4>){
     if self.velocity.len() == 0 {
       for dim in dims {
-        self.velocity.push(initializations::zeros(dim));
+        self.velocity.push(initializations::zeros::<f32>(dim));
       }
     }
   }

@@ -1,7 +1,7 @@
 pub use self::sequential::Sequential;
 mod sequential;
 
-use af::{Array};
+use af::{Array, HasAfEnum};
 use std::collections::HashMap;
 
 use device::{Device, DeviceManager};
@@ -20,6 +20,6 @@ pub trait Model {
   fn forward(&mut self, activation: &Array, src_device: Device, dest_device: Device, train: bool) -> Array;
   fn backward(&mut self, prediction: &Array, target: &Array) -> f32;
 
-  fn add(&mut self, layer: &str, params: HashMap<&str, String>);
+  fn add<T: HasAfEnum>(&mut self, layer: &str, params: HashMap<&str, String>);
   fn info(&self);
 }

@@ -1,5 +1,5 @@
 use af;
-use af::{Array, Backend};
+use af::{Array, Backend, HasAfEnum};
 use std::cmp::max;
 use std::default::Default;
 use std::collections::HashMap;
@@ -56,7 +56,7 @@ impl Model for Sequential {
     }
   }
 
-  fn add(&mut self, layer: &str
+  fn add<T: HasAfEnum>(&mut self, layer: &str
          , params: HashMap<&str, String>)
   {
     //TODO: Error handling for hashmap
@@ -64,7 +64,7 @@ impl Model for Sequential {
     let output_size = params.get("output_size").unwrap().parse::<u64>().unwrap() as usize;
     match layer {
       "dense" => {
-        self.param_manager.add_dense(self.manager.clone(), self.device
+        self.param_manager.add_dense::<T>(self.manager.clone(), self.device
                                      , input_size, output_size
                                      , params.get("activation").unwrap()
                                      , params.get("w_init").unwrap()
@@ -73,7 +73,7 @@ impl Model for Sequential {
                                         , output_size: output_size}));
       },
       // "lstm"  => {
-      //   self.param_manager.add_lstm(self.manager.clone(), self.device
+      //   self.param_manager.add_lstm::<T>(self.manager.clone(), self.device
       //                               , input_size, output_size
       //                               , params.get("max_seq_size").unwrap()
       //                               , params.get("input_activation").unwrap()

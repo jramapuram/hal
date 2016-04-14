@@ -20,7 +20,7 @@ fn verify_derivative<F>(ufunc: F, name: &str, kinks: bool)
 {
   println!("\nGradient testing {}...", name);
   let dims = Dim4::new(&[32, 1, 1, 1]);
-  let x = initializations::normal(dims, 0.05f32);
+  let x = initializations::normal::<f32>(dims, 0.05f64);
   let grad = activations::get_derivative(name, &ufunc(&x)).unwrap();
   match kinks {
     true  => utils::verify_gradient_kinks(ufunc, &x, 1e-5, &grad).unwrap(),
@@ -152,7 +152,7 @@ fn cross_entropy_softmax(){
 /// test layers
 pub fn layer_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
                     , eps: f64, activation: &str, w_init: &str, b_init: &str
-                    , inputs: Vec<f32>, targets: Vec<f32>)
+                    , inputs: Vec<f64>, targets: Vec<f64>)
 {
   println!("Testing {} Layer with activation {}...", layer_type, activation);
   env::set_var("AF_DISABLE_GRAPHICS", "1"); // GLFW crashes otherwise
@@ -161,8 +161,8 @@ pub fn layer_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
   let output_size: usize = odims[1] as usize;
   let temporal_size: usize = idims[2] as usize;
 
-  let x = Array::new::<f32>(&inputs[..], idims).unwrap();
-  let x_target_activ = Array::new::<f32>(&targets[..], odims).unwrap();
+  let x = Array::new::<f64>(&inputs[..], idims).unwrap();
+  let x_target_activ = Array::new::<f64>(&targets[..], odims).unwrap();
 
   // add a param manager, a device manager, a device
   let mut param_manager = ParamManager::default();
@@ -181,11 +181,11 @@ pub fn layer_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
 
   // push it into the param manager
   match layer_type {
-    "Dense" => param_manager.add_dense(device_manager, device
-                            , input_size, output_size
-                            , activation
-                            , w_init
-                            , b_init),
+    "Dense" => param_manager.add_dense::<f64>(device_manager, device
+                                              , input_size, output_size
+                                              , activation
+                                              , w_init
+                                              , b_init),
   //TODO: RNN, LSTM, etc
     _      => panic!("unknown layer type specified"),
   };
@@ -195,7 +195,8 @@ pub fn layer_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
   let activ = layer.forward(params
                             , &Input{data: x.clone(), activation: activation.to_owned()}
                             , true);
-
+  //print!("x = "); af::print(&x.clone()).unwrap();
+  //print!("x+e = "); af::print(&af::add(&x.clone(), &eps, false).unwrap()).unwrap();
   let loss_activ = loss::get_loss(loss, &activ.data, &x_target_activ).unwrap();
   assert!(loss_activ < 1e-9
           , "Forward pass verification failed, error = {}"
@@ -203,11 +204,11 @@ pub fn layer_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
 
   // run a forward pass on f(x + h) and f(x - h)
   let activ_p_h = layer.forward(params
-                                , &Input{data: af::add(&x.clone(), &(eps as f32), false).unwrap()
+                                , &Input{data: af::add(&x.clone(), &eps, false).unwrap()
                                         , activation: activation.to_owned()}
                                 , false);
   let activ_m_h = layer.forward(params
-                                , &Input{data: af::sub(&x.clone(), &(eps as f32), false).unwrap()
+                                , &Input{data: af::sub(&x.clone(), &eps, false).unwrap()
                                          , activation: activation.to_owned()}
                                 , false);
   let l_p_h = loss::get_loss_vec(loss, &activ_p_h.data, &x.clone()).unwrap();

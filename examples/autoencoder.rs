@@ -19,7 +19,7 @@ fn main() {
   let num_train_samples = 65536;
   let batch_size = 128;
   let optimizer_type = "SGD";
-  let epochs = 20;
+  let epochs = 5;
 
   // Now, let's build a model with an device manager on a specific device
   // an optimizer and a loss function. For this example we demonstrate a simple autoencoder
@@ -34,16 +34,16 @@ fn main() {
                                            , gpu_device));     // device for model
 
   // Let's add a few layers why don't we?
-  model.add("dense", hashmap!["activation"    => "tanh".to_string()
-                              , "input_size"  => input_dims.to_string()
-                              , "output_size" => hidden_dims.to_string()
-                              , "w_init"      => "glorot_uniform".to_string()
-                              , "b_init"      => "zeros".to_string()]);
-  model.add("dense", hashmap!["activation"    => "tanh".to_string()
-                              , "input_size"  => hidden_dims.to_string()
-                              , "output_size" => output_dims.to_string()
-                              , "w_init"      => "glorot_uniform".to_string()
-                              , "b_init"      => "zeros".to_string()]);
+  model.add::<f32>("dense", hashmap!["activation"    => "tanh".to_string()
+                                     , "input_size"  => input_dims.to_string()
+                                     , "output_size" => hidden_dims.to_string()
+                                     , "w_init"      => "glorot_uniform".to_string()
+                                     , "b_init"      => "zeros".to_string()]);
+  model.add::<f32>("dense", hashmap!["activation"    => "tanh".to_string()
+                                     , "input_size"  => hidden_dims.to_string()
+                                     , "output_size" => output_dims.to_string()
+                                     , "w_init"      => "glorot_uniform".to_string()
+                                     , "b_init"      => "zeros".to_string()]);
 
   // Get some nice information about our model
   model.info();
