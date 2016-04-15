@@ -1,18 +1,19 @@
 [package]
 name = "hal"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Jason Ramapuram <jason.ramapuram@gmail.com>"]
 
 [dependencies]
-rustc-serialize = "*"
-rand = "*"
-csv = "*"
-num = "*"
-tar = "0.4.4"
+rustc-serialize = "0.3.19"
+rand = "0.3.14"
+csv = "0.14.4"
+num = "0.1.31"
+conv = "0.3.3"
+tar = "0.4.5"
 hyper = "0.8.0"
 flate2 = "0.2.13"
-itertools = "*"
-statistical = "*"
+itertools = "0.4.12"
+statistical = "0.1.1"
 arrayfire = { path ="arrayfire-rust" }
 
 [lib]

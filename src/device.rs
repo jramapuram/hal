@@ -1,5 +1,6 @@
 use af;
-use af::{Backend, Array, Aftype};
+use af::{Backend, Array, Aftype, HasAfEnum};
+use num::Zero;
 use std::cell::Cell;
 use std::sync::Arc;
 
@@ -74,9 +75,10 @@ impl DeviceManagerFactory {
     }
   }
 
-  pub fn swap_array_backend(&self, input: &Array
-                            , input_device: Device
-                            , target_device: Device) -> Array
+  pub fn swap_array_backend<T>(&self, input: &Array
+                               , input_device: Device
+                               , target_device: Device) -> Array
+    where T: HasAfEnum + Zero + Clone
   {
     // return if the devices match
     if input_device.id == target_device.id
@@ -99,11 +101,11 @@ impl DeviceManagerFactory {
 
     // copy data to the host
     let dims = input.dims().unwrap();
-    let mut buffer: Vec<f32> = vec![0.0f32; dims.elements() as usize];
+    let mut buffer: Vec<T> = vec![T::zero(); dims.elements() as usize];
     input.host(&mut buffer).unwrap();
 
     // swap to the new device
     self.swap_device(target_device);
-    Array::new::<f32>(&buffer, dims).unwrap()
+    Array::new::<T>(&buffer, dims).unwrap()
   }
 }

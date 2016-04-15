@@ -20,7 +20,7 @@ fn verify_derivative<F>(ufunc: F, name: &str, kinks: bool)
 {
   println!("\nGradient testing {}...", name);
   let dims = Dim4::new(&[32, 1, 1, 1]);
-  let x = initializations::normal::<f32>(dims, 0.05f64);
+  let x = initializations::normal::<f64>(dims, 0.05f32);
   let grad = activations::get_derivative(name, &ufunc(&x)).unwrap();
   match kinks {
     true  => utils::verify_gradient_kinks(ufunc, &x, 1e-5, &grad).unwrap(),
@@ -79,14 +79,13 @@ fn verify_func<F>(ufunc: F, name: &str, truth: &[f32])
   env::set_var("RUST_TEST_THREADS", "1");
   println!("\nTesting unitary function {}...", name);
   let dims = Dim4::new(&[5, 1, 1, 1]);
-  let x = Array::new(&[-1.0, 0.0, 1.0, 2.0, 3.0], dims).unwrap();
+  let x = Array::new::<f32>(&[-1.0, 0.0, 1.0, 2.0, 3.0], dims).unwrap();
 
   // verify with L2 Loss
-  let x_t = Array::new(truth, dims).unwrap();
+  let x_t = Array::new::<f32>(truth, dims).unwrap();
   let l2 = loss::get_loss("l2", &ufunc(&x), &x_t).unwrap();
   assert!(l2 <= 1e-4, "L2 loss of {} is higher than expected: {}", name, l2);
 }
-
 
 #[test]
 fn tanh(){
@@ -154,7 +153,7 @@ pub fn layer_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
                     , eps: f64, activation: &str, w_init: &str, b_init: &str
                     , inputs: Vec<f64>, targets: Vec<f64>)
 {
-  println!("Testing {} Layer with activation {}...", layer_type, activation);
+  println!("Testing {} Layer with {} acivation...", layer_type, activation);
   env::set_var("AF_DISABLE_GRAPHICS", "1"); // GLFW crashes otherwise
   // [batch_size, input_size, temporal_size, 1]
   let input_size: usize = idims[1] as usize;
@@ -195,12 +194,11 @@ pub fn layer_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
   let activ = layer.forward(params
                             , &Input{data: x.clone(), activation: activation.to_owned()}
                             , true);
-  //print!("x = "); af::print(&x.clone()).unwrap();
-  //print!("x+e = "); af::print(&af::add(&x.clone(), &eps, false).unwrap()).unwrap();
   let loss_activ = loss::get_loss(loss, &activ.data, &x_target_activ).unwrap();
   assert!(loss_activ < 1e-9
           , "Forward pass verification failed, error = {}"
           , loss_activ);
+  println!("successfully tested forward pass...");
 
   // run a forward pass on f(x + h) and f(x - h)
   let activ_p_h = layer.forward(params

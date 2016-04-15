@@ -3,6 +3,7 @@ extern crate itertools;
 extern crate rand;
 extern crate csv;
 extern crate num;
+extern crate conv;
 extern crate tar;
 extern crate flate2;
 extern crate hyper;

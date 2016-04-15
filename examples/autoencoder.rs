@@ -66,20 +66,20 @@ fn main() {
   // iterate our model in Verbose mode (printing loss)
   // Note: more manual control can be enacted by directly calling
   //       forward/backward & optimizer update
-  let loss = model.fit(&sin_generator        // what data source to pull from
-                       , cpu_device          // source device
-                       , epochs, batch_size  // self explanatory :)
-                       , true);              // verbose
+  let loss = model.fit::<SinSource, f32>(&sin_generator        // what data source to pull from
+                                         , cpu_device          // source device
+                                         , epochs, batch_size  // self explanatory :)
+                                         , true);              // verbose
 
   // plot our loss on a 512x512 grid with the provided title
   plot_vec(loss, "Loss vs. Iterations", 512, 512);
 
   // infer on one test and plot the first sample (row) of the predictions
   let test_sample = sin_generator.get_test_iter(1).input.into_inner();
-  let prediction = model.forward(&test_sample
-                                 , cpu_device // source device
-                                 , cpu_device // destination device
-                                 , false);    // not training
+  let prediction = model.forward::<f32>(&test_sample
+                                        , cpu_device // source device
+                                        , cpu_device // destination device
+                                        , false);    // not training
   println!("\nprediction shape: {:?} | backend = {:?}"
            , prediction.dims().unwrap(), prediction.get_backend());
   plot_array(&af::flat(&prediction).unwrap(), "Model Inference", 512, 512);

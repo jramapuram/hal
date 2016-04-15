@@ -1,6 +1,7 @@
 pub use self::sequential::Sequential;
 mod sequential;
 
+use num::Zero;
 use af::{Array, HasAfEnum};
 use std::collections::HashMap;
 
@@ -14,10 +15,15 @@ pub trait Model {
          , loss: &str
          , device: Device) -> Self;
 
-  fn fit<T: DataSource>(&mut self, source: &T, src_device: Device
-         , epochs: u64, batch_size: u64, verbose: bool) -> Vec<f32>;
+  fn fit<T, E>(&mut self, source: &T, src_device: Device
+               , epochs: u64, batch_size: u64
+               , verbose: bool) -> Vec<f32>
+    where T: DataSource, E: HasAfEnum + Zero + Clone;
 
-  fn forward(&mut self, activation: &Array, src_device: Device, dest_device: Device, train: bool) -> Array;
+  fn forward<T: HasAfEnum + Zero + Clone>(&mut self, activation: &Array
+                                          , src_device: Device
+                                          , dest_device: Device
+                                          , train: bool) -> Array;
   fn backward(&mut self, prediction: &Array, target: &Array) -> f32;
 
   fn add<T: HasAfEnum>(&mut self, layer: &str, params: HashMap<&str, String>);

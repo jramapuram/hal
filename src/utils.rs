@@ -3,6 +3,8 @@ use std;
 use csv;
 use rand;
 use rand::Rng;
+use conv::{ConvUtil, Saturate};
+//use conv::errors::GeneralErrorKind;
 use std::path::Path;
 use std::ops::{Sub, Div};
 use std::{str, cmp};
@@ -13,6 +15,7 @@ use flate2::read::GzDecoder;
 use flate2::GzHeader;
 use std::fs::File;
 use num::traits::Float;
+use num::{Complex, Num};
 use statistical::{standard_deviation, mean};
 use af::{Dim4, Array, Aftype, Seq, AfError, HasAfEnum};
 use itertools::Zip;
@@ -56,24 +59,72 @@ impl Ord for NonNan {
   }
 }
 
-// Convert a vector of elements to a vector of Array
+/// Helper to assert all types in a vector are the same
+pub fn assert_types(v: Vec<&Array>){
+  let base_type = v[0].get_type().unwrap();
+  for i in 1..v.len() {
+    let cur_type = v[i].get_type().unwrap();
+    assert!(cur_type == base_type
+            , "type mismatch detected: {:?} vs {:?}"
+            , cur_type, base_type);
+  }
+}
+
+/// Helper to return a constant value based on type
+pub fn constant(dims: Dim4, aftype: Aftype, val: f32) -> Array {
+  match aftype
+  {
+    Aftype::F32 => af::constant(val, dims).unwrap(),
+    Aftype::F64 => af::constant(val.approx_as::<f64>().unwrap(), dims).unwrap(),
+    Aftype::C32 => af::constant(Complex::new(val, 0f32)
+                                , dims).unwrap(),
+    Aftype::C64 => af::constant(Complex::new(val.approx_as::<f64>().unwrap(), 0f64)
+                        , dims).unwrap(),
+    Aftype::B8  => {
+      if val > 0f32 {
+        af::constant(true, dims).unwrap()
+      }else{
+        af::constant(false, dims).unwrap()
+      }
+    },
+    Aftype::S32 => af::constant(val.approx_as::<i32>().saturate().unwrap(), dims).unwrap(),
+    Aftype::U32 => af::constant(val.approx_as::<u32>().saturate().unwrap(), dims).unwrap(),
+    Aftype::U8  => af::constant(val.approx_as::<u8>().saturate().unwrap(), dims).unwrap(),
+    Aftype::S64 => af::constant(val.approx_as::<i64>().saturate().unwrap(), dims).unwrap(),
+    Aftype::U64 => af::constant(val.approx_as::<u64>().saturate().unwrap(), dims).unwrap(),
+    Aftype::S16 => af::constant(val.approx_as::<i16>().saturate().unwrap(), dims).unwrap(),
+    Aftype::U16 => af::constant(val.approx_as::<u16>().saturate().unwrap(), dims).unwrap(),
+  }
+}
+
+
+/// Convert a vector of elements to a vector of Array
 pub fn vec_to_array<T: HasAfEnum>(vec_values: Vec<T>, rows: usize, cols: usize) -> Array {
   raw_to_array(vec_values.as_ref(), rows, cols)
 }
 
-// Convert a generic vector to an Array
+/// Convert a generic vector to an Array
 pub fn raw_to_array<T: HasAfEnum>(raw_values: &[T], rows: usize, cols: usize) -> Array {
   let dims = Dim4::new(&[rows as u64, cols as u64, 1, 1]);
   Array::new::<T>(raw_values, dims).unwrap()
 }
 
-// convert an array into a vector of rows
+/// convert an array into a vector of rows
 pub fn array_to_rows(input: &Array) -> Vec<Array> {
   let mut rows = Vec::new();
   for r in 0..input.dims().unwrap()[0] {
     rows.push(af::row(input, r as u64).unwrap());
   }
   rows
+}
+
+/// convery an array to a single vector [loses dimensions]
+pub fn array_to_vec(input: &Array) -> Vec<f64>
+{
+  let elems = input.dims().unwrap().elements();
+  let mut v: Vec<f64> = vec![0f64; elems as usize];
+  input.host(&mut v).unwrap();
+  v
 }
 
 // convert a vector of rows into a single array

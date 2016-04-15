@@ -1,6 +1,7 @@
 use af;
 use af::{Array, Backend, HasAfEnum};
 use std::cmp::max;
+use num::Zero;
 use std::default::Default;
 use std::collections::HashMap;
 
@@ -98,12 +99,14 @@ impl Model for Sequential {
     println!("loss:           {}\nnum_layers:     {}", self.loss, self.layers.len());
   }
 
-  fn forward(&mut self, activation: &Array
-             , src_device: Device
-             , dest_device: Device
-             , train: bool) -> Array {
+  fn forward<T>(&mut self, activation: &Array
+                , src_device: Device
+                , dest_device: Device
+                , train: bool) -> Array
+    where T: HasAfEnum + Zero + Clone
+  {
     // check & swap if the backend matches to runtime one (if not already)
-    let activ = self.manager.swap_array_backend(&activation, src_device, self.device);
+    let activ = self.manager.swap_array_backend::<T>(&activation, src_device, self.device);
 
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
@@ -119,11 +122,12 @@ impl Model for Sequential {
     }
 
     // return to the dest device
-    self.manager.swap_array_backend(&activate.data, self.device, dest_device)
+    self.manager.swap_array_backend::<T>(&activate.data, self.device, dest_device)
   }
 
-  fn fit<T: DataSource>(&mut self, source: &T, src_device: Device
-         , epochs: u64, batch_size: u64, verbose: bool) -> Vec<f32>
+  fn fit<T, E>(&mut self, source: &T, src_device: Device
+               , epochs: u64, batch_size: u64, verbose: bool) -> Vec<f32>
+    where T: DataSource, E: HasAfEnum + Zero + Clone
   {
     // some simple data validity checks
     let data_params = source.info();
@@ -157,14 +161,14 @@ impl Model for Sequential {
                 , "Ensure that input dims are of batch rows");
         assert!(minibatch.target.borrow().dims().unwrap()[0] == batch_size
                 , "Ensure that target dims are of batch rows");
-        let batch_input = self.manager.swap_array_backend(&minibatch.input.into_inner()
+        let batch_input = self.manager.swap_array_backend::<E>(&minibatch.input.into_inner()
                                                           , src_device
                                                           , compute_device);
-        let batch_target = self.manager.swap_array_backend(&minibatch.target.into_inner()
+        let batch_target = self.manager.swap_array_backend::<E>(&minibatch.target.into_inner()
                                                            , src_device
                                                            , compute_device);
 
-        let a_t = self.forward(&batch_input, compute_device, compute_device, true);
+        let a_t = self.forward::<E>(&batch_input, compute_device, compute_device, true);
         loss = self.backward(&a_t, &batch_target);
         self.optimizer.update(&mut self.param_manager, batch_size as u64);
         lossvec.push(loss);
