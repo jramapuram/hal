@@ -12,7 +12,7 @@ For other OS's please install all the required dependencies[[linux](https://gith
   2. Install the dependencies:
 
   ```bash
-  $ sudo apt-get install -y build-essential git subversion cmake libfreeimage-dev libatlas3gf-base libatlas-dev libfftw3-dev liblapacke-dev libboost1.55-all-dev libglew-dev libglewmx-dev libglfw3-dev
+  $ sudo apt-get install -y libssl-dev build-essential git subversion cmake libfreeimage-dev libatlas3gf-base libatlas-dev libfftw3-dev liblapacke-dev libboost1.55-all-dev libglew-dev libglewmx-dev libglfw3-dev
   ```
   3. Clone the repo with the **submodules**:
 
