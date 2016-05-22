@@ -443,21 +443,44 @@ pub enum LSTMIndex {
 }
 
 pub trait LSTMGenerator {
-  fn add_lstm<T: HasAfEnum>(&mut self
-              , manager: DeviceManager
-              , device: Device
-              , input_size: usize
-              , output_size: usize
-              , max_seq_size: usize
-              , input_activation: &str
-              , output_activation: &str
-              , w_inner_init: &str
-              , w_outer_init: &str
-              , forget_bias_init: &str
-              , b_init: &str);
+fn add_lstm<T: HasAfEnum>(&mut self
+          , manager: DeviceManager
+          , device: Device
+          , input_size: usize
+          , output_size: usize
+          , max_seq_size: usize
+          , input_activation: &str
+          , output_activation: &str
+          , w_inner_init: &str
+          , w_outer_init: &str
+          , forget_bias_init: &str
+          , b_init: &str);
+}
+
+pub trait UnitaryGenerator {
+fn add_unitary<T: HasAfEnum>(&mut self
+          , manager: DeviceManager
+          , device: Device
+          , input_size: usize
+          , output_size: usize
+          , hidden_size: usize
+          , h_activation: &str
+          , o_activation: &str
+          , h_init &str 
+          , r_v_init &str
+          , i_v_init u&str
+          , phase_init &str
+          , r_householder_init &str
+          , i_householder_init &str
+          , permut_init &str
+          , u_init &str
+          , h_bias_init &str
+          , o_bias_init &str
+          , b_init: &str);
 }
 
 /** Custom Layer Impls **/
+
 impl<'a> DenseGenerator for ParamManager {
   fn add_dense<T: HasAfEnum>(&mut self
                , manager: DeviceManager
@@ -543,3 +566,72 @@ impl LSTMGenerator for ParamManager {
                          , ("zeros", bias_dims)]));  // db
   }
 }
+
+impl<'a> UnitaryGenerator for ParamManager {
+    fn add_unitary<T: HasAfEnum>(&mut self
+          , manager: DeviceManager
+          , device: Device
+          , input_size: usize
+          , output_size: usize
+          , hidden_size: usize
+          , h_activation: &str
+          , o_activation: &str
+          , r_h_init &str
+          , i_h_init &str
+          , r_v_init &str
+          , i_v_init &str
+          , phase1_init &str
+          , r_householder1_init &str
+          , i_householder1_init &str
+          , permut_init &str
+          , r_householder2_init &str
+          , i_householder2_init &str
+          , phase2_init &str
+          , u_init &str
+          , r_h_bias_init &str
+          , i_h_bias_init &str
+          , o_bias_init &str
+          )
+    {
+        // We store all unitary matrices params in the attribute vector "weights".
+        // The format of "weights" is then :
+        // [p1, p2, ..., pm]
+        
+        // We assume that we don't need to update parameters through time, only inputs and outputs
+
+        // weights first
+        let weights_params = vec![ (r_v_init, (input_size, hidden_size))
+                            , (i_v_init, (input_size, hidden_size))
+                            , (phase1_init, (hidden_size, 1)))
+                            , (r_householder1_init, (hidden_size, 1))
+                            , (i_householder1_init, (hidden_size, 1))
+                            , (r_householder2_init, (hidden_size, 1))
+                            , (i_householder2_init, (hidden_size, 1))
+                            , (phase2_init, (hidden_size, 1))
+                            , (u_init, (2*hidden_size, output_size))
+        ];
+
+        // biases next
+        let biases.params = vec![(r_h_bias_init, (hidden_size, 1))
+                            , (i_h_bias_init, (hidden_size, 1))
+                            , (o_bias_init, (hidden_size,1 ))
+        ];
+
+        // activations
+        let activations = vec![h_activation, o_activation];
+        
+        // hidden unit
+        let recurrence_dims = Option<vec![(r_h_init, (hidden_size, 1))
+                                            , (i_h_init, (hidden_size, 1))
+        ]>;
+
+        // we won't minimize trough the permutation params so we store them in optional
+        let optional_dims = Option(vec![ (permut_init, hidden_size, hidden_size) ]);
+
+        self.add::<T>(manager, device, "unitary", weights_params, biases_params, activations
+                      , recurrence_dims
+                      , optional_dims
+        );
+}
+
+
