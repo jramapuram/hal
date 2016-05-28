@@ -116,7 +116,7 @@ impl Model for Sequential {
     for t in 0..bptt_unroll {
       activate.data = af::slice(&activ, t).unwrap();
       for i in 0..self.layers.len() {
-        activate = self.layers[i].forward(self.param_manager.get_mut_params(i)
+        activate = self.layers[i].forward(self.param_manager.get_params(i)
                                           , &activate, train);
       }
     }
@@ -198,7 +198,7 @@ impl Model for Sequential {
                                      , &self.loss
                                      , &last_layer_activations[final_activation_index - 1]);
     for i in (0..last_index + 1).rev() {
-      delta = self.layers[i].backward(self.param_manager.get_mut_params(i), &delta);
+      delta = self.layers[i].backward(self.param_manager.get_params(i), &delta);
     }
 
     loss::get_loss(&self.loss, prediction, target).unwrap()

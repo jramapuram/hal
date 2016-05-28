@@ -30,8 +30,7 @@ HAL utilizes RUST's test framework to test all of our modules.
 We employ gradient checking on individual functions as well as layers.
 Testing needs to run on one thread due to our device probing methods.
 ```bash
-export RUST_TEST_THREADS=1
-cargo test
+RUST_TEST_THREADS=1 cargo test
 ```
 
 # Credits

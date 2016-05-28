@@ -1,8 +1,10 @@
 extern crate hal;
 extern crate arrayfire as af;
+extern crate itertools;
 
 use std::env;
 use af::{Array, Dim4, Backend};
+use itertools::Zip;
 
 use hal::{utils, activations, initializations, loss};
 use hal::layer;
@@ -190,8 +192,8 @@ pub fn layer_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
   };
 
   // run a forward pass and verify it
-  let mut params = param_manager.get_mut_params(0);
-  let activ = layer.forward(params
+  let params = param_manager.get_params(0);
+  let activ = layer.forward(params.clone()
                             , &Input{data: x.clone(), activation: activation.to_owned()}
                             , true);
   let loss_activ = loss::get_loss(loss, &activ.data, &x_target_activ).unwrap();
@@ -200,35 +202,50 @@ pub fn layer_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
           , loss_activ);
   println!("successfully tested forward pass...");
 
-  // run a forward pass on f(x + h) and f(x - h)
-  let activ_p_h = layer.forward(params
-                                , &Input{data: af::add(&x.clone(), &eps, false).unwrap()
-                                        , activation: activation.to_owned()}
-                                , false);
-  let activ_m_h = layer.forward(params
-                                , &Input{data: af::sub(&x.clone(), &eps, false).unwrap()
-                                         , activation: activation.to_owned()}
-                                , false);
-  let l_p_h = loss::get_loss_vec(loss, &activ_p_h.data, &x.clone()).unwrap();
-  let l_m_h = loss::get_loss_vec(loss, &activ_m_h.data, &x.clone()).unwrap();
-
-  // get the gradient
+  // run backward pass to cache away our gradients
   let delta = loss::loss_delta(&activ.data
-                               , &x.copy().unwrap()
+                               , &x.clone()
                                , loss
                                , activation);
-  let grad = layer.backward(params, &delta);
+  layer.backward(params.clone(), &delta);
+  let grads = param_manager.get_all_deltas();
 
-  // verify gradient
-  let rel = utils::gradient_check_with_perturbations(&l_p_h
-                                                     , &l_m_h
-                                                     , eps, &grad);
-  println!("Relative error = {}", rel);
-  match rel {
-    n if n > 1e-2             => panic!("Gradient check failed, relative error = {}", rel),
-    n if n < 1e-2 && n > 1e-4 => panic!("Gradient check failed, relative error = {}", rel),
-    _                         => println!("dense test successful"),
-  };
+  let num_params = param_manager.num_arrays(0);
+
+  // run a forward pass on f(theta + h) and f(theta - h) and compare each gradient
+  for (arr, grad, ind) in Zip::new((param_manager.get_all_arrays().iter() // weights + biases
+                                    , grads                               // tabulated gradients
+                                    , 0..num_params))                     // param index iterator
+  {
+    let arr_bkp: Array = arr.copy().unwrap(); // keep a backup
+    let arr_p_h = af::add(&arr.copy().unwrap(), &eps, false).unwrap();
+    let arr_m_h = af::sub(&arr.copy().unwrap(), &eps, false).unwrap();
+
+    // forward pass on the f(theta + eps)
+    param_manager.set_array_from_index(arr_p_h.clone(), ind);
+    let activ_p_h = layer.forward(params.clone()
+                                  , &Input{data: x.clone()
+                                          , activation: activation.to_owned()}
+                                  , false);
+
+    // forward pass on the f(theta - eps)
+    param_manager.set_array_from_index(arr_m_h.clone(), ind);
+    let activ_m_h = layer.forward(params.clone()
+                                  , &Input{data: x.clone()
+                                           , activation: activation.to_owned()}
+                                  , false);
+
+    // verify gradient
+    let rel = utils::gradient_check_with_perturbations(&arr_p_h.clone()
+                                                       , &arr_m_h.clone()
+                                                       , eps, &grad);
+    println!("Relative error = {}", rel);
+    match rel {
+      n if n > 1e-2             => panic!("Gradient check failed, relative error = {}", rel),
+      n if n < 1e-2 && n > 1e-4 => panic!("Gradient check failed, relative error = {}", rel),
+      _                         => println!("dense test successful"),
+    };
+  }
 }
 
 #[test]
