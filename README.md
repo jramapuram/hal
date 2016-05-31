@@ -22,6 +22,13 @@ We can also micro-control steps. An example of this working with each individual
   - OpenGL based plotting and image loading, see [here](https://www.accelereyes.com/arrayfire/c/page_gfx.htm) for more info
   - Multi GPU [horizontal] support **[TODO]**
 
+# Requirements
+  - Rust 1.8 +
+  - arrayfire libs preinstalled (or you can compile manually by following instructions below)
+```bash
+cargo run --example autoencoder
+```
+
 # Installation
 See [here](docs/installation.md)
 

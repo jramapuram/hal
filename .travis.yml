@@ -14,7 +14,6 @@ script:
     - cargo run --example autoencoder
     - cargo test
 rust:
-    - 1.7.0
     - 1.8.0
     - 1.9.0
 env:
