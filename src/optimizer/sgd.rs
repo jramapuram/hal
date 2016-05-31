@@ -73,10 +73,10 @@ impl Optimizer for SGD {
     {
       // v   = momemtum * v + learning_rate * d_w (or d_b)
       // p   = p - v
-      *velocity = af::add(&af::mul(&self.momemtum, velocity, false).unwrap(),
-                          &af::mul(&alpha, delta, false).unwrap(), false).unwrap();
-      assert!(velocity.dims().unwrap().get() == arr.dims().unwrap().get());
-      parameter_manager.set_array_from_index(af::sub(arr, velocity, false).unwrap(), ind);
+      *velocity = af::add(&af::mul(&self.momemtum, velocity, false),
+                          &af::mul(&alpha, delta, false), false);
+      assert!(velocity.dims().get() == arr.dims().get());
+      parameter_manager.set_array_from_index(af::sub(arr, velocity, false), ind);
     }
   }
 

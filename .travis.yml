@@ -16,6 +16,7 @@ script:
 rust:
     - 1.7.0
     - 1.8.0
+    - 1.9.0
 env:
   global:
     - AF_PATH=/home/travis/build/jramapuram/hal/arrayfire-rust/arrayfire/build/package/lib

@@ -22,8 +22,8 @@ pub fn get_fans(dims: Dim4) -> (f32, f32){
 pub fn normal<T: HasAfEnum>(dims: Dim4, scale: f32) -> Array {
   let src_type = T::get_af_dtype();
   let scale_vec = utils::constant(dims, src_type, scale);
-  let u = af::mul(&af::randn::<T>(dims).unwrap(), &scale_vec, false).unwrap();
-  let dst_type = u.get_type().unwrap();
+  let u = af::mul(&af::randn::<T>(dims), &scale_vec, false);
+  let dst_type = u.get_type();
   assert!(src_type == dst_type
           , "type mismatch detected in normal, {:?} vs {:?}"
           , src_type, dst_type);
@@ -34,9 +34,9 @@ pub fn normal<T: HasAfEnum>(dims: Dim4, scale: f32) -> Array {
 pub fn uniform<T: HasAfEnum>(dims: Dim4, scale: f32) -> Array{
   let src_type = T::get_af_dtype();
   let scale_vec = utils::constant(dims, src_type, scale);
-  let u = af::sub(&af::mul(&af::randu::<T>(dims).unwrap(), &scale_vec, false).unwrap()
-                  , &scale, false).unwrap();
-  let dst_type = u.get_type().unwrap();
+  let u = af::sub(&af::mul(&af::randu::<T>(dims), &scale_vec, false)
+                  , &scale, false);
+  let dst_type = u.get_type();
   assert!(src_type == dst_type
           , "type mismatch detected in uniform, {:?} vs {:?}"
           , src_type, dst_type);

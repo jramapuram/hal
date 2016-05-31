@@ -228,8 +228,8 @@ impl ParamManager {
 
       if current + n_weights > ind { // we are a weight
         let w_index = ind - current;
-        let target_dims = self.get_weight(layer_num, w_index).dims().unwrap();
-        let src_dims = arr.dims().unwrap();
+        let target_dims = self.get_weight(layer_num, w_index).dims();
+        let src_dims = arr.dims();
         assert!(src_dims == target_dims
                 , "array at index {} does not match provided [provided: {:?}  internal: {:?}]"
                 , ind, src_dims, target_dims);
@@ -240,8 +240,8 @@ impl ParamManager {
       current += n_weights;
       if current + n_biases > ind { // we are a bias
         let b_index = ind - current;
-        assert!(self.get_bias(layer_num, b_index).dims().unwrap()
-                == arr.dims().unwrap());
+        assert!(self.get_bias(layer_num, b_index).dims()
+                == arr.dims());
         self.set_bias(layer_num, b_index, arr);
         break;
       }
@@ -335,7 +335,7 @@ impl ParamManager {
     let mut dims = Vec::new();
     let layer = self.layer_storage[layer_index].clone();
     for b in &layer.lock().unwrap().biases {
-      dims.push(b.dims().unwrap().clone());
+      dims.push(b.dims().clone());
     }
     dims
   }
@@ -345,7 +345,7 @@ impl ParamManager {
     for layer in &self.layer_storage {
       let ltex = layer.lock().unwrap();
       for w in &ltex.weights {
-        dims.push(w.dims().unwrap().clone());
+        dims.push(w.dims().clone());
       }
     }
     dims
@@ -356,7 +356,7 @@ impl ParamManager {
     for layer in &self.layer_storage {
       let ltex = layer.lock().unwrap();
       for b in &ltex.biases {
-        dims.push(b.dims().unwrap().clone());
+        dims.push(b.dims().clone());
       }
     }
     dims
@@ -367,10 +367,10 @@ impl ParamManager {
     for layer in &self.layer_storage {
       let ltex = layer.lock().unwrap();
       for w in &ltex.weights {
-        dims.push(w.dims().unwrap().clone());
+        dims.push(w.dims().clone());
       }
       for b in &ltex.biases {
-        dims.push(b.dims().unwrap().clone());
+        dims.push(b.dims().clone());
       }
     }
     dims
@@ -382,7 +382,7 @@ impl ParamManager {
     assert!(self.layer_storage.len() - 1 >= layer_index);
     let layer = self.layer_storage[layer_index].clone();
     for w in &layer.lock().unwrap().weights {
-      dims.push(w.dims().unwrap().clone());
+      dims.push(w.dims().clone());
     }
     dims
   }
@@ -407,8 +407,8 @@ impl ParamManager {
     {
       let iweights = layer_src.lock().unwrap();
       let oweights = layer_dest.lock().unwrap();
-      let input_dims = iweights.weights[iweight_index].dims().unwrap();
-      let output_dims = oweights.weights[oweight_index].dims().unwrap();
+      let input_dims = iweights.weights[iweight_index].dims();
+      let output_dims = oweights.weights[oweight_index].dims();
       assert!((input_dims[0] == output_dims[0] && input_dims[1] == output_dims[1])
               || (input_dims[0] == output_dims[1] && input_dims[1] == output_dims[0]));
     }
@@ -433,8 +433,8 @@ impl ParamManager {
     }
 
     {
-      let input_dims = layer_src.lock().unwrap().biases[ibias_index].dims().unwrap();
-      let output_dims = layer_dest.lock().unwrap().biases[obias_index].dims().unwrap();
+      let input_dims = layer_src.lock().unwrap().biases[ibias_index].dims();
+      let output_dims = layer_dest.lock().unwrap().biases[obias_index].dims();
       assert!(input_dims[0] == output_dims[0] && input_dims[1] == output_dims[1]);
     }
 

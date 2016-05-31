@@ -61,7 +61,7 @@ fn main() {
   // Pull a sample to verify sizing
   let test_sample = sin_generator.get_train_iter(batch_size);
   println!("test sample shape: {:?}"
-           , test_sample.input.into_inner().dims().unwrap());
+           , test_sample.input.into_inner().dims());
 
   // iterate our model in Verbose mode (printing loss)
   // Note: more manual control can be enacted by directly calling
@@ -81,6 +81,6 @@ fn main() {
                                         , cpu_device // destination device
                                         , false);    // not training
   println!("\nprediction shape: {:?} | backend = {:?}"
-           , prediction.dims().unwrap(), prediction.get_backend());
-  plot_array(&af::flat(&prediction).unwrap(), "Model Inference", 512, 512);
+           , prediction.dims(), prediction.get_backend());
+  plot_array(&af::flat(&prediction), "Model Inference", 512, 512);
 }

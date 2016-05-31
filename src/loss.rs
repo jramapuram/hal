@@ -6,50 +6,50 @@ use error::HALError;
 /// Return a vector form of the l2 error
 /// (y - x) * (y - x)
 pub fn l2_vec(pred: &Array, target: &Array) -> Array{
-  let diff = af::sub(pred, target, false).unwrap();
-  af::mul(&diff, &diff, false).unwrap()
+  let diff = af::sub(pred, target, false);
+  af::mul(&diff, &diff, false)
 }
 
 /// Return a vector form of the mean squared error
 /// 0.5 * (y - x) * (y - x)
 pub fn mse_vec(pred: &Array, target: &Array) -> Array {
-  af::mul(&l2_vec(pred, target), &0.5f32, false).unwrap()
+  af::mul(&l2_vec(pred, target), &0.5f32, false)
 }
 
 /// Return a vector form of cross entropy
 /// -ylnx - [1-y]ln[1-x]
 pub fn cross_entropy_vec(pred: &Array, target: &Array) -> Array {
-  let pos = af::mul(&af::mul(&-1.0, target, false).unwrap()
-                    , &af::log(&pred).unwrap(), false).unwrap(); // -ylnx
-  let neg = af::mul(&af::sub(&1.0, target, false).unwrap()       //[1-y]ln[1-x]
-                    , &af::log(&(af::sub(&1.0, pred, false).unwrap())).unwrap(), false).unwrap();
-  af::sub(&pos, &neg, false).unwrap()
+  let pos = af::mul(&af::mul(&-1.0, target, false)
+                    , &af::log(&pred), false); // -ylnx
+  let neg = af::mul(&af::sub(&1.0, target, false)       //[1-y]ln[1-x]
+                    , &af::log(&(af::sub(&1.0, pred, false))), false);
+  af::sub(&pos, &neg, false)
 }
 
 /// Provide a reduced form the L2 loss (single scalar)
 pub fn l2(pred: &Array, target: &Array) -> f32 {
-  af::sum_all(&l2_vec(pred, target)).unwrap().0 as f32
+  af::sum_all(&l2_vec(pred, target)).0 as f32
 }
 
 /// Provide a reduced form the mean squared error loss (single scalar)
 pub fn mse(pred: &Array, target: &Array) -> f32 {
-  0.5f32 * af::mean_all(&l2_vec(pred, target)).unwrap().0 as f32
+  0.5f32 * af::mean_all(&l2_vec(pred, target)).0 as f32
 }
 
 /// Provide a reduced form the cross-entropy loss (single scalar)
 pub fn cross_entropy(pred: &Array, target: &Array) -> f32 {
   // y: true target, x: prediction
   // E = sum(-ylnx - [1-y]ln[1-x])
-  af::sum_all(&cross_entropy_vec(pred, target)).unwrap().0 as f32
+  af::sum_all(&cross_entropy_vec(pred, target)).0 as f32
 }
 
 /// Provides the vector derivative of the mean squared error
 pub fn mse_derivative(pred: &Array, target: &Array) -> Array {
-  af::sub(pred, target, false).unwrap()
+  af::sub(pred, target, false)
 }
 /// Provides the vector derivative of the l2 error
 pub fn l2_derivative(pred: &Array, target: &Array) -> Array {
-  af::mul(&mse_derivative(pred, target), &2.0f32, false).unwrap()
+  af::mul(&mse_derivative(pred, target), &2.0f32, false)
 }
 
 /// Provides the vector derivative of the cross-entropy error

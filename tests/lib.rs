@@ -4,7 +4,7 @@ extern crate itertools;
 extern crate rand;
 
 use std::env;
-use af::{Array, Dim4, Backend, Aftype};
+use af::{Array, Dim4, Backend, DType};
 use itertools::Zip;
 use rand::distributions::{IndependentSample, Range};
 
@@ -33,7 +33,7 @@ fn verify_derivative<F>(ufunc: F, name: &str)
   let rnd_num = between.ind_sample(&mut rng);
 
   // build a constant r^1 array
-  let x = utils::constant(dims, Aftype::F64, rnd_num);
+  let x = utils::constant(dims, DType::F64, rnd_num);
 
   // get the original activation and the symbolic gradient
   let activated = ufunc(&x);
@@ -94,10 +94,10 @@ fn verify_func<F>(ufunc: F, name: &str, truth: &[f32])
   env::set_var("rust_test_threads", "1");
   println!("\ntesting unitary function {}...", name);
   let dims = Dim4::new(&[5, 1, 1, 1]);
-  let x = Array::new::<f32>(&[-1.0, 0.0, 1.0, 2.0, 3.0], dims).unwrap();
+  let x = Array::new::<f32>(&[-1.0, 0.0, 1.0, 2.0, 3.0], dims);
 
   // verify with l2 loss
-  let x_t = Array::new::<f32>(truth, dims).unwrap();
+  let x_t = Array::new::<f32>(truth, dims);
   let l2 = loss::get_loss("l2", &ufunc(&x), &x_t).unwrap();
   assert!(l2 <= 1e-4, "l2 loss of {} is higher than expected: {}", name, l2);
 }
@@ -150,8 +150,8 @@ fn ones(){
 fn cross_entropy_softmax(){
   println!("\ntesting cross-entropy soft max...");
   let dims = Dim4::new(&[5, 1, 1, 1]);
-  let x = Array::new(&[-0.01, 0.00, 1.10, 2.20, 3.15], dims).unwrap();
-  let target = Array::new(&[1.0, 0.00, 0.00, 0.00, 0.00], dims).unwrap();
+  let x = Array::new(&[-0.01, 0.00, 1.10, 2.20, 3.15], dims);
+  let target = Array::new(&[1.0, 0.00, 0.00, 0.00, 0.00], dims);
   let x_t = 4.9980f32;
 
   let x_pred = loss::get_loss("cross_entropy"
@@ -211,8 +211,8 @@ pub fn layer_forward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &s
   //env::set_var("af_disable_graphics", "1"); // glfw crashes otherwise
   println!("testing {} layer with {} acivation for forward pass..."
            , layer_type, activation);
-  let x = Array::new::<f64>(&inputs_vec[..], idims).unwrap();
-  let targets = Array::new::<f64>(&targets_vec[..], odims).unwrap();
+  let x = Array::new::<f64>(&inputs_vec[..], idims);
+  let targets = Array::new::<f64>(&targets_vec[..], odims);
 
   layer_builder(layer_type, idims, odims, loss
                 , eps, activation, w_init, b_init, |param_manager, layer|
@@ -275,7 +275,7 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                                                       , grads                               // tabulated gradients
                                                       , 0..num_params))                     // param index iterator
                     {
-                      let arr_bkp: Array = arr.copy().unwrap(); // keep a backup
+                      let arr_bkp: Array = arr.copy(); // keep a backup
 
                       // do the gradient check specific to the activation type
                       match activations::is_smooth(activation) {

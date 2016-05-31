@@ -39,13 +39,13 @@ impl SinSource {
   fn generate_sin_wave(&self, input_dims: u64, num_rows: u64) -> Array {
     let tdims = Dim4::new(&[input_dims, num_rows, 1, 1]);
     let dims = Dim4::new(&[1, num_rows * input_dims, 1, 1]);
-    let x = af::transpose(&af::moddims(&af::range::<f32>(dims, 1).unwrap()
-                                       , tdims).unwrap(), false).unwrap();
+    let x = af::transpose(&af::moddims(&af::range::<f32>(dims, 1)
+                                       , tdims), false);
     let x_shifted = af::add(&self.offset.get()
-                            , &af::div(&x, &(input_dims), false).unwrap()
-                            , false).unwrap();
+                            , &af::div(&x, &(input_dims), false)
+                            , false);
     self.offset.set(self.offset.get() + 1.0/(input_dims*num_rows - 1) as f32);
-    af::sin(&x_shifted).unwrap()
+    af::sin(&x_shifted)
   }
 }
 
@@ -55,7 +55,7 @@ impl DataSource for SinSource
     let inp = self.generate_sin_wave(self.params.input_dims[1], num_batch);
     let mut batch = Data {
       input: RefCell::new(Box::new(inp.clone())),
-      target: RefCell::new(Box::new(inp.copy().unwrap())),
+      target: RefCell::new(Box::new(inp.copy())),
     };
 
     if self.params.normalize { batch.normalize(3.0); }
