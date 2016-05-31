@@ -1,5 +1,5 @@
 use af;
-use af::{Array, Dim4};
+use af::{Array, Dim4, DType};
 use itertools::Zip;
 use std::collections::HashMap;
 use std::default::Default;
@@ -62,6 +62,7 @@ impl Optimizer for SGD {
     self.iter += 1;
     let lr = self.learning_rate * (1.0 / (1.0 + self.decay * (self.iter as f32)));
     let alpha = lr / batch_size as f32;
+    let mut running_type = DType::F32;
 
     // all arrays are returned as [W0, b0, .. WN, bN, ..] (note this is per layer)
     // deltas are returned in the same way
@@ -76,8 +77,12 @@ impl Optimizer for SGD {
       *velocity = af::add(&af::mul(&self.momemtum, velocity, false),
                           &af::mul(&alpha, delta, false), false);
       assert!(velocity.dims().get() == arr.dims().get());
+      running_type = arr.get_type();
       parameter_manager.set_array_from_index(af::sub(arr, velocity, false), ind);
     }
+
+    // zero out the deltas
+    parameter_manager.zero_all_deltas(running_type);
   }
 
   fn info(&self){

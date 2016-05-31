@@ -301,12 +301,9 @@ pub fn normalize<T: Float + Sub>(src: &[T], num_std_dev: T) -> Vec<T> {
 // Normalize an array based on mean & num_std_dev deviations of the variance
 pub fn normalize_array(src: &Array, num_std_dev: f32) -> Array {
   let mean = af::mean_all(src).0 as f32;
-  let var = num_std_dev * af::var_all(src, false).0 as f32;
-  if var > 0.00000001 || var < 0.00000001 {
-    af::div(&af::sub(src, &mean, false), &var, false)
-  }else{
-    af::sub(src, &mean, false)
-  }
+  let mut std_dev = num_std_dev * (af::var_all(src, false).0 as f32).sqrt().abs();
+  std_dev = std_dev + 1e-9f32; // to not divide by zero
+  af::div(&af::sub(src, &mean, false), &std_dev, false)
 }
 
 pub fn scale(src: &Array, low: f32, high: f32) -> Array {

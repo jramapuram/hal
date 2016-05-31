@@ -1,7 +1,8 @@
-use af::{Array, Dim4, HasAfEnum};
+use af::{Array, Dim4, HasAfEnum, DType};
 use std::default::Default;
 use std::sync::{Arc, Mutex};
 
+use utils;
 use initializations;
 use device::{Device, DeviceManager};
 //use error::HAL Error;
@@ -283,6 +284,16 @@ impl ParamManager {
       d.extend(self.get_deltas(layer_num));
     }
     d
+  }
+
+  pub fn zero_all_deltas(&self, dtype: DType) {
+    for layer_num in 0..self.num_layers() {
+      for delta_num in 0..self.num_arrays(layer_num) {
+        let delta_dims = self.get_delta(layer_num, delta_num).dims();
+        let zero_tensor = utils::constant(delta_dims, dtype, 0.0f32);
+        self.set_delta(layer_num, delta_num, zero_tensor);
+      }
+    }
   }
 
   get_param_func!(get_weight, weights, Array);

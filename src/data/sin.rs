@@ -58,7 +58,7 @@ impl DataSource for SinSource
       target: RefCell::new(Box::new(inp.copy())),
     };
 
-    if self.params.normalize { batch.normalize(3.0); }
+    if self.params.normalize { batch.normalize(1.0); }
     if self.params.shuffle   {  batch.shuffle(); }
     let current_iter = self.params.current_epoch.get();
     if self.iter.get()  == self.params.num_samples as u64/ num_batch as u64 {

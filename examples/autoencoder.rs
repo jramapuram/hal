@@ -14,12 +14,12 @@ use af::{Backend};
 fn main() {
   // First we need to parameterize our network
   let input_dims = 128;
-  let hidden_dims = 32;
+  let hidden_dims = 64;
   let output_dims = 128;
   let num_train_samples = 65536;
   let batch_size = 128;
   let optimizer_type = "SGD";
-  let epochs = 5;
+  let epochs = 20;
 
   // Now, let's build a model with an device manager on a specific device
   // an optimizer and a loss function. For this example we demonstrate a simple autoencoder
@@ -39,7 +39,7 @@ fn main() {
                                      , "output_size" => hidden_dims.to_string()
                                      , "w_init"      => "glorot_uniform".to_string()
                                      , "b_init"      => "zeros".to_string()]);
-  model.add::<f32>("dense", hashmap!["activation"    => "tanh".to_string()
+  model.add::<f32>("dense", hashmap!["activation"    => "linear".to_string()
                                      , "input_size"  => hidden_dims.to_string()
                                      , "output_size" => output_dims.to_string()
                                      , "w_init"      => "glorot_uniform".to_string()
