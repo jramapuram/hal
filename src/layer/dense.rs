@@ -18,11 +18,12 @@ impl Layer for Dense
     // get a handle to the underlying params
     let mut ltex = params.lock().unwrap();
 
-    // z_t = Wx + b [the bias is added in parallel for batch]
-    let wx = af::matmul(&inputs.data            //activated_input
-                        , &ltex.weights[0]
+    // z_t = xW + b [the bias is added in parallel for batch]
+    let wx = af::matmul(&inputs.data            // activated_input
+                        , &ltex.weights[0]      // layer weights
                         , MatProp::NONE
                         , MatProp::NONE).unwrap();
+
     let z_t = af::transpose(&af::add(&af::transpose(&wx, false).unwrap()
                                      , &ltex.biases[0], true).unwrap(), false).unwrap();
 

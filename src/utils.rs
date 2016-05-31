@@ -411,14 +411,14 @@ pub fn dir_exists(path: &str) -> bool{
 /// - `eps` is a very small number (Generally 1e-5)
 /// - `grad` is your evaluated gradient
 pub fn verify_gradient_smooth<F>(fn_closure: F, input: &Array, eps: f64, grad: &Array) -> Result<f64, HALError>
-  where F : Fn(&Array) -> Array
+  where F : Fn(&Array) -> f64
 {
   let rel = gradient_check(fn_closure, input, eps, grad);
-  println!("Relative error = {}", rel);
+  println!("Relative error[smooth] = {}", rel);
   match rel {
-    n if n > 1e-2             => Err(HALError::GRADIENT_ERROR),
-    n if n < 1e-2 && n > 1e-4 => Err(HALError::GRADIENT_ERROR),
-    _                         => Ok(rel),
+    n if n > 1e-2 => Err(HALError::GRADIENT_ERROR),
+    n if n < 1e-4 => Err(HALError::GRADIENT_ERROR),
+    _             => Ok(rel),
   }
 }
 
@@ -431,10 +431,10 @@ pub fn verify_gradient_smooth<F>(fn_closure: F, input: &Array, eps: f64, grad: &
 /// - `eps` is a very small number (Generally 1e-5)
 /// - `grad` is your evaluated gradient
 pub fn verify_gradient_kinks<F>(fn_closure: F, input: &Array, eps: f64, grad: &Array) -> Result<f64, HALError>
-  where F : Fn(&Array) -> Array
+  where F : Fn(&Array) -> f64
 {
   let rel = gradient_check(fn_closure, input, eps, grad);
-  println!("Relative error = {}", rel);
+  println!("Relative error[kinks] = {}", rel);
   match rel {
     n if n > 1e-2 => Err(HALError::GRADIENT_ERROR),
     n if n < 1e-4 => Ok(rel),
@@ -442,47 +442,62 @@ pub fn verify_gradient_kinks<F>(fn_closure: F, input: &Array, eps: f64, grad: &A
   }
 }
 
-/// Gradient checking helper that accepts perturbations
+/// Numerical gradient calculator
 ///
 /// df(input)/dinput = ((f(input + eps)- f(input - eps))/(2*eps)
-/// everything is tabulated in double precision
 ///
 /// # Parameters
-/// - `fi_plus_eps` is f(input + eps)
-/// - `fi_minus_eps` is f(input - eps)
-/// - `input` is the input data array
+/// - `F` is a closure that returns a pointwise derivative
+/// - `arr` is the input data array
 /// - `eps` is a very small number (Generally 1e-5)
-/// - `grad` is your evaluated gradient
-pub fn gradient_check_with_perturbations(fi_plus_eps: &Array, fi_minus_eps: &Array, eps: f64, grad: &Array) -> f64
+pub fn numerical_gradient<F>(fn_closure: F, arr: &Array, eps: f64) -> Array
+  where F : Fn(&Array) -> f64
 {
-  let num_grad = af::div(&af::sub(fi_plus_eps, fi_minus_eps, false).unwrap()
-                         , &(2.0f64 * eps), false).unwrap();
+  // build a vector to hold the gradients
+  let num_elems = arr.elements().unwrap() as usize;
+  let num_rows = arr.dims().unwrap()[0] as usize;
+  let num_cols = arr.dims().unwrap()[1] as usize;
+  let mut grad_vec = vec![0f64; num_elems];
 
-  // now calculate the relative error
-  let abs_diff_grads = af::abs(&af::sub(&grad.cast::<f64>().unwrap(), &num_grad, false).unwrap()).unwrap();
-  let abs_num_grad = NonNan::new(af::sum_all(&af::abs(&num_grad).unwrap()).unwrap().0).unwrap();
-  let abs_grad = NonNan::new(af::sum_all(&af::abs(&grad.cast::<f64>().unwrap()).unwrap()).unwrap().0).unwrap();
-  af::sum_all(&abs_diff_grads).unwrap().0 / cmp::max(abs_grad, abs_num_grad).0
+  for i in 0..num_elems
+  {
+    // build a vec(matrix) of [0....eps...0] (same size as arr)
+    // then add and subtract it correspondingly.
+    let mut eps_vec = vec![0f64; num_elems];
+    eps_vec[i] = eps;
+
+    let eps_arr = vec_to_array::<f64>(eps_vec.clone(), num_rows, num_cols);
+    let arr_p_h = af::add(arr, &eps_arr, false).unwrap();
+    let arr_m_h = af::sub(arr, &eps_arr, false).unwrap();
+
+    // run it through the function to map to R1
+    grad_vec[i] = (fn_closure(&arr_p_h) - fn_closure(&arr_m_h)) / (2f64 * eps);
+  }
+
+  vec_to_array::<f64>(grad_vec, num_rows, num_cols)
 }
 
 
 /// Gradient checking helper
 ///
-/// df(input)/dinput = ((f(input + eps)- f(input - eps))/(2*eps)
-/// everything is tabulated in double precision
+/// rel = abs(grad - numgrad) / max(abs(grad), abs(numgrad))
 ///
 /// # Parameters
-/// - `F` is the function whose gradient we will evaluate
+/// - `F` is a closure that returns a pointwise derivative
 /// - `input` is the input data array
 /// - `eps` is a very small number (Generally 1e-5)
-/// - `grad` is your evaluated gradient
+/// - `grad` is your analytically evaluated gradient
 pub fn gradient_check<F>(fn_closure: F, input: &Array, eps: f64, grad: &Array) -> f64
-  where F : Fn(&Array) -> Array
+  where F : Fn(&Array) -> f64
 {
   // calculate the numerical gradient
-  let fi_plus_eps = fn_closure(&af::add(&input.cast::<f64>().unwrap(), &eps, false).unwrap());
-  let fi_minus_eps = fn_closure(&af::sub(&input.cast::<f64>().unwrap(), &eps, false).unwrap());
-  // assert!(f_input_minus_eps.get_type().unwrap() == f_input_plus_eps.get_type().unwrap(),
-  //         "Gradient checking failed to typecast input to a double array");
-  gradient_check_with_perturbations(&fi_plus_eps, &fi_minus_eps, eps, grad)
+  let num_grad = numerical_gradient(fn_closure, input, eps);
+  println!("numgrad = {:?} | grad = {:?}", array_to_vec(&num_grad), array_to_vec(grad));
+
+  // now calculate the relative error
+  let abs_diff_grads = af::abs(&af::sub(&grad.cast::<f64>().unwrap(), &num_grad, false).unwrap()).unwrap();
+  let abs_num_grad = NonNan::new(af::sum_all(&af::abs(&num_grad).unwrap()).unwrap().0).unwrap();
+  let abs_grad = NonNan::new(af::sum_all(&af::abs(&grad.cast::<f64>().unwrap()).unwrap()).unwrap().0).unwrap();
+  println!("abs tot = {}  | ag = {} | ang = {}", af::sum_all(&abs_diff_grads).unwrap().0, abs_grad.0, abs_num_grad.0);
+  af::sum_all(&abs_diff_grads).unwrap().0 / cmp::max(abs_grad, abs_num_grad).0
 }

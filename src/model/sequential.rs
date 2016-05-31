@@ -192,11 +192,7 @@ impl Model for Sequential {
     // the last element of the activation's vector of the last layer
     let last_index = self.layers.len() - 1;
     let last_layer_activations = self.param_manager.get_activations(last_index);
-    let final_activation_index = last_layer_activations.len();
-    let mut delta = loss::loss_delta(prediction
-                                     , target
-                                     , &self.loss
-                                     , &last_layer_activations[final_activation_index - 1]);
+    let mut delta = loss::get_loss_derivative(&self.loss, prediction, target).unwrap();
     for i in (0..last_index + 1).rev() {
       delta = self.layers[i].backward(self.param_manager.get_params(i), &delta);
     }

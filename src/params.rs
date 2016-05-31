@@ -9,7 +9,7 @@ use device::{Device, DeviceManager};
 macro_rules! set_param_vec_func {
   ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
     #[allow(unused_mut)]
-    pub fn $fn_name(&mut self, layer_index: usize, p: Vec<$base_type>) {
+    pub fn $fn_name(&self, layer_index: usize, p: Vec<$base_type>) {
       assert!(self.layer_storage.len() - 1 >= layer_index);
       let layer = self.layer_storage[layer_index].clone();
       let mut ltex = &mut layer.lock().unwrap();
@@ -46,7 +46,7 @@ macro_rules! with_mut_param_vec_func {
 macro_rules! set_param_func {
   ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
     #[allow(unused_mut)]
-    pub fn $fn_name(&mut self, layer_index: usize, num: usize, p: $base_type) {
+    pub fn $fn_name(&self, layer_index: usize, num: usize, p: $base_type) {
       assert!(self.layer_storage.len() - 1 >= layer_index);
       let layer = self.layer_storage[layer_index].clone();
       let mut ltex = layer.lock().unwrap();
@@ -60,7 +60,7 @@ macro_rules! set_param_func {
 macro_rules! get_param_func {
   ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
     #[allow(unused_mut)]
-    pub fn $fn_name(&mut self, layer_index: usize, num: usize) -> $base_type {
+    pub fn $fn_name(&self, layer_index: usize, num: usize) -> $base_type {
       assert!(self.layer_storage.len() - 1 >= layer_index);
       let layer = self.layer_storage[layer_index].clone();
       let mut ltex = layer.lock().unwrap();
@@ -220,7 +220,7 @@ impl ParamManager {
 
   // assumes params are coming in layer wise
   // eg: [W0, b0, .. , WN, bN]
-  pub fn set_array_from_index(&mut self, arr: Array, ind: usize) {
+  pub fn set_array_from_index(&self, arr: Array, ind: usize) {
     let mut current: usize = 0;
     for layer_num in 0..self.num_layers() {
       let n_weights = self.num_weights(layer_num);
@@ -228,8 +228,11 @@ impl ParamManager {
 
       if current + n_weights > ind { // we are a weight
         let w_index = ind - current;
-        assert!(self.get_weight(layer_num, w_index).dims().unwrap()
-                == arr.dims().unwrap());
+        let target_dims = self.get_weight(layer_num, w_index).dims().unwrap();
+        let src_dims = arr.dims().unwrap();
+        assert!(src_dims == target_dims
+                , "array at index {} does not match provided [provided: {:?}  internal: {:?}]"
+                , ind, src_dims, target_dims);
         self.set_weight(layer_num, w_index, arr);
         break;
       }

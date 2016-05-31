@@ -1,7 +1,6 @@
 use af;
 use af::Array;
 
-use activations;
 use error::HALError;
 
 /// Return a vector form of the l2 error
@@ -27,15 +26,14 @@ pub fn cross_entropy_vec(pred: &Array, target: &Array) -> Array {
   af::sub(&pos, &neg, false).unwrap()
 }
 
-
 /// Provide a reduced form the L2 loss (single scalar)
 pub fn l2(pred: &Array, target: &Array) -> f32 {
-  af::mean_all(&l2_vec(pred, target)).unwrap().0 as f32
+  af::sum_all(&l2_vec(pred, target)).unwrap().0 as f32
 }
 
 /// Provide a reduced form the mean squared error loss (single scalar)
 pub fn mse(pred: &Array, target: &Array) -> f32 {
-  0.5f32 * l2(pred, target)
+  0.5f32 * af::mean_all(&l2_vec(pred, target)).unwrap().0 as f32
 }
 
 /// Provide a reduced form the cross-entropy loss (single scalar)
@@ -57,17 +55,6 @@ pub fn l2_derivative(pred: &Array, target: &Array) -> Array {
 /// Provides the vector derivative of the cross-entropy error
 pub fn cross_entropy_derivative(pred: &Array, target: &Array) -> Array {
   mse_derivative(pred, target)
-}
-
-/// Helper to provide the delta from the loss layer [vector]
-/// This value is backpropagated through all the remaining layers
-/// d_L = d_loss * d(z) where z = activation w/out non-linearity (& in this case the predictions)
-pub fn loss_delta(prediction: &Array, target: &Array
-                  , loss: &str, activation_type: &str) -> Array
-{
-  let d_loss = get_loss_derivative(loss, &prediction, target).unwrap();
-  let d_z = activations::get_derivative(activation_type, &prediction).unwrap();
-  af::mul(&d_loss, &d_z, false).unwrap()
 }
 
 /// Helper to provide a loss from a string

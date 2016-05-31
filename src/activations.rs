@@ -112,6 +112,20 @@ pub fn ones_derivative(x: &Array) -> Array {
   grad
 }
 
+/// Helper to determine whether function is smooth or non-smooth
+pub fn is_smooth(name: &str) -> bool {
+  match name {
+    "softmax" => true,
+    "sigmoid" => true,
+    "relu"    => false,
+    "lrelu"   => false,
+    "tanh"    => true,
+    "ones"    => true,
+    "linear"  => true,
+    _         => panic!("unknown function name provided"),
+  }
+}
+
 /// Helper to get the correct activation using a string
 pub fn get_activation(name: &str, x: &Array) -> Result<Array, HALError> {
   match name {
