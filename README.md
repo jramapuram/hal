@@ -13,11 +13,11 @@ We can also micro-control steps. An example of this working with each individual
   - **OpenCL + CUDA + Parallel CPU support**
   - **LSTM's with internal RTRL [Work in Progress]**
   - **RNN's [Work in Progress]**
-  - Perceptrons, AutoEncoders, ConvNets [TODO]
-  - Optimizers:      [SGD, Adam[TODO], AdaGrad[TODO]]
+  - Perceptrons, AutoEncoders, ConvNets**[TODO]**
+  - Optimizers:      [SGD, Adam, AdaGrad**[TODO]**]
   - Activations:     [Linear, Sigmoid, Tanh, ReLU, LReLU, Softmax]
   - Initializations: [Lecun Uniform, Glorot Normal, Glorot Uniform, Normal, Uniform]
-  - Data Gatherers:  [SinSource, MNIST[TODO], CIFAR10[TODO]]
+  - Data Gatherers:  [SinSource, MNIST**[In Progress]**, CIFAR10**[TODO]**]
   - Loss Functions:  [MSE, L2, Cross-Entropy]
   - OpenGL based plotting and image loading, see [here](https://www.accelereyes.com/arrayfire/c/page_gfx.htm) for more info
   - Multi GPU [horizontal] support **[TODO]**
