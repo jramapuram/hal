@@ -18,7 +18,7 @@ fn main() {
   let output_dims = 128;
   let num_train_samples = 65536;
   let batch_size = 128;
-  let optimizer_type = "SGD";
+  let optimizer_type = "Adam";
   let epochs = 20;
 
   // Now, let's build a model with an device manager on a specific device

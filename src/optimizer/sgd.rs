@@ -92,5 +92,6 @@ impl Optimizer for SGD {
     println!("decay:          {}", self.decay);
     println!("nesterov:       {}", self.nesterov);
     println!("clip_grad:      {}", self.clip_grad);
+    println!("iter:           {}", self.iter);
   }
 }
