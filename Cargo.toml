@@ -10,11 +10,14 @@ csv = "0.14.4"
 num = "0.1.31"
 conv = "0.3.3"
 tar = "0.4.5"
-hyper = "0.8.0"
 flate2 = "0.2.13"
 itertools = "0.4.12"
 statistical = "0.1.1"
 arrayfire = { path ="arrayfire-rust" }
+
+[dependencies.hyper]
+version = "0.9.6"
+default-features = false
 
 [lib]
 name = "hal"
