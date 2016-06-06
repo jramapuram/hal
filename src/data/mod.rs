@@ -1,6 +1,9 @@
 pub use self::sin::SinSource;
 mod sin;
 
+pub use self::unit_src::MultUniformSource;
+mod unit_src;
+
 use af::{Dim4, Array};
 use std::cell::{RefCell, Cell};
 

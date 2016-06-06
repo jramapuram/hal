@@ -74,6 +74,10 @@ pub fn lecun_uniform<T: HasAfEnum>(dims: Dim4) -> Array {
   uniform::<T>(dims, s)
 }
 
+//TODO: permut
+pub fn permut<T: HasAfEnum>(dims: Dim4) -> Array{
+    af::range::<T>(dims, 0).unwrap()
+}
 //TODO: Orthogonal
 
 /// A helper to retrieve an initialization based on a name and a shape
@@ -87,6 +91,7 @@ pub fn get_initialization<T: HasAfEnum>(name: &str, dims: Dim4) -> Result<Array,
     "uniform"        => Ok(uniform::<T>(dims, 0.05f32)), //TODO: Parameterize
     "zeros"          => Ok(zeros::<T>(dims)),
     "ones"           => Ok(ones::<T>(dims)),
+    "permut"         => Ok(permut::<T>(dims)),
     _                => Err(HALError::UNKNOWN),
   }
 }

@@ -1,5 +1,6 @@
 use af::{Array, Dim4, HasAfEnum};
 use std::default::Default;
+use num::Complex;
 //use itertools::Zip;
 
 use initializations;
@@ -167,8 +168,8 @@ impl ParamManager {
   }
 
   fn generate<T: HasAfEnum>(&self, init: &str, dims: (usize, usize)) -> Array {
-    let dims = Dim4::new(&[dims.0 as u64, dims.1 as u64, 1, 1]);
-    initializations::get_initialization::<T>(init, dims).unwrap()
+      let dims = Dim4::new(&[dims.0 as u64, dims.1 as u64, 1, 1]);
+      initializations::get_initialization::<T>(init, dims).unwrap()
   }
 
   pub fn num_layers(&self) -> usize {
@@ -461,22 +462,23 @@ pub trait UnitaryGenerator {
 fn add_unitary<T: HasAfEnum>(&mut self
           , manager: DeviceManager
           , device: Device
+          , batch_size: usize
           , input_size: usize
           , output_size: usize
           , hidden_size: usize
           , h_activation: &str
           , o_activation: &str
-          , h_init &str 
-          , r_v_init &str
-          , i_v_init u&str
-          , phase_init &str
-          , r_householder_init &str
-          , i_householder_init &str
-          , permut_init &str
-          , u_init &str
-          , h_bias_init &str
-          , o_bias_init &str
-          , b_init: &str);
+          , h_init: &str 
+          , v_init: &str
+          , phase1_init: &str
+          , householder1_init: &str
+          , phase2_init: &str
+          , permut_init: &str
+          , householder2_init: &str
+          , phase3_init: &str
+          , u_init: &str
+          , h_bias_init: &str
+          , o_bias_init: &str);
 }
 
 /** Custom Layer Impls **/
@@ -571,67 +573,75 @@ impl<'a> UnitaryGenerator for ParamManager {
     fn add_unitary<T: HasAfEnum>(&mut self
           , manager: DeviceManager
           , device: Device
+          , batch_size: usize
           , input_size: usize
           , output_size: usize
           , hidden_size: usize
           , h_activation: &str
           , o_activation: &str
-          , r_h_init &str
-          , i_h_init &str
-          , r_v_init &str
-          , i_v_init &str
-          , phase1_init &str
-          , r_householder1_init &str
-          , i_householder1_init &str
-          , permut_init &str
-          , r_householder2_init &str
-          , i_householder2_init &str
-          , phase2_init &str
-          , u_init &str
-          , r_h_bias_init &str
-          , i_h_bias_init &str
-          , o_bias_init &str
+          , h_init: &str
+          , v_init: &str
+          , phase1_init: &str
+          , householder1_init: &str
+          , phase2_init: &str
+          , permut_init: &str
+          , householder2_init: &str
+          , phase3_init: &str
+          , u_init: &str
+          , h_bias_init: &str
+          , o_bias_init: &str
           )
     {
         // We store all unitary matrices params in the attribute vector "weights".
         // The format of "weights" is then :
         // [p1, p2, ..., pm]
         
-        // We assume that we don't need to update parameters through time, only inputs and outputs
+        // We assume that we don't need to update parameters through time, only inputs,
+        // outputs and hidden states.
+        //
+        manager.swap_device(device);
 
         // weights first
-        let weights_params = vec![ (r_v_init, (input_size, hidden_size))
-                            , (i_v_init, (input_size, hidden_size))
-                            , (phase1_init, (hidden_size, 1)))
-                            , (r_householder1_init, (hidden_size, 1))
-                            , (i_householder1_init, (hidden_size, 1))
-                            , (r_householder2_init, (hidden_size, 1))
-                            , (i_householder2_init, (hidden_size, 1))
-                            , (phase2_init, (hidden_size, 1))
-                            , (u_init, (2*hidden_size, output_size))
-        ];
-
+        let mut weights: Vec<Array> = Vec::with_capacity(7);
+        weights.push(self.generate::<Complex<f32>>(v_init, (input_size, hidden_size)));
+        weights.push(self.generate::<T>(phase1_init, (1, hidden_size)));
+        weights.push(self.generate::<T>(phase2_init, (1, hidden_size)));
+        weights.push(self.generate::<T>(phase3_init, (1, hidden_size)));
+        weights.push(self.generate::<Complex<f32>>(householder1_init, (hidden_size, 1)));
+        weights.push(self.generate::<Complex<f32>>(householder2_init, (hidden_size, 1)));
+        weights.push(self.generate::<T>(u_init, (2*hidden_size, output_size)));
+            
         // biases next
-        let biases.params = vec![(r_h_bias_init, (hidden_size, 1))
-                            , (i_h_bias_init, (hidden_size, 1))
-                            , (o_bias_init, (hidden_size,1 ))
-        ];
+        let mut biases: Vec<Array> = Vec::with_capacity(2);
+        biases.push(self.generate::<Complex<f32>>(h_bias_init, (1, hidden_size)));
+        biases.push(self.generate::<T>(o_bias_init, (1, output_size)));
 
         // activations
         let activations = vec![h_activation, o_activation];
         
         // hidden unit
-        let recurrence_dims = Option<vec![(r_h_init, (hidden_size, 1))
-                                            , (i_h_init, (hidden_size, 1))
-        ]>;
+        let mut recurrences: Vec<Array> = Vec::new();
+        recurrences.push(self.generate::<Complex<f32>>(h_init, (batch_size, hidden_size)));
 
         // we won't minimize trough the permutation params so we store them in optional
-        let optional_dims = Option(vec![ (permut_init, hidden_size, hidden_size) ]);
+        let mut optional: Vec<Array> = Vec::with_capacity(1);
+        optional.push(self.generate::<i32>(permut_init, (hidden_size, 1)));
+        
+        let owned_activations = activations.iter().map(|x| x.to_string()).collect::<Vec<String>>();
+        let mut deltas: Vec<Array> = Vec::with_capacity(9);
 
-        self.add::<T>(manager, device, "unitary", weights_params, biases_params, activations
-                      , recurrence_dims
-                      , optional_dims
-        );
+        self.layer_storage.push(Params{
+            layer_type: "unitary".to_string(),
+            device: device,
+            weights: weights,
+            biases: biases,
+            activations: owned_activations,
+            deltas: deltas,
+            inputs: Vec::new(),
+            outputs: Vec::new(),
+            recurrences: recurrences,
+            current_unroll: 0,
+            optional: optional,
+        });
+    }
 }
-
-

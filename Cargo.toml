@@ -24,3 +24,7 @@ plugin = true
 [[example]]
 name = "autoencoder"
 path = "examples/autoencoder.rs"
+
+[[example]]
+name = "test"
+path = "examples/test.rs"

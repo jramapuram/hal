@@ -7,16 +7,17 @@ use std::collections::HashMap;
 
 use utils;
 use loss;
-use layer::{Layer, Dense};//, LSTM};
+use layer::{Layer, Dense, Unitary};//, LSTM};
 use data::{DataSource};
 use device::{Device, DeviceManager, DeviceManagerFactory};
 use model::Model;
 use optimizer::{Optimizer, SGD};
-use params::{ParamManager, DenseGenerator, LSTMGenerator, Input};
+use params::{ParamManager, DenseGenerator, LSTMGenerator, UnitaryGenerator, Input};
 
 pub struct Sequential {
   layers: Vec<Box<Layer>>,
-  param_manager: ParamManager,
+// Attention : drop the pub
+  pub  param_manager: ParamManager,
   optimizer: Box<Optimizer>,
   manager: DeviceManager,
   loss: String,
@@ -63,6 +64,8 @@ impl Model for Sequential {
     //TODO: Error handling for hashmap
     let input_size = params.get("input_size").unwrap().parse::<u64>().unwrap() as usize;
     let output_size = params.get("output_size").unwrap().parse::<u64>().unwrap() as usize;
+    let hidden_size = params.get("hidden_size").unwrap().parse::<u64>().unwrap() as usize;
+
     match layer {
       "dense" => {
         self.param_manager.add_dense::<T>(self.manager.clone(), self.device
@@ -88,6 +91,41 @@ impl Model for Sequential {
       //                                  , max_seq_size: params.get("max_seq_size").unwrap()
       //                                  , return_sequences: params.get("return_sequences").unwrap()}));
       // },
+      
+      "unitary" => {
+          self.param_manager.add_unitary::<T>(self.manager.clone(), self.device
+                                            , params.get("batch_size").unwrap().parse::<u64>().unwrap() as usize
+                                            , input_size, output_size, hidden_size
+
+                                            // activations for Ux + Wh + b1 and for Vh + b2
+                                            , params.get("h_activation").unwrap()
+                                            , params.get("o_activation").unwrap()
+
+                                            // init hidden state values
+                                            , params.get("h_init").unwrap()
+
+                                            // init values for input2hidden matrix params
+                                            , params.get("v_init").unwrap()
+                                            
+                                            // init values for unitary matrices params
+                                            , params.get("phase1_init").unwrap()
+                                            , params.get("householder1_init").unwrap()
+                                            , params.get("phase2_init").unwrap()
+                                            , params.get("permut_init").unwrap()
+                                            , params.get("householder2_init").unwrap()
+                                            , params.get("phase3_init").unwrap()
+
+                                            // init values for hidden2output matrix params
+                                            , params.get("u_init").unwrap()
+                                            
+                                            // init biases values
+                                            , params.get("h_bias_init").unwrap()
+                                            , params.get("o_bias_init").unwrap()
+                                            ); 
+            self.layers.push(Box::new(Unitary{input_size: input_size
+                                        , output_size: output_size}));
+     }
+
       _  => panic!("Error unknown layer type"),
     }
   }
