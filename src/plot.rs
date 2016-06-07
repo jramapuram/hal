@@ -5,20 +5,17 @@ use utils;
 //use error::HALError;
 
 pub fn plot_array(values: &Array, title: &str, window_x: u16, window_y: u16) {
-  assert!(values.dims().unwrap()[1] == 1);
+  assert!(values.dims()[1] == 1);
 
   // create a window
   let title_str = String::from(title);
-  let wnd = match af::Window::new(window_x as i32, window_y as i32, title_str) {
-    Ok(v)  => v,
-    Err(e) => panic!("Window creation failed: {}", e), //XXX: handle better
-  };
+  let wnd = af::Window::new(window_x as i32, window_y as i32, title_str);
 
   // display till closed
   loop {
-    wnd.draw_plot(&af::range::<f32>(values.dims().unwrap().clone()
-                                    , 0).unwrap(), &values, None);
-    if wnd.is_closed().unwrap() == true { break; }
+    wnd.draw_plot(&af::range::<f32>(values.dims().clone()
+                                    , 0), &values, None);
+    if wnd.is_closed() == true { break; }
   }
 }
 

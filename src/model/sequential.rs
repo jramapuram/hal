@@ -148,13 +148,13 @@ impl Model for Sequential {
 
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
-    let bptt_unroll = max(activ.dims().unwrap()[2], 1);
-    let mut activate = Input {data: af::slice(&activ, 0).unwrap()
+    let bptt_unroll = max(activ.dims()[2], 1);
+    let mut activate = Input {data: af::slice(&activ, 0)
                               , activation: "ones".to_string()};
     for t in 0..bptt_unroll {
-      activate.data = af::slice(&activ, t).unwrap();
+      activate.data = af::slice(&activ, t);
       for i in 0..self.layers.len() {
-        activate = self.layers[i].forward(self.param_manager.get_mut_params(i)
+        activate = self.layers[i].forward(self.param_manager.get_params(i)
                                           , &activate, train);
       }
     }
@@ -195,9 +195,9 @@ impl Model for Sequential {
         // extract part of the array onto the GPU
         self.manager.swap_device(src_device);
         let minibatch = source.get_train_iter(batch_size);
-        assert!(minibatch.input.borrow().dims().unwrap()[0] == batch_size
+        assert!(minibatch.input.borrow().dims()[0] == batch_size
                 , "Ensure that input dims are of batch rows");
-        assert!(minibatch.target.borrow().dims().unwrap()[0] == batch_size
+        assert!(minibatch.target.borrow().dims()[0] == batch_size
                 , "Ensure that target dims are of batch rows");
         let batch_input = self.manager.swap_array_backend::<E>(&minibatch.input.into_inner()
                                                           , src_device
@@ -230,13 +230,9 @@ impl Model for Sequential {
     // the last element of the activation's vector of the last layer
     let last_index = self.layers.len() - 1;
     let last_layer_activations = self.param_manager.get_activations(last_index);
-    let final_activation_index = last_layer_activations.len();
-    let mut delta = loss::loss_delta(prediction
-                                     , target
-                                     , &self.loss
-                                     , &last_layer_activations[final_activation_index - 1]);
+    let mut delta = loss::get_loss_derivative(&self.loss, prediction, target).unwrap();
     for i in (0..last_index + 1).rev() {
-      delta = self.layers[i].backward(self.param_manager.get_mut_params(i), &delta);
+      delta = self.layers[i].backward(self.param_manager.get_params(i), &delta);
     }
 
     loss::get_loss(&self.loss, prediction, target).unwrap()

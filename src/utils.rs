@@ -17,7 +17,7 @@ use std::fs::File;
 use num::traits::Float;
 use num::{Complex, Num};
 use statistical::{standard_deviation, mean};
-use af::{Dim4, Array, Aftype, Seq, AfError, HasAfEnum};
+use af::{Dim4, Array, DType, Seq, AfError, HasAfEnum};
 use itertools::Zip;
 use rustc_serialize::Encodable;
 
@@ -61,9 +61,9 @@ impl Ord for NonNan {
 
 /// Helper to assert all types in a vector are the same
 pub fn assert_types(v: Vec<&Array>){
-  let base_type = v[0].get_type().unwrap();
+  let base_type = v[0].get_type();
   for i in 1..v.len() {
-    let cur_type = v[i].get_type().unwrap();
+    let cur_type = v[i].get_type();
     assert!(cur_type == base_type
             , "type mismatch detected: {:?} vs {:?}"
             , cur_type, base_type);
@@ -71,29 +71,29 @@ pub fn assert_types(v: Vec<&Array>){
 }
 
 /// Helper to return a constant value based on type
-pub fn constant(dims: Dim4, aftype: Aftype, val: f32) -> Array {
+pub fn constant(dims: Dim4, aftype: DType, val: f32) -> Array {
   match aftype
   {
-    Aftype::F32 => af::constant(val, dims).unwrap(),
-    Aftype::F64 => af::constant(val.approx_as::<f64>().unwrap(), dims).unwrap(),
-    Aftype::C32 => af::constant(Complex::new(val, 0f32)
-                                , dims).unwrap(),
-    Aftype::C64 => af::constant(Complex::new(val.approx_as::<f64>().unwrap(), 0f64)
-                        , dims).unwrap(),
-    Aftype::B8  => {
+    DType::F32 => af::constant(val, dims),
+    DType::F64 => af::constant(val.approx_as::<f64>().unwrap(), dims),
+    DType::C32 => af::constant(Complex::new(val, 0f32)
+                                , dims),
+    DType::C64 => af::constant(Complex::new(val.approx_as::<f64>().unwrap(), 0f64)
+                        , dims),
+    DType::B8  => {
       if val > 0f32 {
-        af::constant(true, dims).unwrap()
+        af::constant(true, dims)
       }else{
-        af::constant(false, dims).unwrap()
+        af::constant(false, dims)
       }
     },
-    Aftype::S32 => af::constant(val.approx_as::<i32>().saturate().unwrap(), dims).unwrap(),
-    Aftype::U32 => af::constant(val.approx_as::<u32>().saturate().unwrap(), dims).unwrap(),
-    Aftype::U8  => af::constant(val.approx_as::<u8>().saturate().unwrap(), dims).unwrap(),
-    Aftype::S64 => af::constant(val.approx_as::<i64>().saturate().unwrap(), dims).unwrap(),
-    Aftype::U64 => af::constant(val.approx_as::<u64>().saturate().unwrap(), dims).unwrap(),
-    Aftype::S16 => af::constant(val.approx_as::<i16>().saturate().unwrap(), dims).unwrap(),
-    Aftype::U16 => af::constant(val.approx_as::<u16>().saturate().unwrap(), dims).unwrap(),
+    DType::S32 => af::constant(val.approx_as::<i32>().saturate().unwrap(), dims),
+    DType::U32 => af::constant(val.approx_as::<u32>().saturate().unwrap(), dims),
+    DType::U8  => af::constant(val.approx_as::<u8>().saturate().unwrap(), dims),
+    DType::S64 => af::constant(val.approx_as::<i64>().saturate().unwrap(), dims),
+    DType::U64 => af::constant(val.approx_as::<u64>().saturate().unwrap(), dims),
+    DType::S16 => af::constant(val.approx_as::<i16>().saturate().unwrap(), dims),
+    DType::U16 => af::constant(val.approx_as::<u16>().saturate().unwrap(), dims),
   }
 }
 
@@ -106,14 +106,14 @@ pub fn vec_to_array<T: HasAfEnum>(vec_values: Vec<T>, rows: usize, cols: usize) 
 /// Convert a generic vector to an Array
 pub fn raw_to_array<T: HasAfEnum>(raw_values: &[T], rows: usize, cols: usize) -> Array {
   let dims = Dim4::new(&[rows as u64, cols as u64, 1, 1]);
-  Array::new::<T>(raw_values, dims).unwrap()
+  Array::new::<T>(raw_values, dims)
 }
 
 /// convert an array into a vector of rows
 pub fn array_to_rows(input: &Array) -> Vec<Array> {
   let mut rows = Vec::new();
-  for r in 0..input.dims().unwrap()[0] {
-    rows.push(af::row(input, r as u64).unwrap());
+  for r in 0..input.dims()[0] {
+    rows.push(af::row(input, r as u64));
   }
   rows
 }
@@ -121,9 +121,9 @@ pub fn array_to_rows(input: &Array) -> Vec<Array> {
 /// convery an array to a single vector [loses dimensions]
 pub fn array_to_vec(input: &Array) -> Vec<f64>
 {
-  let elems = input.dims().unwrap().elements();
+  let elems = input.dims().elements();
   let mut v: Vec<f64> = vec![0f64; elems as usize];
-  input.host(&mut v).unwrap();
+  input.host(&mut v);
   v
 }
 
@@ -133,14 +133,14 @@ pub fn rows_to_array(input: Vec<&Array>) -> Array {
   // // af_join_many supports up to 10 (9 + previous) arrays being joined at once
   // for rows in input[1..input.len()].iter().collect::<Vec<_>>().chunks(9) {
   //   arr.extend(Vec::from(rows));
-  //   arr = vec![&af::join_many(0, arr).unwrap()];
+  //   arr = vec![&af::join_many(0, arr)];
   // }
   // arr[0].clone();
   if input.len() > 10 {
     panic!("cannot currently handle array merge of more than 10 items");
   }
 
-  af::join_many(0, input).unwrap()
+  af::join_many(0, input)
 }
 
 // Helper to swap rows (row major order) in a generic type [non GPU]
@@ -192,23 +192,23 @@ pub fn shuffle_array(v: &mut[&mut Array], rows: u64) {
   for row in 0..rows {
     let rnd_row = rng.gen_range(0, rows - row);
     for mat in v.iter_mut() { //swap all tensors similarly
-      let dims = mat.dims().unwrap();
-      let rnd_plane  = row_plane(mat, rnd_row).unwrap();
-      let orig_plane = row_plane(mat, dims[0] - row - 1).unwrap();
-      **mat = set_row_plane(mat, &rnd_plane, dims[0] - row - 1).unwrap();
-      **mat = set_row_plane(mat, &orig_plane, rnd_row).unwrap();
+      let dims = mat.dims();
+      let rnd_plane  = row_plane(mat, rnd_row);
+      let orig_plane = row_plane(mat, dims[0] - row - 1);
+      **mat = set_row_plane(mat, &rnd_plane, dims[0] - row - 1);
+      **mat = set_row_plane(mat, &orig_plane, rnd_row);
     }
   }
 }
 
-pub fn row_plane(input: &Array, slice_num: u64) -> Result<Array, AfError> {
+pub fn row_plane(input: &Array, slice_num: u64) -> Array {
   af::index(input, &[Seq::new(slice_num as f64, slice_num as f64, 1.0)
                      , Seq::default()
                      , Seq::default()])
 }
 
-pub fn set_row_plane(input: &Array, new_plane: &Array, plane_num: u64) -> Result<Array, AfError> {
-  match input.dims().unwrap().ndims() {
+pub fn set_row_plane(input: &Array, new_plane: &Array, plane_num: u64) -> Array {
+  match input.dims().ndims() {
     4 => af::assign_seq(input, &[Seq::new(plane_num as f64, plane_num as f64, 1.0)
                                  , Seq::default()
                                  , Seq::default()
@@ -227,16 +227,16 @@ pub fn set_row_plane(input: &Array, new_plane: &Array, plane_num: u64) -> Result
   }
 }
 
-pub fn row_planes(input: &Array, first: u64, last: u64) -> Result<Array, AfError> {
+pub fn row_planes(input: &Array, first: u64, last: u64) -> Array {
   af::index(input, &[Seq::new(first as f64, last as f64, 1.0)
                      , Seq::default()
                      , Seq::default()])
 }
 
 pub fn set_row_planes(input: &Array, new_planes: &Array
-                      , first: u64, last: u64) -> Result<Array, AfError>
+                      , first: u64, last: u64) -> Array
 {
-  match input.dims().unwrap().ndims() {
+  match input.dims().ndims() {
     4 => af::assign_seq(input, &[Seq::new(first as f64, last as f64, 1.0)
                                  , Seq::default()
                                  , Seq::default()
@@ -300,22 +300,19 @@ pub fn normalize<T: Float + Sub>(src: &[T], num_std_dev: T) -> Vec<T> {
 
 // Normalize an array based on mean & num_std_dev deviations of the variance
 pub fn normalize_array(src: &Array, num_std_dev: f32) -> Array {
-  let mean = af::mean_all(src).unwrap().0 as f32;
-  let var = num_std_dev * af::var_all(src, false).unwrap().0 as f32;
-  if var > 0.00000001 || var < 0.00000001 {
-    af::div(&af::sub(src, &mean, false).unwrap(), &var, false).unwrap()
-  }else{
-    af::sub(src, &mean, false).unwrap()
-  }
+  let mean = af::mean_all(src).0 as f32;
+  let mut std_dev = num_std_dev * (af::var_all(src, false).0 as f32).sqrt().abs();
+  std_dev = std_dev + 1e-9f32; // to not divide by zero
+  af::div(&af::sub(src, &mean, false), &std_dev, false)
 }
 
 pub fn scale(src: &Array, low: f32, high: f32) -> Array {
-  let min = af::min_all(&src).unwrap().0 as f32;
-  let max = af::max_all(&src).unwrap().0 as f32;
+  let min = af::min_all(&src).0 as f32;
+  let max = af::max_all(&src).0 as f32;
 
-  af::add(&af::div(&af::mul(&(high - low), &af::sub(src, &min, false).unwrap(), false).unwrap()
-                   , &(max - min), false).unwrap()
-          , &low, false).unwrap()
+  af::add(&af::div(&af::mul(&(high - low), &af::sub(src, &min, false), false)
+                   , &(max - min), false)
+          , &low, false)
 }
 
 fn _read_gzip_filename(entire_file: &Vec<u8>) -> String {
@@ -411,14 +408,14 @@ pub fn dir_exists(path: &str) -> bool{
 /// - `eps` is a very small number (Generally 1e-5)
 /// - `grad` is your evaluated gradient
 pub fn verify_gradient_smooth<F>(fn_closure: F, input: &Array, eps: f64, grad: &Array) -> Result<f64, HALError>
-  where F : Fn(&Array) -> Array
+  where F : Fn(&Array) -> f64
 {
   let rel = gradient_check(fn_closure, input, eps, grad);
-  println!("Relative error = {}", rel);
+  println!("Relative error[smooth] = {}", rel);
   match rel {
-    n if n > 1e-2             => Err(HALError::GRADIENT_ERROR),
-    n if n < 1e-2 && n > 1e-4 => Err(HALError::GRADIENT_ERROR),
-    _                         => Ok(rel),
+    n if n > 1e-2 => Err(HALError::GRADIENT_ERROR),
+    n if n < 1e-4 => Err(HALError::GRADIENT_ERROR),
+    _             => Ok(rel),
   }
 }
 
@@ -431,10 +428,10 @@ pub fn verify_gradient_smooth<F>(fn_closure: F, input: &Array, eps: f64, grad: &
 /// - `eps` is a very small number (Generally 1e-5)
 /// - `grad` is your evaluated gradient
 pub fn verify_gradient_kinks<F>(fn_closure: F, input: &Array, eps: f64, grad: &Array) -> Result<f64, HALError>
-  where F : Fn(&Array) -> Array
+  where F : Fn(&Array) -> f64
 {
   let rel = gradient_check(fn_closure, input, eps, grad);
-  println!("Relative error = {}", rel);
+  println!("Relative error[kinks] = {}", rel);
   match rel {
     n if n > 1e-2 => Err(HALError::GRADIENT_ERROR),
     n if n < 1e-4 => Ok(rel),
@@ -442,47 +439,62 @@ pub fn verify_gradient_kinks<F>(fn_closure: F, input: &Array, eps: f64, grad: &A
   }
 }
 
-/// Gradient checking helper that accepts perturbations
+/// Numerical gradient calculator
 ///
 /// df(input)/dinput = ((f(input + eps)- f(input - eps))/(2*eps)
-/// everything is tabulated in double precision
 ///
 /// # Parameters
-/// - `fi_plus_eps` is f(input + eps)
-/// - `fi_minus_eps` is f(input - eps)
-/// - `input` is the input data array
+/// - `F` is a closure that returns a pointwise derivative
+/// - `arr` is the input data array
 /// - `eps` is a very small number (Generally 1e-5)
-/// - `grad` is your evaluated gradient
-pub fn gradient_check_with_perturbations(fi_plus_eps: &Array, fi_minus_eps: &Array, eps: f64, grad: &Array) -> f64
+pub fn numerical_gradient<F>(fn_closure: F, arr: &Array, eps: f64) -> Array
+  where F : Fn(&Array) -> f64
 {
-  let num_grad = af::div(&af::sub(fi_plus_eps, fi_minus_eps, false).unwrap()
-                         , &(2.0f64 * eps), false).unwrap();
+  // build a vector to hold the gradients
+  let num_elems = arr.elements() as usize;
+  let num_rows = arr.dims()[0] as usize;
+  let num_cols = arr.dims()[1] as usize;
+  let mut grad_vec = vec![0f64; num_elems];
 
-  // now calculate the relative error
-  let abs_diff_grads = af::abs(&af::sub(&grad.cast::<f64>().unwrap(), &num_grad, false).unwrap()).unwrap();
-  let abs_num_grad = NonNan::new(af::sum_all(&af::abs(&num_grad).unwrap()).unwrap().0).unwrap();
-  let abs_grad = NonNan::new(af::sum_all(&af::abs(&grad.cast::<f64>().unwrap()).unwrap()).unwrap().0).unwrap();
-  af::sum_all(&abs_diff_grads).unwrap().0 / cmp::max(abs_grad, abs_num_grad).0
+  for i in 0..num_elems
+  {
+    // build a vec(matrix) of [0....eps...0] (same size as arr)
+    // then add and subtract it correspondingly.
+    let mut eps_vec = vec![0f64; num_elems];
+    eps_vec[i] = eps;
+
+    let eps_arr = vec_to_array::<f64>(eps_vec.clone(), num_rows, num_cols);
+    let arr_p_h = af::add(arr, &eps_arr, false);
+    let arr_m_h = af::sub(arr, &eps_arr, false);
+
+    // run it through the function to map to R1
+    grad_vec[i] = (fn_closure(&arr_p_h) - fn_closure(&arr_m_h)) / (2f64 * eps);
+  }
+
+  vec_to_array::<f64>(grad_vec, num_rows, num_cols)
 }
 
 
 /// Gradient checking helper
 ///
-/// df(input)/dinput = ((f(input + eps)- f(input - eps))/(2*eps)
-/// everything is tabulated in double precision
+/// rel = abs(grad - numgrad) / max(abs(grad), abs(numgrad))
 ///
 /// # Parameters
-/// - `F` is the function whose gradient we will evaluate
+/// - `F` is a closure that returns a pointwise derivative
 /// - `input` is the input data array
 /// - `eps` is a very small number (Generally 1e-5)
-/// - `grad` is your evaluated gradient
+/// - `grad` is your analytically evaluated gradient
 pub fn gradient_check<F>(fn_closure: F, input: &Array, eps: f64, grad: &Array) -> f64
-  where F : Fn(&Array) -> Array
+  where F : Fn(&Array) -> f64
 {
   // calculate the numerical gradient
-  let fi_plus_eps = fn_closure(&af::add(&input.cast::<f64>().unwrap(), &eps, false).unwrap());
-  let fi_minus_eps = fn_closure(&af::sub(&input.cast::<f64>().unwrap(), &eps, false).unwrap());
-  // assert!(f_input_minus_eps.get_type().unwrap() == f_input_plus_eps.get_type().unwrap(),
-  //         "Gradient checking failed to typecast input to a double array");
-  gradient_check_with_perturbations(&fi_plus_eps, &fi_minus_eps, eps, grad)
+  let num_grad = numerical_gradient(fn_closure, input, eps);
+  println!("numgrad = {:?} | grad = {:?}", array_to_vec(&num_grad), array_to_vec(grad));
+
+  // now calculate the relative error
+  let abs_diff_grads = af::abs(&af::sub(&grad.cast::<f64>(), &num_grad, false));
+  let abs_num_grad = NonNan::new(af::sum_all(&af::abs(&num_grad)).0).unwrap();
+  let abs_grad = NonNan::new(af::sum_all(&af::abs(&grad.cast::<f64>())).0).unwrap();
+  println!("abs tot = {}  | ag = {} | ang = {}", af::sum_all(&abs_diff_grads).0, abs_grad.0, abs_num_grad.0);
+  af::sum_all(&abs_diff_grads).0 / cmp::max(abs_grad, abs_num_grad).0
 }

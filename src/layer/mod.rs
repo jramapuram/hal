@@ -8,10 +8,11 @@ mod unitary;
 
 use af::Array;
 use params::{Input, Params};
+use std::sync::{Arc, Mutex};
 
 pub trait Layer {
-  fn forward(&self, params: &mut Params, inputs: &Input, train: bool) -> Input;
-  fn backward(&self, params: &mut Params, delta: &Array) -> Array;
+  fn forward(&self, params: Arc<Mutex<Params>>, inputs: &Input, train: bool) -> Input;
+  fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array) -> Array;
 }
 
 pub trait RecurrentLayer: Layer {
