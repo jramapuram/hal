@@ -1,6 +1,9 @@
 pub use self::sgd::SGD;
 mod sgd;
 
+pub use self::adam::Adam;
+mod adam;
+
 use af::Dim4;
 use std::collections::HashMap;
 
@@ -17,14 +20,16 @@ pub trait Optimizer {
 
 pub fn get_optimizer(name: &str, params: &HashMap<&str, &str>) -> Result<Box<Optimizer>, HALError>{
   match name.to_lowercase().as_str() {
-    "sgd" => Ok(Box::new(SGD::new(params))),
+    "sgd"  => Ok(Box::new(SGD::new(params))),
+    "adam" => Ok(Box::new(Adam::new(params))),
     _     => Err(HALError::UNKNOWN),
   }
 }
 
 pub fn get_optimizer_with_defaults(name: &str) -> Result<Box<Optimizer>, HALError>{
   match name.to_lowercase().as_str() {
-    "sgd" => Ok(Box::new(SGD::default())),
+    "sgd" =>  Ok(Box::new(SGD::default())),
+    "adam" => Ok(Box::new(Adam::default())),
     _     => Err(HALError::UNKNOWN),
   }
 }

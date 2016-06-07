@@ -1,7 +1,8 @@
-use af::{Array, Dim4, HasAfEnum};
+use af::{Array, Dim4, HasAfEnum, DType};
 use std::default::Default;
-//use itertools::Zip;
+use std::sync::{Arc, Mutex};
 
+use utils;
 use initializations;
 use device::{Device, DeviceManager};
 //use error::HAL Error;
@@ -9,9 +10,11 @@ use device::{Device, DeviceManager};
 macro_rules! set_param_vec_func {
   ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
     #[allow(unused_mut)]
-    pub fn $fn_name(&mut self, layer_index: usize, p: Vec<$base_type>) {
+    pub fn $fn_name(&self, layer_index: usize, p: Vec<$base_type>) {
       assert!(self.layer_storage.len() - 1 >= layer_index);
-      self.layer_storage[layer_index].$vec_extension = p;
+      let layer = self.layer_storage[layer_index].clone();
+      let mut ltex = &mut layer.lock().unwrap();
+      ltex.$vec_extension = p;
     }
     )
 }
@@ -21,17 +24,22 @@ macro_rules! get_param_vec_func {
     #[allow(unused_mut)]
     pub fn $fn_name(&self, layer_index: usize) -> Vec<$base_type> {
       assert!(self.layer_storage.len() - 1 >= layer_index);
-      self.layer_storage[layer_index].$vec_extension.clone()
+      let layer = self.layer_storage[layer_index].clone();
+      let ltex = layer.lock().unwrap();
+      ltex.$vec_extension.clone()
     }
     )
 }
 
-macro_rules! get_mut_param_vec_func {
+macro_rules! with_mut_param_vec_func {
   ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
     #[allow(unused_mut)]
-    pub fn $fn_name(&mut self, layer_index: usize) -> &mut Vec<$base_type> {
+    pub fn $fn_name<F>(&mut self, layer_index: usize, mut f: F)
+      where F: FnMut(&mut Vec<$base_type>)
+    {
       assert!(self.layer_storage.len() - 1 >= layer_index);
-      &mut self.layer_storage[layer_index].$vec_extension
+      let layer = self.layer_storage[layer_index].clone();
+      f(&mut layer.lock().unwrap().$vec_extension);
     }
     )
 }
@@ -39,10 +47,13 @@ macro_rules! get_mut_param_vec_func {
 macro_rules! set_param_func {
   ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
     #[allow(unused_mut)]
-    pub fn $fn_name(&mut self, layer_index: usize, num: usize, p: $base_type) {
+    pub fn $fn_name(&self, layer_index: usize, num: usize, p: $base_type) {
       assert!(self.layer_storage.len() - 1 >= layer_index);
-      assert!(self.layer_storage[layer_index].$vec_extension.len() - 1 >= num);
-      self.layer_storage[layer_index].$vec_extension[num] = p;
+      let layer = self.layer_storage[layer_index].clone();
+      let mut ltex = layer.lock().unwrap();
+      let mut ext = &mut ltex.$vec_extension;
+      assert!(ext.len() - 1 >= num);
+      ext[num] = p;
     }
     )
 }
@@ -50,21 +61,13 @@ macro_rules! set_param_func {
 macro_rules! get_param_func {
   ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
     #[allow(unused_mut)]
-    pub fn $fn_name(&mut self, layer_index: usize, num: usize) -> $base_type {
+    pub fn $fn_name(&self, layer_index: usize, num: usize) -> $base_type {
       assert!(self.layer_storage.len() - 1 >= layer_index);
-      assert!(self.layer_storage[layer_index].$vec_extension.len() - 1 >= num);
-      self.layer_storage[layer_index].$vec_extension[num].clone()
-    }
-    )
-}
-
-macro_rules! get_mut_param_func {
-  ($fn_name: ident, $vec_extension: ident, $base_type: ty) => (
-    #[allow(unused_mut)]
-    pub fn $fn_name(&mut self, layer_index: usize, num: usize) -> &mut $base_type {
-      assert!(self.layer_storage.len() - 1 >= layer_index);
-      assert!(self.layer_storage[layer_index].$vec_extension.len() - 1 >= num);
-      &mut self.layer_storage[layer_index].$vec_extension[num]
+      let layer = self.layer_storage[layer_index].clone();
+      let mut ltex = layer.lock().unwrap();
+      let mut ext = &ltex.$vec_extension;
+      assert!(ext.len() - 1 >= num);
+      ext[num].clone()
     }
     )
 }
@@ -91,7 +94,7 @@ pub struct Params {
 }
 
 pub struct ParamManager {
-  layer_storage: Vec<Params>,
+  layer_storage: Vec<Arc<Mutex<Params>>>,
 }
 
 impl Default for ParamManager {
@@ -151,7 +154,7 @@ impl ParamManager {
     }
 
     let owned_activations = activations.iter().map(|x| x.to_string()).collect::<Vec<String>>();
-    self.layer_storage.push(Params{
+    self.layer_storage.push(Arc::new(Mutex::new(Params{
       layer_type: layer_type.to_string(),
       device: device,
       weights: weights,
@@ -163,7 +166,7 @@ impl ParamManager {
       recurrences: recurrences,
       current_unroll: 0,
       optional: optional,
-    });
+    })));
   }
 
   fn generate<T: HasAfEnum>(&self, init: &str, dims: (usize, usize)) -> Array {
@@ -177,12 +180,16 @@ impl ParamManager {
 
   pub fn num_weights(&self, layer_index: usize) -> usize {
     assert!(self.layer_storage.len() - 1 >= layer_index);
-    self.layer_storage[layer_index].weights.len()
+    let layer = self.layer_storage[layer_index].clone();
+    let ltex = layer.lock().unwrap();
+    ltex.weights.len()
   }
 
   pub fn num_biases(&self, layer_index: usize) -> usize {
     assert!(self.layer_storage.len() - 1 >= layer_index);
-    self.layer_storage[layer_index].biases.len()
+    let layer = self.layer_storage[layer_index].clone();
+    let ltex = layer.lock().unwrap();
+    ltex.biases.len()
   }
 
   pub fn num_arrays(&self, layer_index: usize) -> usize {
@@ -190,14 +197,17 @@ impl ParamManager {
     self.num_biases(layer_index) + self.num_weights(layer_index)
   }
 
-  pub fn get_params(&self, layer_index: usize) -> Params {
-    assert!(self.layer_storage.len() - 1 >= layer_index);
+  pub fn get_params(&self, layer_index: usize) -> Arc<Mutex<Params>> {
+    assert!(self.layer_storage.len() - 1>= layer_index);
     self.layer_storage[layer_index].clone()
   }
 
-  pub fn get_mut_params(&mut self, layer_index: usize) -> &mut Params {
+  pub fn with_mut_params<F>(&self, layer_index: usize, mut f: F)
+    where F: FnMut(&Params)
+  {
     assert!(self.layer_storage.len() - 1 >= layer_index);
-    &mut self.layer_storage[layer_index]
+    let layer = self.layer_storage[layer_index].clone();
+    f(&mut layer.lock().unwrap());
   }
 
   pub fn get_all_arrays(&self) -> Vec<Array> {
@@ -211,7 +221,7 @@ impl ParamManager {
 
   // assumes params are coming in layer wise
   // eg: [W0, b0, .. , WN, bN]
-  pub fn set_array_from_index(&mut self, arr: Array, ind: usize) {
+  pub fn set_array_from_index(&self, arr: Array, ind: usize) {
     let mut current: usize = 0;
     for layer_num in 0..self.num_layers() {
       let n_weights = self.num_weights(layer_num);
@@ -219,8 +229,11 @@ impl ParamManager {
 
       if current + n_weights > ind { // we are a weight
         let w_index = ind - current;
-        assert!(self.get_weight(layer_num, w_index).dims().unwrap()
-                == arr.dims().unwrap());
+        let target_dims = self.get_weight(layer_num, w_index).dims();
+        let src_dims = arr.dims();
+        assert!(src_dims == target_dims
+                , "array at index {} does not match provided [provided: {:?}  internal: {:?}]"
+                , ind, src_dims, target_dims);
         self.set_weight(layer_num, w_index, arr);
         break;
       }
@@ -228,8 +241,8 @@ impl ParamManager {
       current += n_weights;
       if current + n_biases > ind { // we are a bias
         let b_index = ind - current;
-        assert!(self.get_bias(layer_num, b_index).dims().unwrap()
-                == arr.dims().unwrap());
+        assert!(self.get_bias(layer_num, b_index).dims()
+                == arr.dims());
         self.set_bias(layer_num, b_index, arr);
         break;
       }
@@ -273,6 +286,16 @@ impl ParamManager {
     d
   }
 
+  pub fn zero_all_deltas(&self, dtype: DType) {
+    for layer_num in 0..self.num_layers() {
+      for delta_num in 0..self.num_arrays(layer_num) {
+        let delta_dims = self.get_delta(layer_num, delta_num).dims();
+        let zero_tensor = utils::constant(delta_dims, dtype, 0.0f32);
+        self.set_delta(layer_num, delta_num, zero_tensor);
+      }
+    }
+  }
+
   get_param_func!(get_weight, weights, Array);
   get_param_func!(get_bias, biases, Array);
   get_param_func!(get_activation, activations, String);
@@ -281,15 +304,6 @@ impl ParamManager {
   get_param_func!(get_output, outputs, Input);
   get_param_func!(get_recurrence, recurrences, Array);
   get_param_func!(get_optional, optional, Array);
-
-  get_mut_param_func!(get_mut_weight, weights, Array);
-  get_mut_param_func!(get_mut_bias, biases, Array);
-  get_mut_param_func!(get_mut_activation, activations, String);
-  get_mut_param_func!(get_mut_delta, deltas, Array);
-  get_mut_param_func!(get_mut_input, inputs, Input);
-  get_mut_param_func!(get_mut_output, outputs, Input);
-  get_mut_param_func!(get_mut_recurrence, recurrences, Array);
-  get_mut_param_func!(get_mut_optional, optional, Array);
 
   get_param_vec_func!(get_weights, weights, Array);
   get_param_vec_func!(get_biases, biases, Array);
@@ -300,14 +314,14 @@ impl ParamManager {
   get_param_vec_func!(get_recurrences, recurrences, Array);
   get_param_vec_func!(get_optionals, optional, Array);
 
-  get_mut_param_vec_func!(get_mut_weights, weights, Array);
-  get_mut_param_vec_func!(get_mut_biases, biases, Array);
-  get_mut_param_vec_func!(get_mut_activations, activations, String);
-  get_mut_param_vec_func!(get_mut_deltas, deltas, Array);
-  get_mut_param_vec_func!(get_mut_inputs, inputs, Input);
-  get_mut_param_vec_func!(get_mut_outputs, outputs, Input);
-  get_mut_param_vec_func!(get_mut_recurrences, recurrences, Array);
-  get_mut_param_vec_func!(get_mut_optionals, optional, Array);
+  with_mut_param_vec_func!(with_mut_weights, weights, Array);
+  with_mut_param_vec_func!(with_mut_biases, biases, Array);
+  with_mut_param_vec_func!(with_mut_activations, activations, String);
+  with_mut_param_vec_func!(with_mut_deltas, deltas, Array);
+  with_mut_param_vec_func!(with_mut_inputs, inputs, Input);
+  with_mut_param_vec_func!(with_mut_outputs, outputs, Input);
+  with_mut_param_vec_func!(with_mut_recurrences, recurrences, Array);
+  with_mut_param_vec_func!(with_mut_optionals, optional, Array);
 
   set_param_func!(set_weight, weights, Array);
   set_param_func!(set_bias, biases, Array);
@@ -328,9 +342,11 @@ impl ParamManager {
   set_param_vec_func!(set_optionals, optional, Array);
 
   pub fn get_bias_dims(&self, layer_index: usize) -> Vec<Dim4> {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
     let mut dims = Vec::new();
-    for b in &self.layer_storage[layer_index].biases {
-      dims.push(b.dims().unwrap().clone());
+    let layer = self.layer_storage[layer_index].clone();
+    for b in &layer.lock().unwrap().biases {
+      dims.push(b.dims().clone());
     }
     dims
   }
@@ -338,8 +354,9 @@ impl ParamManager {
   pub fn get_all_weight_dims(&self) -> Vec<Dim4> {
     let mut dims = Vec::new();
     for layer in &self.layer_storage {
-      for w in &layer.weights {
-        dims.push(w.dims().unwrap().clone());
+      let ltex = layer.lock().unwrap();
+      for w in &ltex.weights {
+        dims.push(w.dims().clone());
       }
     }
     dims
@@ -348,8 +365,9 @@ impl ParamManager {
   pub fn get_all_bias_dims(&self) -> Vec<Dim4> {
     let mut dims = Vec::new();
     for layer in &self.layer_storage {
-      for b in &layer.biases {
-        dims.push(b.dims().unwrap().clone());
+      let ltex = layer.lock().unwrap();
+      for b in &ltex.biases {
+        dims.push(b.dims().clone());
       }
     }
     dims
@@ -358,11 +376,12 @@ impl ParamManager {
   pub fn get_all_dims(&self) -> Vec<Dim4> {
     let mut dims = Vec::new();
     for layer in &self.layer_storage {
-      for w in &layer.weights {
-        dims.push(w.dims().unwrap().clone());
+      let ltex = layer.lock().unwrap();
+      for w in &ltex.weights {
+        dims.push(w.dims().clone());
       }
-      for b in &layer.biases {
-        dims.push(b.dims().unwrap().clone());
+      for b in &ltex.biases {
+        dims.push(b.dims().clone());
       }
     }
     dims
@@ -371,39 +390,67 @@ impl ParamManager {
 
   pub fn get_weight_dims(&self, layer_index: usize) -> Vec<Dim4> {
     let mut dims = Vec::new();
-    for w in &self.layer_storage[layer_index].weights {
-      dims.push(w.dims().unwrap().clone());
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    let layer = self.layer_storage[layer_index].clone();
+    for w in &layer.lock().unwrap().weights {
+      dims.push(w.dims().clone());
     }
     dims
   }
 
-  pub fn tie_weight(&mut self, layer_input: usize, iweight_index: usize
-                , layer_output: usize, oweight_index: usize)
+  pub fn tie_weights(&mut self, layer_input: usize, iweight_index: usize
+                     , layer_output: usize, oweight_index: usize)
   {
     assert!(self.layer_storage.len() - 1 >= layer_input);
     assert!(self.layer_storage.len() - 1 >= layer_output);
-    assert!(self.layer_storage[layer_input].weights.len() - 1 >= iweight_index);
-    assert!(self.layer_storage[layer_output].weights.len() - 1 >= oweight_index);
-    let input_dims = self.layer_storage[layer_input].weights[iweight_index].dims().unwrap();
-    let output_dims = self.layer_storage[layer_output].weights[oweight_index].dims().unwrap();
-    assert!((input_dims[0] == output_dims[0] && input_dims[1] == output_dims[1])
-            || (input_dims[0] == output_dims[1] && input_dims[1] == output_dims[0]));
-    self.layer_storage[layer_output].weights[oweight_index]
-      = self.layer_storage[layer_input].weights[iweight_index].clone();
+
+    let layer_src = self.layer_storage[layer_input].clone();
+    let layer_dest = self.layer_storage[layer_output].clone();
+
+    {
+      let weights_src_len = layer_src.lock().unwrap().weights.len();
+      let weights_dest_len = layer_dest.lock().unwrap().weights.len();
+      assert!(weights_src_len - 1 >= iweight_index);
+      assert!(weights_dest_len - 1 >= oweight_index);
+    }
+
+
+    {
+      let iweights = layer_src.lock().unwrap();
+      let oweights = layer_dest.lock().unwrap();
+      let input_dims = iweights.weights[iweight_index].dims();
+      let output_dims = oweights.weights[oweight_index].dims();
+      assert!((input_dims[0] == output_dims[0] && input_dims[1] == output_dims[1])
+              || (input_dims[0] == output_dims[1] && input_dims[1] == output_dims[0]));
+    }
+
+    layer_dest.lock().unwrap().weights[oweight_index]
+      = layer_src.lock().unwrap().weights[iweight_index].clone();
   }
 
   pub fn tie_bias(&mut self, layer_input: usize, ibias_index: usize
-              , layer_output: usize, obias_index: usize)
+                  , layer_output: usize, obias_index: usize)
   {
     assert!(self.layer_storage.len() - 1 >= layer_input);
     assert!(self.layer_storage.len() - 1 >= layer_output);
-    assert!(self.layer_storage[layer_input].biases.len() - 1 >= ibias_index);
-    assert!(self.layer_storage[layer_output].biases.len() - 1 >= obias_index);
-    let input_dims = self.layer_storage[layer_input].biases[ibias_index].dims().unwrap();
-    let output_dims = self.layer_storage[layer_output].biases[obias_index].dims().unwrap();
-    assert!(input_dims[0] == output_dims[0] && input_dims[1] == output_dims[1]);
-    self.layer_storage[layer_output].biases[obias_index]
-      = self.layer_storage[layer_input].biases[ibias_index].clone();
+    let layer_src = self.layer_storage[layer_input].clone();
+    let layer_dest = self.layer_storage[layer_output].clone();
+
+    {
+      let biases_src_len = layer_src.lock().unwrap().biases.len();
+      let biases_dest_len = layer_dest.lock().unwrap().biases.len();
+      assert!(biases_src_len - 1 >= ibias_index);
+      assert!(biases_dest_len - 1 >= obias_index);
+    }
+
+    {
+      let input_dims = layer_src.lock().unwrap().biases[ibias_index].dims();
+      let output_dims = layer_dest.lock().unwrap().biases[obias_index].dims();
+      assert!(input_dims[0] == output_dims[0] && input_dims[1] == output_dims[1]);
+    }
+
+    layer_dest.lock().unwrap().biases[obias_index]
+      = layer_src.lock().unwrap().biases[ibias_index].clone();
   }
 }
 

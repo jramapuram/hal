@@ -1,5 +1,5 @@
 use af;
-use af::{Backend, Array, Aftype, HasAfEnum};
+use af::{Backend, Array, HasAfEnum};
 use num::Zero;
 use std::cell::Cell;
 use std::sync::Arc;
@@ -19,21 +19,13 @@ pub struct DeviceManagerFactory {
 
 // toggle the backend and device
 fn set_device(device: Device) {
-  match af::set_backend(device.backend) {
-    Ok(_)  => {},
-    Err(e) =>  panic!("could not set backend: {:?}", e),
-  };
-
-  match af::set_device(device.id) {
-    Ok(_)  => {},
-    Err(e) =>  panic!("could not set device: {:?}", e),
-  };
+  af::set_backend(device.backend);
 }
 
 fn create_devices(backend: Backend) -> Vec<Device> {
   let mut buffer: Vec<Device> = Vec::new();
-  af::set_backend(backend).unwrap();
-  let num_devices: i32 = af::device_count().unwrap();
+  af::set_backend(backend);
+  let num_devices: i32 = af::device_count();
   for i in 0..num_devices {
     buffer.push(Device{ backend: backend, id: i });
   }
@@ -44,7 +36,7 @@ fn create_devices(backend: Backend) -> Vec<Device> {
 impl DeviceManagerFactory {
   pub fn new() -> Arc<DeviceManagerFactory> {
     let mut devices = Vec::new();
-    let available = af::get_available_backends().unwrap();
+    let available = af::get_available_backends();
     for backend in available {
       devices.extend(create_devices(backend));
     }
@@ -88,7 +80,7 @@ impl DeviceManagerFactory {
     }
 
     // we have done something bad if the following triggers
-    let ib = input.get_backend().unwrap();
+    let ib = input.get_backend();
     if input_device.backend != Backend::DEFAULT {
       assert!(ib == input_device.backend
               , "provide src was {:?}, but actually {:?}"
@@ -100,12 +92,12 @@ impl DeviceManagerFactory {
     self.swap_device(input_device);
 
     // copy data to the host
-    let dims = input.dims().unwrap();
+    let dims = input.dims();
     let mut buffer: Vec<T> = vec![T::zero(); dims.elements() as usize];
-    input.host(&mut buffer).unwrap();
+    input.host(&mut buffer);
 
     // swap to the new device
     self.swap_device(target_device);
-    Array::new::<T>(&buffer, dims).unwrap()
+    Array::new::<T>(&buffer, dims)
   }
 }

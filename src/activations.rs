@@ -1,5 +1,5 @@
 use af;
-use af::{Array, HasAfEnum, Aftype};
+use af::{Array};
 use num::Complex;
 
 use utils;
@@ -7,17 +7,17 @@ use error::HALError;
 
 /// Returns the tanh activated value
 pub fn tanh(x: &Array) -> Array {
-  af::tanh(x).unwrap()
+  af::tanh(x)
 }
 
 /// Returns the sigmoid activated value
 /// 1.0/(1.0 + exp(-1.0 * e))
 pub fn sigmoid(x: &Array) -> Array {
-  let neg_one = utils::constant(x.dims().unwrap(), x.get_type().unwrap(), -1.0f32);
-  let one = utils::constant(x.dims().unwrap(), x.get_type().unwrap(), 1.0f32);
-  let exp_m_e = af::exp(&af::mul(&neg_one, x, false).unwrap()).unwrap();
-  let denominator = af::add(&one, &exp_m_e, false).unwrap();
-  let a = af::div(&one, &denominator, false).unwrap();
+  let neg_one = utils::constant(x.dims(), x.get_type(), -1.0f32);
+  let one = utils::constant(x.dims(), x.get_type(), 1.0f32);
+  let exp_m_e = af::exp(&af::mul(&neg_one, x, false));
+  let denominator = af::add(&one, &exp_m_e, false);
+  let a = af::div(&one, &denominator, false);
   utils::assert_types(vec![x, &a]);
   a
 }
@@ -25,10 +25,10 @@ pub fn sigmoid(x: &Array) -> Array {
 /// Return the softmax activated value
 /// exp(x_i) / sum(exp(x))
 pub fn softmax(x: &Array) -> Array {
-  let exponentiated = af::exp(&x).unwrap();
-  let sum_epx_x = af::sum_all(&exponentiated).unwrap().0 as f32;
-  let sum_exp_x_vec = utils::constant(x.dims().unwrap(), x.get_type().unwrap(), sum_epx_x);
-  let a = af::div(&exponentiated, &sum_exp_x_vec, false).unwrap();
+  let exponentiated = af::exp(&x);
+  let sum_epx_x = af::sum_all(&exponentiated).0 as f32;
+  let sum_exp_x_vec = utils::constant(x.dims(), x.get_type(), sum_epx_x);
+  let a = af::div(&exponentiated, &sum_exp_x_vec, false);
   utils::assert_types(vec![x, &a]);
   a
 }
@@ -36,11 +36,11 @@ pub fn softmax(x: &Array) -> Array {
 /// Return the lrelu activated value
 /// max(0.01*x, x)
 pub fn lrelu(x: &Array) -> Array {
-  let zero_one = utils::constant(x.dims().unwrap(), x.get_type().unwrap(), 0.01f32);
-  let scaled = af::mul(x, &zero_one, false).unwrap();
+  let zero_one = utils::constant(x.dims(), x.get_type(), 0.01f32);
+  let scaled = af::mul(x, &zero_one, false);
   let a = af::select(&scaled                               // return 0.01x
-                     , &af::lt(x, &0.0f32, false).unwrap() // if x > 0.0
-                     , x).unwrap();                        // else x
+                     , &af::lt(x, &0.0f32, false) // if x > 0.0
+                     , x);                        // else x
   utils::assert_types(vec![x, &a]);
   a
 }
@@ -49,9 +49,9 @@ pub fn lrelu(x: &Array) -> Array {
 /// 0.01     for x <= 0
 /// 1        otherwise
 pub fn lrelu_derivative(x: &Array) -> Array {
-  let x_lt_zero = utils::constant(x.dims().unwrap(), x.get_type().unwrap(), 0.01f32);
-  let one = utils::constant(x.dims().unwrap(), x.get_type().unwrap(), 1.0f32);
-  let grad = af::select(&one, &af::gt(x, &0.0f32, false).unwrap(), &x_lt_zero).unwrap();
+  let x_lt_zero = utils::constant(x.dims(), x.get_type(), 0.01f32);
+  let one = utils::constant(x.dims(), x.get_type(), 1.0f32);
+  let grad = af::select(&one, &af::gt(x, &0.0f32, false), &x_lt_zero);
   utils::assert_types(vec![x, &grad]);
   grad
 }
@@ -59,8 +59,8 @@ pub fn lrelu_derivative(x: &Array) -> Array {
 /// Return the relu activated value
 /// max(0, x)
 pub fn relu(x: &Array) -> Array {
-  let zero = utils::constant(x.dims().unwrap(), x.get_type().unwrap(), 0.0f32);
-  let a = af::select(&zero, &af::lt(x, &0.0, false).unwrap(), x).unwrap();
+  let zero = utils::constant(x.dims(), x.get_type(), 0.0f32);
+  let a = af::select(&zero, &af::lt(x, &0.0, false), x);
   utils::assert_types(vec![x, &a]);
   a
 }
@@ -69,9 +69,9 @@ pub fn relu(x: &Array) -> Array {
 /// 0 for x <= 0
 /// 1 otherwise
 pub fn relu_derivative(x: &Array) -> Array {
-  let zero = utils::constant(x.dims().unwrap(), x.get_type().unwrap(), 0.0f32);
-  let one = utils::constant(x.dims().unwrap(), x.get_type().unwrap(), 1.0f32);
-  let grad = af::select(&one, &af::gt(x, &0.0f32, false).unwrap(), &zero).unwrap();
+  let zero = utils::constant(x.dims(), x.get_type(), 0.0f32);
+  let one = utils::constant(x.dims(), x.get_type(), 1.0f32);
+  let grad = af::select(&one, &af::gt(x, &0.0f32, false), &zero);
   utils::assert_types(vec![x, &grad]);
   grad
 }
@@ -79,8 +79,8 @@ pub fn relu_derivative(x: &Array) -> Array {
 /// Return the derivative of tanh [assumes that tanh has already been applied]
 /// 1 - tanh(x)*tanh(x)
 pub fn tanh_derivative(x: &Array) -> Array {
-  let one = utils::constant(x.dims().unwrap(), x.get_type().unwrap(), 1.0f32);
-  let grad = af::sub(&one, &af::mul(x, x, false).unwrap(), false).unwrap();
+  let one = utils::constant(x.dims(), x.get_type(), 1.0f32);
+  let grad = af::sub(&one, &af::mul(x, x, false), false);
   utils::assert_types(vec![x, &grad]);
   grad
 }
@@ -88,8 +88,8 @@ pub fn tanh_derivative(x: &Array) -> Array {
 /// Returns the derivative of sigmoid [assumes that sigmoid is already applied]
 /// x * (1 - x)
 pub fn sigmoid_derivative(x: &Array) -> Array {
-  let one = utils::constant(x.dims().unwrap(), x.get_type().unwrap(), 1.0f32);
-  let grad = af::mul(x, &af::sub(&one, x, false).unwrap(), false).unwrap();
+  let one = utils::constant(x.dims(), x.get_type(), 1.0f32);
+  let grad = af::mul(x, &af::sub(&one, x, false), false);
   utils::assert_types(vec![x, &grad]);
   grad
 }
@@ -107,9 +107,23 @@ pub fn ones(x: &Array) -> Array {
 
 /// Returns a derivative of a linear activation (1's)
 pub fn ones_derivative(x: &Array) -> Array {
-  let grad = utils::constant(x.dims().unwrap(), x.get_type().unwrap(), 1.0f32);
+  let grad = utils::constant(x.dims(), x.get_type(), 1.0f32);
   utils::assert_types(vec![x, &grad]);
   grad
+}
+
+/// Helper to determine whether function is smooth or non-smooth
+pub fn is_smooth(name: &str) -> bool {
+  match name {
+    "softmax" => true,
+    "sigmoid" => true,
+    "relu"    => false,
+    "lrelu"   => false,
+    "tanh"    => true,
+    "ones"    => true,
+    "linear"  => true,
+    _         => panic!("unknown function name provided"),
+  }
 }
 
 /// Helper to get the correct activation using a string
