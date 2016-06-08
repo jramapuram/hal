@@ -72,8 +72,9 @@ fn main() {
 
   model.forward::<f32>(&batch_input, cpu_device, cpu_device, true);
 
+  let params_arc = model.param_manager.get_params(0);
 
-  let params = model.param_manager.get_params(0);
+  let params = params_arc.lock().unwrap();
 
   //af::print(&batch_input);
   

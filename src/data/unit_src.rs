@@ -56,7 +56,7 @@ impl DataSource for MultUniformSource {
                                         , self.params.input_dims[2]);
         let mut batch = Data {
             input: RefCell::new(Box::new(inp.clone())),
-            target: RefCell::new(Box::new(inp.copy().unwrap())),
+            target: RefCell::new(Box::new(inp.copy())),
         };
         
         let current_iter = self.params.current_epoch.get();

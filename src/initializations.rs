@@ -76,7 +76,7 @@ pub fn lecun_uniform<T: HasAfEnum>(dims: Dim4) -> Array {
 
 //TODO: permut
 pub fn permut<T: HasAfEnum>(dims: Dim4) -> Array{
-    af::range::<T>(dims, 0).unwrap()
+    af::range::<T>(dims, 0)
 }
 //TODO: Orthogonal
 
