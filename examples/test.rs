@@ -20,7 +20,7 @@ fn main() {
   let batch_size = 3;
   let optimizer_type = "SGD";
   let epochs = 5;
-  let bptt_unroll = 1;
+  let bptt_unroll = 10;
 
   // Now, let's build a model with an device manager on a specific device
   // an optimizer and a loss function. For this example we demonstrate a simple autoencoder
@@ -38,17 +38,13 @@ fn main() {
   model.add::<f32>("unitary", hashmap!["input_size"   => input_dims.to_string()
                                      , "output_size"  => output_dims.to_string()
                                      , "hidden_size"  => hidden_dims.to_string()
-                                     , "batch_size"   => batch_size.to_string()
                                      , "h_activation" => "relu".to_string()
                                      , "o_activation" => "tanh".to_string()
                                      , "h_init"       => "glorot_uniform".to_string()
                                      , "v_init"       => "glorot_uniform".to_string()
-                                     , "phase1_init"      => "glorot_uniform".to_string()
-                                     , "phase2_init"      => "glorot_uniform".to_string()
-                                     , "phase3_init"      => "glorot_uniform".to_string()
+                                     , "phase_init"      => "glorot_uniform".to_string()
                                      , "permut_init"      => "permut".to_string()
-                                     , "householder1_init"      => "glorot_uniform".to_string()
-                                     , "householder2_init"      => "glorot_uniform".to_string()
+                                     , "householder_init"      => "glorot_uniform".to_string()
                                      , "u_init"       => "glorot_uniform".to_string()
                                      , "h_bias_init"      => "zeros".to_string()
                                      , "o_bias_init"      => "zeros".to_string()]);
@@ -93,7 +89,7 @@ fn main() {
       af::print(&params.biases[i]);
   }
   */
- 
+
   
   for i in 0..params.recurrences.len() {
       println!("{}", i);

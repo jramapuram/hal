@@ -511,7 +511,6 @@ pub trait UnitaryGenerator {
 fn add_unitary<T: HasAfEnum>(&mut self
           , manager: DeviceManager
           , device: Device
-          , batch_size: usize
           , input_size: usize
           , output_size: usize
           , hidden_size: usize
@@ -519,12 +518,9 @@ fn add_unitary<T: HasAfEnum>(&mut self
           , o_activation: &str
           , h_init: &str 
           , v_init: &str
-          , phase1_init: &str
-          , householder1_init: &str
-          , phase2_init: &str
+          , phase_init: &str
+          , householder_init: &str
           , permut_init: &str
-          , householder2_init: &str
-          , phase3_init: &str
           , u_init: &str
           , h_bias_init: &str
           , o_bias_init: &str);
@@ -622,7 +618,6 @@ impl<'a> UnitaryGenerator for ParamManager {
     fn add_unitary<T: HasAfEnum>(&mut self
           , manager: DeviceManager
           , device: Device
-          , batch_size: usize
           , input_size: usize
           , output_size: usize
           , hidden_size: usize
@@ -630,12 +625,9 @@ impl<'a> UnitaryGenerator for ParamManager {
           , o_activation: &str
           , h_init: &str
           , v_init: &str
-          , phase1_init: &str
-          , householder1_init: &str
-          , phase2_init: &str
+          , phase_init: &str
+          , householder_init: &str
           , permut_init: &str
-          , householder2_init: &str
-          , phase3_init: &str
           , u_init: &str
           , h_bias_init: &str
           , o_bias_init: &str
@@ -653,11 +645,11 @@ impl<'a> UnitaryGenerator for ParamManager {
         // weights first
         let mut weights: Vec<Array> = Vec::with_capacity(7);
         weights.push(self.generate::<Complex<f32>>(v_init, (input_size, hidden_size)));
-        weights.push(self.generate::<T>(phase1_init, (1, hidden_size)));
-        weights.push(self.generate::<T>(phase2_init, (1, hidden_size)));
-        weights.push(self.generate::<T>(phase3_init, (1, hidden_size)));
-        weights.push(self.generate::<Complex<f32>>(householder1_init, (hidden_size, 1)));
-        weights.push(self.generate::<Complex<f32>>(householder2_init, (hidden_size, 1)));
+        weights.push(self.generate::<T>(phase_init, (1, hidden_size)));
+        weights.push(self.generate::<T>(phase_init, (1, hidden_size)));
+        weights.push(self.generate::<T>(phase_init, (1, hidden_size)));
+        weights.push(self.generate::<Complex<f32>>(householder_init, (hidden_size, 1)));
+        weights.push(self.generate::<Complex<f32>>(householder_init, (hidden_size, 1)));
         weights.push(self.generate::<T>(u_init, (2*hidden_size, output_size)));
             
         // biases next
@@ -670,7 +662,7 @@ impl<'a> UnitaryGenerator for ParamManager {
         
         // hidden unit
         let mut recurrences: Vec<Array> = Vec::new();
-        recurrences.push(self.generate::<Complex<f32>>(h_init, (batch_size, hidden_size)));
+        recurrences.push(self.generate::<Complex<f32>>(h_init, (1, hidden_size)));
 
         // we won't minimize trough the permutation params so we store them in optional
         let mut optional: Vec<Array> = Vec::with_capacity(1);

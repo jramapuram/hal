@@ -111,8 +111,8 @@ impl Layer for Unitary
                              , &ltex.weights[0]
                              , MatProp::NONE
                              , MatProp::NONE);
-        af::print(&vx);
-        let new_h = af::add(&af::add(&wh, &vx, false)
+
+        let new_h = af::add(&af::add(&wh, &vx, true)
                             , &ltex.biases[0]
                             , true);
         let sigma_result = activations::get_activation(&ltex.activations[0]

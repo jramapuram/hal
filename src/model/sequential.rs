@@ -94,8 +94,7 @@ impl Model for Sequential {
       
       "unitary" => {
           self.param_manager.add_unitary::<T>(self.manager.clone(), self.device
-                                            , params.get("batch_size").unwrap().parse::<u64>().unwrap() as usize
-                                            , input_size, output_size, hidden_size
+                                            , input_size, output_size, hidden_size 
 
                                             // activations for Ux + Wh + b1 and for Vh + b2
                                             , params.get("h_activation").unwrap()
@@ -108,12 +107,9 @@ impl Model for Sequential {
                                             , params.get("v_init").unwrap()
                                             
                                             // init values for unitary matrices params
-                                            , params.get("phase1_init").unwrap()
-                                            , params.get("householder1_init").unwrap()
-                                            , params.get("phase2_init").unwrap()
+                                            , params.get("phase_init").unwrap()
+                                            , params.get("householder_init").unwrap()
                                             , params.get("permut_init").unwrap()
-                                            , params.get("householder2_init").unwrap()
-                                            , params.get("phase3_init").unwrap()
 
                                             // init values for hidden2output matrix params
                                             , params.get("u_init").unwrap()
