@@ -81,13 +81,18 @@ impl CopyingProblemSource {
             , af::Seq::new((bptt_unroll-2*seq_size-1) as f64, (bptt_unroll-2*seq_size-1) as f64, 1.0)];
         ar2 = af::assign_seq(&ar2, seq, &one);
 
-        af::join_many(2, vec!(&ar1,&ar2,&ar3))
+        af::join_many(2, vec!(&ar1,&ar2,&ar3))    
+    }
 
+    fn generate_target(&self, input: &Array, batch_size: u64, input_size: u64, bptt_unroll: u64, seq_size: u64) -> Array {
+        let mut first = af::constant(0, af::Dim4::new(&[batch_size, input_size, bptt_unroll-seq_size,1]));
+        let ones = af::constant(1, af::Dim4::new(&[batch_size, 1, 1, 1]));
 
-
-
-
-        
+        for i in 0..bptt_unroll-seq_size {
+            first = af::set_slice(&first, &af::set_col(&af::slice(&first, i), &ones, input_size-2), i);
+        }
+        let second = af::slices(&input, 0, seq_size-1);
+        af::join(2, &first, &second)
     }
 }
 
@@ -97,9 +102,14 @@ impl DataSource for CopyingProblemSource {
                                         , self.params.input_dims[1]
                                         , self.params.input_dims[2]
                                         , self.seq_size);
+        let tar = self.generate_target(&inp
+                                       , num_batch
+                                       , self.params.target_dims[1]
+                                       , self.params.target_dims[2]
+                                       , self.seq_size);
         let mut batch = Data {
             input: RefCell::new(Box::new(inp.clone())),
-            target: RefCell::new(Box::new(inp.copy())),
+            target: RefCell::new(Box::new(tar.clone())),
         };
         
         let current_iter = self.params.current_epoch.get();
