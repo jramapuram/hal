@@ -1,9 +1,11 @@
 #[macro_use] extern crate hal;
 extern crate arrayfire as af;
+extern crate rand;
+use rand::distributions::{Range, IndependentSample};
 
 use hal::Model;
 use hal::optimizer::{Optimizer, get_optimizer_with_defaults};
-use hal::data::{DataSource, MultUniformSource};
+use hal::data::{DataSource, CopyingProblemSource};
 use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::plot::{plot_vec, plot_array};
@@ -13,14 +15,15 @@ use af::{Backend};
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 2;
+  let input_dims = 6;
   let hidden_dims = 3;
-  let output_dims = 2;
+  let output_dims = 6;
   let num_train_samples = 5;
   let batch_size = 3;
   let optimizer_type = "SGD";
   let epochs = 5;
-  let bptt_unroll = 10;
+  let bptt_unroll = 12;
+  let seq_size = 3;
 
   // Now, let's build a model with an device manager on a specific device
   // an optimizer and a loss function. For this example we demonstrate a simple autoencoder
@@ -53,12 +56,11 @@ fn main() {
   manager.swap_device(cpu_device);
 
   // Build our sin wave source
-  let uniform_generator = MultUniformSource::new(input_dims, output_dims
+  let uniform_generator = CopyingProblemSource::new(input_dims
                                                  , batch_size
+                                                 , seq_size 
                                                  , bptt_unroll
-                                                 , num_train_samples
-                                                 , false   // normalized
-                                                 , false); // shuffled
+                                                 , num_train_samples);
 
   // Pull a sample to verify sizing
   let minibatch = uniform_generator.get_train_iter(batch_size);
@@ -72,7 +74,7 @@ fn main() {
 
   let params = params_arc.lock().unwrap();
 
-  //af::print(&batch_input);
+  af::print(&batch_input);
   
   
   /*
@@ -91,10 +93,12 @@ fn main() {
   */
 
   
+  /*
   for i in 0..params.recurrences.len() {
       println!("{}", i);
       af::print(&params.recurrences[i]);
   }
+  */
   
 
   /*
@@ -105,10 +109,15 @@ fn main() {
   */
 
 
-  
-  //af::print(&params.optional[0]);
+  /*
+  let between = Range::new(0, 10);
+  let mut rng = rand::thread_rng();
 
-
+  for _ in 1..100{
+  let a = between.ind_sample(&mut rng);
+  println!("{}", a);
+  }
+ */
 
 }
 
