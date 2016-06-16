@@ -413,7 +413,7 @@ pub fn verify_gradient_smooth<F>(fn_closure: F, input: &Array, eps: f64, grad: &
   println!("Relative error[smooth] = {}", rel);
   match rel {
     n if n > 1e-2 => Err(HALError::GRADIENT_ERROR),
-    n if n < 1e-4 => Err(HALError::GRADIENT_ERROR),
+    n if n < 1e-5 => Err(HALError::GRADIENT_ERROR),
     _             => Ok(rel),
   }
 }
