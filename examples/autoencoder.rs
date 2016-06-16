@@ -69,6 +69,7 @@ fn main() {
   let loss = model.fit::<SinSource, f32>(&sin_generator        // what data source to pull from
                                          , cpu_device          // source device
                                          , epochs, batch_size  // self explanatory :)
+                                         , None                // BPTT interval
                                          , true);              // verbose
 
   // plot our loss on a 512x512 grid with the provided title

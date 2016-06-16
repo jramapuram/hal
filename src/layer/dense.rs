@@ -50,6 +50,8 @@ impl Layer for Dense
     // get a handle to the underlying params
     let mut ltex = params.lock().unwrap();
     let current_unroll = ltex.current_unroll;
+    assert!(current_unroll > 0
+            , "Cannot call backward pass without at least 1 forward pass");
 
     // delta_t     = (transpose(W_{t+1}) * d_{l+1}) .* dActivation(z)
     // delta_{t-1} = (transpose(W_{t}) * d_{l})
@@ -57,7 +59,7 @@ impl Layer for Dense
                                          , &ltex.outputs[current_unroll - 1]).unwrap();
     let delta_t = af::mul(delta, &dz, false);
     let dw = af::matmul(&ltex.inputs[current_unroll - 1]
-                        , &delta_t                        // delta_w = delta_t * a_{t-1}
+                        , &delta_t                        // delta_w = delta_t * a_{t}
                         , af::MatProp::TRANS
                         , af::MatProp::NONE);
     let db = af::transpose(&af::sum(&delta_t, 0), false); // delta_b = sum_{batch}delta

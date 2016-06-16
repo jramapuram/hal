@@ -473,7 +473,7 @@ pub trait RNNGenerator {
                            , device: Device
                            , input_size: usize
                            , output_size: usize
-                           , max_seq_size: usize
+                           //, bptt_interval: usize
                            , activation: &str
                            , w_init: &str
                            , w_recurrent_init: &str
@@ -495,7 +495,7 @@ pub trait LSTMGenerator {
                             , device: Device
                             , input_size: usize
                             , output_size: usize
-                            , max_seq_size: usize
+                            , bptt_interval: usize
                             , input_activation: &str
                             , output_activation: &str
                             , w_init: &str
@@ -529,7 +529,7 @@ impl RNNGenerator for ParamManager {
                            , device: Device
                            , input_size: usize
                            , output_size: usize
-                           , max_seq_size: usize
+                           //, bptt_interval: usize
                            , activation: &str
                            , w_init: &str
                            , w_recurrent_init: &str
@@ -547,7 +547,7 @@ impl RNNGenerator for ParamManager {
                   , weights                                            // weight dims
                   , vec![(b_init, bias_dims)]                          // bias dims
                   , vec![activation]                                   // activation vector
-                  , Some(vec![("zeros", bias_dims); max_seq_size + 1]) // h_tm1 = sizeof(bias)
+                  , None//, Some(vec![("zeros", bias_dims); bptt_interval + 1]) // h_tm1 = sizeof(bias)
                   , None);
   }
 }
@@ -558,7 +558,7 @@ impl LSTMGenerator for ParamManager {
               , device: Device
               , input_size: usize
               , output_size: usize
-              , max_seq_size: usize
+              , bptt_interval: usize
               , inner_activation: &str
               , outer_activation: &str
               , w_init: &str

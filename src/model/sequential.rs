@@ -8,8 +8,8 @@ use std::collections::HashMap;
 
 use utils;
 use loss;
-use layer::{Layer, Dense};//, LSTM};
-use data::{DataSource, Data};
+use layer::{Layer, Dense, RNN};//, LSTM};
+use data::{DataSource};
 use device::{Device, DeviceManager, DeviceManagerFactory};
 use model::Model;
 use optimizer::{Optimizer, SGD};
@@ -74,6 +74,16 @@ impl Model for Sequential {
         self.layers.push(Box::new(Dense{input_size: input_size
                                         , output_size: output_size}));
       },
+      "rnn" => {
+        self.param_manager.add_rnn::<T>(self.manager.clone(), self.device
+                                        , input_size, output_size
+                                        , params.get("activation").unwrap()
+                                        , params.get("w_init").unwrap()
+                                        , params.get("w_recurrent_init").unwrap()
+                                        , params.get("b_init").unwrap());
+        self.layers.push(Box::new(RNN{input_size: input_size
+                                      , output_size: output_size}));
+      }
       // "lstm"  => {
       //   self.param_manager.add_lstm::<T>(self.manager.clone(), self.device
       //                               , input_size, output_size
@@ -111,7 +121,7 @@ impl Model for Sequential {
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
     let bptt_unroll = max(activ.dims()[2], 1);
-    let mut activate ;//= af::slice(&activ, 0);
+    let mut activate;
 
     for t in 0..bptt_unroll {
       activate = af::slice(&activ, t);
@@ -134,7 +144,8 @@ impl Model for Sequential {
   }
 
   fn fit<T, E>(&mut self, source: &T, src_device: Device
-               , epochs: u64, batch_size: u64, verbose: bool) -> Vec<f32>
+               , epochs: u64, batch_size: u64, bptt_interval: Option<u64>
+               , verbose: bool) -> Vec<f32>
     where T: DataSource, E: HasAfEnum + Zero + Clone
   {
     // some simple data validity checks
@@ -145,7 +156,10 @@ impl Model for Sequential {
     println!("\ntrain samples: {:?} | target samples: {:?} | batch size: {}"
              , idims, tdims, batch_size);
     println!("epochs: {} | iterations[per epoch]: {}", epochs, iters);
-    assert!(tdims[0] == idims[0]);          // batches are of equal size
+    assert!(idims[0] == tdims[0]
+            , "batch sizes for inputs and targets much be equal");
+    assert!(idims[2] == tdims[2]
+            , "sequence lengths for inputs and targets must be equal");
 
     // loss vector current loss
     let mut lossvec = Vec::<f32>::new();
@@ -175,19 +189,36 @@ impl Model for Sequential {
                                                            , src_device
                                                            , compute_device);
 
-        let a_t = self.forward::<E>(&batch_input, compute_device, compute_device);
-        let current_loss_vec = self.backward(&a_t, &batch_target);
+        // if bptt_interval is specified we slice our minibatch
+        // into bptt_interval number of slices and then forward pass on it
+        let mut current_loss_vec = Vec::new();
+        if let Some(bptt_interval) = bptt_interval {
+          let num_seqs = idims[2]/bptt_interval;
+          let start: Vec<_>  = (0..num_seqs).map(|x| x * bptt_interval).collect();
+          let finish: Vec<_> = (1..num_seqs+1).map(|x| x * bptt_interval).collect();
+          for (begin, end) in Zip::new((start, finish)) //TODO: fix when .step_by() becomes stable
+          {
+            let bptt_input_slice = af::slices(&batch_input, begin, end-1);
+            let bptt_target_slice = af::slices(&batch_target, begin, end-1);
+            let a_t = self.forward::<E>(&bptt_input_slice, compute_device, compute_device);
+            current_loss_vec = self.backward(&a_t, &bptt_target_slice);
+          }
+        }else{
+          let a_t = self.forward::<E>(&batch_input, compute_device, compute_device);
+          current_loss_vec = self.backward(&a_t, &batch_target);
+        }
 
         self.optimizer.update(&mut self.param_manager, batch_size as u64);
 
+        // cache and print loss (if verbose)
         if verbose {
-          print!("{:?} ", current_loss_vec);
+          print!("{} ", current_loss_vec.last().unwrap());
         }
         lossvec.extend(current_loss_vec);
       }
     }
 
-    utils::write_csv::<f32>("loss.csv", &lossvec);
+    //utils::write_csv::<f32>("loss.csv", &lossvec);
     self.manager.swap_device(src_device); // return to src device
     lossvec
   }

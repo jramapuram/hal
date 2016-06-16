@@ -1,6 +1,9 @@
 pub use self::dense::Dense;
 mod dense;
 
+pub use self::rnn::RNN;
+mod rnn;
+
 // pub use self::lstm::LSTM;
 // mod lstm;
 
