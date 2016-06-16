@@ -1,7 +1,8 @@
 use af;
-use af::{Array, Dim4};
+use af::{Array, Dim4, DType};
 use std::cell::{RefCell, Cell};
 
+use utils;
 use data::{Data, DataSource, DataParams, Normalize, Shuffle};
 
 pub struct SinSource {
@@ -11,7 +12,7 @@ pub struct SinSource {
 }
 
 impl SinSource {
-  pub fn new(input_size: u64, batch_size: u64
+  pub fn new(input_size: u64, batch_size: u64, dtype: DType
              , max_samples: u64, is_normalized: bool
              , is_shuffled: bool) -> SinSource
   {
@@ -23,6 +24,7 @@ impl SinSource {
       params: DataParams {
         input_dims: dims,   // input is the same size as the output
         target_dims: dims,  // ^
+        dtype: dtype,
         normalize: is_normalized,
         shuffle: is_shuffled,
         current_epoch: Cell::new(0),
@@ -45,7 +47,7 @@ impl SinSource {
                             , &af::div(&x, &(input_dims), false)
                             , false);
     self.offset.set(self.offset.get() + 1.0/(input_dims*num_rows - 1) as f32);
-    af::sin(&x_shifted)
+    utils::cast(&af::sin(&x_shifted), self.params.dtype)
   }
 }
 

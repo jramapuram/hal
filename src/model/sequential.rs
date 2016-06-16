@@ -6,7 +6,6 @@ use itertools::Zip;
 use std::default::Default;
 use std::collections::HashMap;
 
-use utils;
 use loss;
 use layer::{Layer, Dense, RNN};//, LSTM};
 use data::{DataSource};
@@ -67,10 +66,10 @@ impl Model for Sequential {
     match layer {
       "dense" => {
         self.param_manager.add_dense::<T>(self.manager.clone(), self.device
-                                     , input_size, output_size
-                                     , params.get("activation").unwrap()
-                                     , params.get("w_init").unwrap()
-                                     , params.get("b_init").unwrap());
+                                          , input_size, output_size
+                                          , params.get("activation").unwrap()
+                                          , params.get("w_init").unwrap()
+                                          , params.get("b_init").unwrap());
         self.layers.push(Box::new(Dense{input_size: input_size
                                         , output_size: output_size}));
       },

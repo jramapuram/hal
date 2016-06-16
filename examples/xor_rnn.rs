@@ -8,16 +8,16 @@ use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::plot::{plot_vec, plot_array};
 use hal::device::{DeviceManagerFactory, Device};
-use af::{Backend};
+use af::{Backend, DType};
 
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 1;
-  let batch_size = 1;
-  let seq_len = 128;
+  let input_dims = 32;
+  let batch_size = 128;
+  let seq_len = 32;
   let hidden_dims = 64;
-  let output_dims = 1;
+  let output_dims = 32;
   let num_train_samples = 65536;
   let optimizer_type = "Adam";
   let epochs = 1000;
@@ -31,22 +31,21 @@ fn main() {
   let optimizer = get_optimizer_with_defaults(optimizer_type).unwrap();
   let mut model = Box::new(Sequential::new(manager.clone()
                                            , optimizer         // optimizer
-                                           , "mse"             // loss
+                                           , "cross_entropy"   // loss
                                            , gpu_device));     // device for model
 
   // Let's add a few layers why don't we?
   model.add::<f32>("rnn", hashmap!["activation"          => "tanh".to_string()
                                    , "input_size"        => input_dims.to_string()
-                                   , "output_size"       => output_dims.to_string()
+                                   , "output_size"       => hidden_dims.to_string()
                                    , "w_init"            => "glorot_uniform".to_string()
                                    , "w_recurrent_init"  => "glorot_uniform".to_string()
                                    , "b_init"            => "zeros".to_string()]);
-  // model.add::<f32>("rnn", hashmap!["activation"          => "linear".to_string()
-  //                                  , "input_size"        => hidden_dims.to_string()
-  //                                  , "output_size"       => output_dims.to_string()
-  //                                  , "w_init"            => "glorot_uniform".to_string()
-  //                                  , "w_recurrent_init"  => "glorot_uniform".to_string()
-  //                                  , "b_init"            => "zeros".to_string()]);
+  model.add::<f32>("dense", hashmap!["activation"        => "softmax".to_string()  // classification
+                                     , "input_size"      => hidden_dims.to_string()
+                                     , "output_size"     => output_dims.to_string()
+                                     , "w_init"          => "glorot_uniform".to_string()
+                                     , "b_init"          => "zeros".to_string()]);
 
   // Get some nice information about our model
   model.info();
@@ -57,9 +56,10 @@ fn main() {
 
   // Build our xor source
   let xor_generator = XORSource::new(input_dims, batch_size, seq_len
-                                     , num_train_samples
-                                     , false   // normalized
-                                     , false); // shuffled
+                                     , DType::F32        // specify the type of data
+                                     , num_train_samples // generator can do inf, so decide
+                                     , false             // normalized ?
+                                     , false);           // shuffled ?
 
   // let test_sample = xor_generator.get_train_iter(2);
   // let inp = test_sample.input.into_inner();

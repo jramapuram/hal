@@ -12,7 +12,7 @@ use rand::distributions::{IndependentSample, Range};
 use hal::{utils, activations, initializations, loss};
 use hal::layer;
 use hal::layer::{Layer};
-use hal::params::{DenseGenerator, ParamManager};
+use hal::params::{DenseGenerator, RNNGenerator, ParamManager};
 use hal::device::{DeviceManagerFactory, Device};
 use hal::error::HALError;
 
@@ -179,12 +179,16 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
   let device = Device{backend: Backend::DEFAULT, id: 0};
 
   // add the layer type
-  let layer = match layer_type {
-    "Dense" => layer::Dense {
+  let layer: Box<Layer> = match layer_type {
+    "Dense" => Box::new(layer::Dense {
       input_size: input_size,
       output_size: output_size,
-    },
-    //todo: rnn/lstm, etc
+    }),
+    "rnn"  => Box::new(layer::RNN {
+      input_size: input_size,
+      output_size: output_size,
+    }),
+    //todo: lstm, etc
     _      => panic!("unknown layer type specified"),
   };
 
@@ -195,12 +199,17 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
                                               , activation
                                               , w_init
                                               , b_init),
-  //todo: rnn, lstm, etc
+    "rnn"  => param_manager.add_rnn::<f64>(device_manager, device
+                                             , input_size, output_size
+                                             , activation
+                                             , w_init, w_init // just dupe it
+                                             , b_init),
+  //todo: lstm, etc
     _      => panic!("unknown layer type specified"),
   };
 
   // run the closure
-  f(&mut param_manager, Box::new(layer));
+  f(&mut param_manager, layer);
 }
 
 /// test forward pass for layers
@@ -258,37 +267,50 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
   layer_builder(layer_type, idims, odims, loss
                 , eps, activation, w_init, b_init, |param_manager, layer|
                 {
-                    // run a forward and then bkwd pass to extract the gradients
-                    let params = param_manager.get_params(0);
-                    let activ = layer.forward(params.clone(), &x.clone());
-                    let delta = loss::get_loss_derivative(loss, &activ, &targets).unwrap();
-                    layer.backward(params.clone(), &delta);
-                    let grads = param_manager.get_all_deltas();
-                    let num_params = param_manager.num_arrays(0);
+                  // run a forward and then bkwd pass to extract the gradients
+                  let params = param_manager.get_params(0);
+                  let activ = layer.forward(params.clone(), &x.clone());
+                  let delta = loss::get_loss_derivative(loss, &activ, &targets).unwrap();
+                  layer.backward(params.clone(), &delta);
+                  let grads = param_manager.get_all_deltas();
+                  let num_params = param_manager.num_arrays(0);
+                  let bkp_input = param_manager.get_inputs(0);
+                  let bkp_output = param_manager.get_inputs(0);
+                  let bkp_recur = param_manager.get_recurrences(0);
 
-                    // iterate over all arrays and grads and run gradient checking
-                    for (arr, grad, ind) in Zip::new((param_manager.get_all_arrays().iter() // weights + biases
-                                                      , grads                               // tabulated gradients
-                                                      , 0..num_params))                     // param index iterator
-                    {
-                      let arr_bkp: Array = arr.copy(); // keep a backup
+                  // iterate over all arrays and grads and run gradient checking
+                  for (arr, grad, ind) in Zip::new((param_manager.get_all_arrays().iter() // weights + biases
+                                                    , grads                               // tabulated gradients
+                                                    , 0..num_params))                     // param index iterator
+                  {
+                    let arr_bkp: Array = arr.copy(); // keep a backup
 
-                      // do the gradient check specific to the activation type
-                      match activations::is_smooth(activation) {
-                        false => utils::verify_gradient_kinks(|i| {
-                          // run forward pass using the modified array
-                          param_manager.set_array_from_index(i.clone(), ind);
-                          let fwd_pass = layer.forward(params.clone(), &x.clone());
-                          loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
-                        }, &arr_bkp, eps, &grad).unwrap(),
-                        true  => utils::verify_gradient_smooth(|i| {
-                          // run forward pass using the modified array
-                          param_manager.set_array_from_index(i.clone(), ind);
-                          let fwd_pass = layer.forward(params.clone(), &x.clone());
-                          loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
-                        }, &arr_bkp, eps, &grad).unwrap(),
-                      };
-                    }
+                    // do the gradient check specific to the activation type
+                    match activations::is_smooth(activation) {
+                      false => utils::verify_gradient_kinks(|i| {
+                        // run forward pass using the modified array
+                        let p = params.clone();
+                        p.lock().unwrap().current_unroll = 0;
+                        param_manager.set_array_from_index(i.clone(), ind);
+                        param_manager.set_inputs(0, bkp_input.clone());
+                        param_manager.set_outputs(0, bkp_output.clone());
+                        param_manager.set_recurrences(0, bkp_recur.clone());
+                        let fwd_pass = layer.forward(params.clone(), &x.clone());
+                        loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
+                      }, &arr_bkp, eps, &grad).unwrap(),
+                      true  => utils::verify_gradient_smooth(|i| {
+                        // run forward pass using the modified array
+                        let p = params.clone();
+                        p.lock().unwrap().current_unroll = 0;
+                        param_manager.set_array_from_index(i.clone(), ind);
+                        param_manager.set_inputs(0, bkp_input.clone());
+                        param_manager.set_outputs(0, bkp_output.clone());
+                        param_manager.set_recurrences(0, bkp_recur.clone());
+                        let fwd_pass = layer.forward(params.clone(), &x.clone());
+                        loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
+                      }, &arr_bkp, eps, &grad).unwrap(),
+                    };
+                  }
                 });
 }
 
@@ -312,6 +334,34 @@ fn dense_backward() {
     let idims = Dim4::new(&[1, 5, 1, 1]);
     let odims = Dim4::new(&[1, 5, 1, 1]);
     layer_backward_helper("Dense", idims, odims
+                          , "l2"              // loss
+                          , 1e-4              // eps for numerical grad
+                          , "tanh"            // activation
+                          , "glorot_uniform"  // weight init
+                          , "zeros");         // bias init
+  });
+}
+
+#[test]
+fn rnn_forward(){
+  timeit!({
+    let idims = Dim4::new(&[1, 5, 1, 1]);
+    let odims = Dim4::new(&[1, 5, 1, 1]);
+    layer_forward_helper("rnn", idims, odims, "l2", 1e-4
+                         , "linear"                                      // activation
+                         , "ones"                                        // weight init
+                         , "zeros"                                       // bias init
+                         , vec![-0.01, 0.00, 1.10, 2.20, 3.15]           //input
+                         , vec![6.4400, 6.4400,6.4400, 6.4400, 6.4400]); //target
+  });
+}
+
+#[test]
+fn rnn_backward() {
+  timeit! ({
+    let idims = Dim4::new(&[1, 5, 1, 1]); // single time slice
+    let odims = Dim4::new(&[1, 5, 1, 1]); // single time slice
+    layer_backward_helper("rnn", idims, odims
                           , "l2"              // loss
                           , 1e-4              // eps for numerical grad
                           , "tanh"            // activation

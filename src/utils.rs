@@ -17,7 +17,7 @@ use std::fs::File;
 use num::traits::Float;
 use num::{Complex, Num};
 use statistical::{standard_deviation, mean};
-use af::{Dim4, Array, DType, Seq, AfError, HasAfEnum};
+use af::{Dim4, Array, DType, Seq, HasAfEnum};
 use itertools::Zip;
 use rustc_serialize::Encodable;
 
@@ -94,6 +94,24 @@ pub fn constant(dims: Dim4, aftype: DType, val: f32) -> Array {
     DType::U64 => af::constant(val.approx_as::<u64>().saturate().unwrap(), dims),
     DType::S16 => af::constant(val.approx_as::<i16>().saturate().unwrap(), dims),
     DType::U16 => af::constant(val.approx_as::<u16>().saturate().unwrap(), dims),
+  }
+}
+
+pub fn cast(input: &Array, dest_type: DType) -> Array {
+  match dest_type
+  {
+    DType::F32 => input.cast::<f32>(),
+    DType::F64 => input.cast::<f64>(),
+    DType::C32 => input.cast::<Complex<f32>>(),
+    DType::C64 => input.cast::<Complex<f64>>(),
+    DType::B8  => input.cast::<bool>(),
+    DType::S32 => input.cast::<i32>(),
+    DType::U32 => input.cast::<u32>(),
+    DType::U8  => input.cast::<u8>(),
+    DType::S64 => input.cast::<i64>(),
+    DType::U64 => input.cast::<u64>(),
+    DType::S16 => input.cast::<i64>(),
+    DType::U16 => input.cast::<u16>(),
   }
 }
 

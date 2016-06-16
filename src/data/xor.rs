@@ -1,7 +1,9 @@
-use af::{Array, Dim4};
-use std::cell::{RefCell, Cell};
+use af;
 use rand;
 use rand::distributions::{IndependentSample, Range};
+use af::{Array, Dim4, DType};
+use std::sync::{Arc, Mutex};
+use std::cell::{RefCell, Cell};
 
 use utils;
 use data::{Data, DataSource, DataParams, Normalize, Shuffle};
@@ -9,13 +11,13 @@ use data::{Data, DataSource, DataParams, Normalize, Shuffle};
 pub struct XORSource {
   pub params: DataParams,
   pub iter: Cell<u64>,
-  pub last_x: Cell<f32>,
+  pub last_x: Arc<Mutex<Array>>,
 }
 
 impl XORSource {
   pub fn new(input_size: u64, batch_size: u64, seq_len: u64
-             , max_samples: u64, is_normalized: bool
-             , is_shuffled: bool) -> XORSource
+             , dtype: DType, max_samples: u64
+             , is_normalized: bool, is_shuffled: bool) -> XORSource
   {
     let dims = Dim4::new(&[batch_size, input_size, seq_len, 1]);
     let train_samples = 0.7 * max_samples as f32;
@@ -25,6 +27,7 @@ impl XORSource {
       params: DataParams {
         input_dims: dims,   // input is the same size as the output
         target_dims: dims,  // ^
+        dtype: dtype,
         normalize: is_normalized,
         shuffle: is_shuffled,
         current_epoch: Cell::new(0),
@@ -34,33 +37,30 @@ impl XORSource {
         num_validation: Some(validation_samples as u64),
       },
       iter: Cell::new(0),
-      last_x: Cell::new(0f32),
+      last_x: Arc::new(Mutex::new(utils::constant(dims, DType::B8, 0.0f32))),
     }
   }
 
   pub fn generate_minibatch(&self, batch_size: u64) -> (Array, Array){
-    // generator for x
-    let between = Range::new(0i32, 2i32); //range is non-inclusive
-    let mut rng = rand::thread_rng();
+    // grab an arc and unlock the mutex
+    let last_x = self.last_x.clone();
+    let mut lastex = last_x.lock().unwrap();
 
-    let input_size = self.params.input_dims[1];
-    let seq_size = self.params.input_dims[2];
-    let total_size = batch_size * seq_size * input_size;
-    let mut x: Vec<f32> = vec![0f32; total_size as usize];
-    let mut y: Vec<f32> = vec![0f32; total_size as usize];
-    for i in 0..total_size as usize
-    {
-      x[i] = between.ind_sample(&mut rng) as f32;
-      y[i] = (self.last_x.get() as i32 ^ x[i] as i32) as f32;
-      self.last_x.set(x[i]);
-    }
+    assert!(batch_size == lastex.dims()[0]
+            ,"xorsource does not allow varying batch sizes");
+    let dims = Dim4::new(&[batch_size, self.params.input_dims[1]
+                           , self.params.input_dims[2], self.params.input_dims[3]]);
 
-    (utils::vec_to_array(x, self.params.input_dims),
-     utils::vec_to_array(y, self.params.target_dims))
+    // generate the random type
+    //let x_t = utils::constant(self.params.input_dims, self.params.dtype, 0.0f32);
+    let x_t = af::randu::<bool>(dims);
+    let y_t = af::bitxor(&x_t, &lastex);
+
+    *lastex = x_t.clone();
+    (utils::cast(&x_t, self.params.dtype)
+     , utils::cast(&y_t, self.params.dtype))
   }
 }
-
-
 
 impl DataSource for XORSource
 {

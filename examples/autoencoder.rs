@@ -8,7 +8,7 @@ use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::plot::{plot_vec, plot_array};
 use hal::device::{DeviceManagerFactory, Device};
-use af::{Backend};
+use af::{Backend, DType};
 
 
 fn main() {
@@ -54,14 +54,10 @@ fn main() {
 
   // Build our sin wave source
   let sin_generator = SinSource::new(input_dims, batch_size
-                                     , num_train_samples
-                                     , false   // normalized
-                                     , false); // shuffled
-
-  // Pull a sample to verify sizing
-  let train_sample = sin_generator.get_train_iter(batch_size);
-  println!("train minibatch shape: {:?}"
-           , train_sample.input.into_inner().dims());
+                                     , DType::F32        // specify the type of data
+                                     , num_train_samples // generator can do inf, so decide
+                                     , false             // normalized ?
+                                     , false);           // shuffled ?
 
   // iterate our model in Verbose mode (printing loss)
   // Note: more manual control can be enacted by directly calling
