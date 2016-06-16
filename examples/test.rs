@@ -3,27 +3,28 @@ extern crate arrayfire as af;
 extern crate rand;
 use rand::distributions::{Range, IndependentSample};
 
+use hal::utils;
 use hal::Model;
+use hal::initializations::uniform;
 use hal::optimizer::{Optimizer, get_optimizer_with_defaults};
-use hal::data::{DataSource, CopyingProblemSource};
+use hal::data::{DataSource, AddingProblemSource, CopyingProblemSource};
 use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::plot::{plot_vec, plot_array};
 use hal::device::{DeviceManagerFactory, Device};
-use af::{Backend};
+use af::{Backend, HasAfEnum};
 
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 6;
+  let input_dims = 1;
   let hidden_dims = 3;
-  let output_dims = 6;
+  let output_dims = 1;
   let num_train_samples = 5;
-  let batch_size = 3;
+  let batch_size = 2;
   let optimizer_type = "SGD";
   let epochs = 5;
   let bptt_unroll = 12;
-  let seq_size = 3;
 
   // Now, let's build a model with an device manager on a specific device
   // an optimizer and a loss function. For this example we demonstrate a simple autoencoder
@@ -56,17 +57,15 @@ fn main() {
   manager.swap_device(cpu_device);
 
   // Build our sin wave source
-  let uniform_generator = CopyingProblemSource::new(input_dims
-                                                 , batch_size
-                                                 , seq_size 
+  let uniform_generator = AddingProblemSource::new(batch_size
                                                  , bptt_unroll
                                                  , num_train_samples);
 
   // Pull a sample to verify sizing
   let minibatch = uniform_generator.get_train_iter(batch_size);
   let batch_input = minibatch.input.into_inner();
+  let batch_target = minibatch.target.into_inner();
     
-
 
   model.forward::<f32>(&batch_input, cpu_device, cpu_device, true);
 
@@ -74,7 +73,9 @@ fn main() {
 
   let params = params_arc.lock().unwrap();
 
+  
   af::print(&batch_input);
+  //af::print(&batch_target);
   
   
   /*
@@ -118,6 +119,8 @@ fn main() {
   println!("{}", a);
   }
  */
+
+
 
 }
 

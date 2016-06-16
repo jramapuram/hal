@@ -4,6 +4,9 @@ mod sin;
 pub use self::copying_prob_src::CopyingProblemSource;
 mod copying_prob_src;
 
+pub use self::adding_prob_src::AddingProblemSource;
+mod adding_prob_src;
+
 use af::{Dim4, Array};
 use std::cell::{RefCell, Cell};
 

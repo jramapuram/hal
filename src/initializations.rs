@@ -43,6 +43,13 @@ pub fn uniform<T: HasAfEnum>(dims: Dim4, scale: f32) -> Array{
   u
 }
 
+// Provide values between 0 and "scale" from a uniform distribution 
+pub fn uniform_pos<T: HasAfEnum>(dims: Dim4, scale: f32) -> Array{
+  let src_type = T::get_af_dtype();
+  let scale_vec = utils::constant(dims, src_type, scale);
+  af::mul(&af::randu::<T>(dims), &scale_vec, false)
+}
+
 /// A helper to provide a shape of zeros
 pub fn zeros<T: HasAfEnum>(dims: Dim4) -> Array {
   utils::constant(dims, T::get_af_dtype(), 0.0f32)
