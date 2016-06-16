@@ -2,17 +2,18 @@ use af;
 use af::{Array, Backend, HasAfEnum};
 use std::cmp::max;
 use num::Zero;
+use itertools::Zip;
 use std::default::Default;
 use std::collections::HashMap;
 
 use utils;
 use loss;
 use layer::{Layer, Dense};//, LSTM};
-use data::{DataSource};
+use data::{DataSource, Data};
 use device::{Device, DeviceManager, DeviceManagerFactory};
 use model::Model;
 use optimizer::{Optimizer, SGD};
-use params::{ParamManager, DenseGenerator, LSTMGenerator, Input};
+use params::{ParamManager, DenseGenerator, LSTMGenerator, RNNGenerator};
 
 pub struct Sequential {
   layers: Vec<Box<Layer>>,
@@ -101,8 +102,7 @@ impl Model for Sequential {
 
   fn forward<T>(&mut self, activation: &Array
                 , src_device: Device
-                , dest_device: Device
-                , train: bool) -> Array
+                , dest_device: Device) -> Vec<Array>
     where T: HasAfEnum + Zero + Clone
   {
     // check & swap if the backend matches to runtime one (if not already)
@@ -111,18 +111,26 @@ impl Model for Sequential {
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
     let bptt_unroll = max(activ.dims()[2], 1);
-    let mut activate = Input {data: af::slice(&activ, 0)
-                              , activation: "ones".to_string()};
+    let mut activate ;//= af::slice(&activ, 0);
+
     for t in 0..bptt_unroll {
-      activate.data = af::slice(&activ, t);
+      activate = af::slice(&activ, t);
       for i in 0..self.layers.len() {
         activate = self.layers[i].forward(self.param_manager.get_params(i)
-                                          , &activate, train);
+                                          , &activate);
       }
     }
 
+    // return the collected outputs of the last layer
+    let last_index = self.layers.len() - 1;
+    let mut outputs = self.param_manager.get_outputs(last_index);
+
     // return to the dest device
-    self.manager.swap_array_backend::<T>(&activate.data, self.device, dest_device)
+    for i in 0..outputs.len() {
+      outputs[i] = self.manager.swap_array_backend::<T>(&outputs[i], self.device, dest_device);
+    }
+
+    outputs
   }
 
   fn fit<T, E>(&mut self, source: &T, src_device: Device
@@ -140,7 +148,6 @@ impl Model for Sequential {
     assert!(tdims[0] == idims[0]);          // batches are of equal size
 
     // loss vector current loss
-    let mut loss: f32;
     let mut lossvec = Vec::<f32>::new();
     let compute_device = self.device.clone();
 
@@ -168,14 +175,15 @@ impl Model for Sequential {
                                                            , src_device
                                                            , compute_device);
 
-        let a_t = self.forward::<E>(&batch_input, compute_device, compute_device, true);
-        loss = self.backward(&a_t, &batch_target);
+        let a_t = self.forward::<E>(&batch_input, compute_device, compute_device);
+        let current_loss_vec = self.backward(&a_t, &batch_target);
+
         self.optimizer.update(&mut self.param_manager, batch_size as u64);
-        lossvec.push(loss);
 
         if verbose {
-          print!("{} ", loss);
+          print!("{:?} ", current_loss_vec);
         }
+        lossvec.extend(current_loss_vec);
       }
     }
 
@@ -184,19 +192,22 @@ impl Model for Sequential {
     lossvec
   }
 
-  fn backward(&mut self, prediction: &Array, target: &Array) -> f32 {
+  fn backward(&mut self, predictions: &Vec<Array>, targets: &Array) -> Vec<f32> {
     // setup the optimizer parameters (if not already setup)
     self.optimizer.setup(self.param_manager.get_all_dims());
+    let mut loss_vec = Vec::with_capacity(predictions.len());
 
-    // Note: a requirement here is that the output activation is
-    // the last element of the activation's vector of the last layer
-    let last_index = self.layers.len() - 1;
-    let last_layer_activations = self.param_manager.get_activations(last_index);
-    let mut delta = loss::get_loss_derivative(&self.loss, prediction, target).unwrap();
-    for i in (0..last_index + 1).rev() {
-      delta = self.layers[i].backward(self.param_manager.get_params(i), &delta);
+    for (pred, ind) in Zip::new((predictions.iter().rev(), (0..predictions.len()).rev()))
+    {
+      let tar = af::slice(&targets, ind as u64);
+      let last_index = self.layers.len();
+      let mut delta = loss::get_loss_derivative(&self.loss, pred, &tar).unwrap();
+      for i in (0..last_index).rev() {
+        delta = self.layers[i].backward(self.param_manager.get_params(i), &delta);
+      }
+      loss_vec.push(loss::get_loss(&self.loss, pred, &tar).unwrap());
     }
 
-    loss::get_loss(&self.loss, prediction, target).unwrap()
+    loss_vec
   }
 }

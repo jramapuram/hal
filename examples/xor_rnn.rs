@@ -3,7 +3,7 @@ extern crate arrayfire as af;
 
 use hal::Model;
 use hal::optimizer::{Optimizer, get_optimizer_with_defaults};
-use hal::data::{DataSource, SinSource};
+use hal::data::{DataSource, XORSource};
 use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::plot::{plot_vec, plot_array};
@@ -13,11 +13,12 @@ use af::{Backend};
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 128;
-  let hidden_dims = 64;
-  let output_dims = 128;
-  let num_train_samples = 65536;
+  let input_dims = 1;
   let batch_size = 128;
+  let seq_len = 128;
+  let hidden_dims = 64;
+  let output_dims = 1;
+  let num_train_samples = 65536;
   let optimizer_type = "Adam";
   let epochs = 20;
 
@@ -34,16 +35,16 @@ fn main() {
                                            , gpu_device));     // device for model
 
   // Let's add a few layers why don't we?
-  model.add::<f32>("dense", hashmap!["activation"    => "tanh".to_string()
-                                     , "input_size"  => input_dims.to_string()
-                                     , "output_size" => hidden_dims.to_string()
-                                     , "w_init"      => "glorot_uniform".to_string()
-                                     , "b_init"      => "zeros".to_string()]);
-  model.add::<f32>("dense", hashmap!["activation"    => "linear".to_string()
-                                     , "input_size"  => hidden_dims.to_string()
-                                     , "output_size" => output_dims.to_string()
-                                     , "w_init"      => "glorot_uniform".to_string()
-                                     , "b_init"      => "zeros".to_string()]);
+  model.add::<f32>("rnn", hashmap!["activation"    => "tanh".to_string()
+                                   , "input_size"  => input_dims.to_string()
+                                   , "output_size" => hidden_dims.to_string()
+                                   , "w_init"      => "glorot_uniform".to_string()
+                                   , "b_init"      => "zeros".to_string()]);
+  model.add::<f32>("rnn", hashmap!["activation"    => "linear".to_string()
+                                   , "input_size"  => hidden_dims.to_string()
+                                   , "output_size" => output_dims.to_string()
+                                   , "w_init"      => "glorot_uniform".to_string()
+                                   , "b_init"      => "zeros".to_string()]);
 
   // Get some nice information about our model
   model.info();
@@ -52,21 +53,30 @@ fn main() {
   // The model will automatically toggle to the desired backend during training
   manager.swap_device(cpu_device);
 
-  // Build our sin wave source
-  let sin_generator = SinSource::new(input_dims, batch_size
+  // Build our xor source
+  let xor_generator = XORSource::new(input_dims, batch_size, seq_len
                                      , num_train_samples
                                      , false   // normalized
                                      , false); // shuffled
 
+  // let test_sample = xor_generator.get_train_iter(1);
+  // let inp = test_sample.input.into_inner();
+  // let tar = test_sample.target.into_inner();
+  // println!("inp dims = {:?} | tar dims = {:?}", inp.dims(), tar.dims());
+  // let inp_s0 = af::slice(&inp, 1);
+  // let tar_s0 = af::slice(&tar, 1);
+  // af::print(&inp);
+  // af::print(&tar);
+
   // Pull a sample to verify sizing
-  let train_sample = sin_generator.get_train_iter(batch_size);
-  println!("train minibatch shape: {:?}"
+  let train_sample = xor_generator.get_train_iter(batch_size);
+  println!("train minibatch sample shape: {:?}"
            , train_sample.input.into_inner().dims());
 
   // iterate our model in Verbose mode (printing loss)
   // Note: more manual control can be enacted by directly calling
   //       forward/backward & optimizer update
-  let loss = model.fit::<SinSource, f32>(&sin_generator        // what data source to pull from
+  let loss = model.fit::<XORSource, f32>(&xor_generator        // what data source to pull from
                                          , cpu_device          // source device
                                          , epochs, batch_size  // self explanatory :)
                                          , true);              // verbose
@@ -75,14 +85,14 @@ fn main() {
   plot_vec(loss, "Loss vs. Iterations", 512, 512);
 
   // infer on one test and plot the first sample (row) of the predictions
-  let test_sample = sin_generator.get_test_iter(1).input.into_inner();
+  let test_sample = xor_generator.get_test_iter(1).input.into_inner();
   println!("test sample shape: {:?}", test_sample.dims());
   let prediction = model.forward::<f32>(&test_sample
                                         , cpu_device   // source device
                                         , cpu_device); // destination device
-  println!("\nprediction shape: {:?} | output backend = {:?}"
+  println!("\nprediction shape: {:?} | backend = {:?}"
            , prediction[0].dims(), prediction[0].get_backend());
 
-  // plot our inference
+  plot_array(&af::flat(&test_sample), "Generated X", 512, 512);
   plot_array(&af::flat(&prediction[0]), "Model Inference", 512, 512);
 }

@@ -1,6 +1,9 @@
 pub use self::sin::SinSource;
 mod sin;
 
+pub use self::xor::XORSource;
+mod xor;
+
 use af::{Dim4, Array};
 use std::cell::{RefCell, Cell};
 

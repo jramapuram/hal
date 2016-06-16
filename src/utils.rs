@@ -99,13 +99,12 @@ pub fn constant(dims: Dim4, aftype: DType, val: f32) -> Array {
 
 
 /// Convert a vector of elements to a vector of Array
-pub fn vec_to_array<T: HasAfEnum>(vec_values: Vec<T>, rows: usize, cols: usize) -> Array {
-  raw_to_array(vec_values.as_ref(), rows, cols)
+pub fn vec_to_array<T: HasAfEnum>(vec_values: Vec<T>, dims: Dim4) -> Array {
+  raw_to_array(vec_values.as_ref(), dims)
 }
 
 /// Convert a generic vector to an Array
-pub fn raw_to_array<T: HasAfEnum>(raw_values: &[T], rows: usize, cols: usize) -> Array {
-  let dims = Dim4::new(&[rows as u64, cols as u64, 1, 1]);
+pub fn raw_to_array<T: HasAfEnum>(raw_values: &[T], dims: Dim4) -> Array {
   Array::new::<T>(raw_values, dims)
 }
 
@@ -456,6 +455,7 @@ pub fn numerical_gradient<F>(fn_closure: F, arr: &Array, eps: f64) -> Array
   let num_cols = arr.dims()[1] as usize;
   let mut grad_vec = vec![0f64; num_elems];
 
+  let target_dims = Dim4::new(&[num_rows as u64, num_cols as u64, 1, 1]);
   for i in 0..num_elems
   {
     // build a vec(matrix) of [0....eps...0] (same size as arr)
@@ -463,7 +463,7 @@ pub fn numerical_gradient<F>(fn_closure: F, arr: &Array, eps: f64) -> Array
     let mut eps_vec = vec![0f64; num_elems];
     eps_vec[i] = eps;
 
-    let eps_arr = vec_to_array::<f64>(eps_vec.clone(), num_rows, num_cols);
+    let eps_arr = vec_to_array::<f64>(eps_vec.clone(), target_dims);
     let arr_p_h = af::add(arr, &eps_arr, false);
     let arr_m_h = af::sub(arr, &eps_arr, false);
 
@@ -471,7 +471,7 @@ pub fn numerical_gradient<F>(fn_closure: F, arr: &Array, eps: f64) -> Array
     grad_vec[i] = (fn_closure(&arr_p_h) - fn_closure(&arr_m_h)) / (2f64 * eps);
   }
 
-  vec_to_array::<f64>(grad_vec, num_rows, num_cols)
+  vec_to_array::<f64>(grad_vec, target_dims)
 }
 
 

@@ -2,6 +2,7 @@ extern crate hal;
 extern crate arrayfire as af;
 extern crate itertools;
 extern crate rand;
+#[macro_use] extern crate timeit;
 
 use std::env;
 use af::{Array, Dim4, Backend, DType};
@@ -13,7 +14,6 @@ use hal::layer;
 use hal::layer::{Layer};
 use hal::params::{DenseGenerator, ParamManager};
 use hal::device::{DeviceManagerFactory, Device};
-use hal::params::Input;
 use hal::error::HALError;
 
 
@@ -219,11 +219,9 @@ pub fn layer_forward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &s
                 {
                   // run a forward pass and verify it is within tolerance
                   let params = param_manager.get_params(0);
-                  let activ = layer.forward(params.clone()
-                                            , &Input{data: x.clone(), activation: activation.to_owned()}
-                                            , true);
+                  let activ = layer.forward(params.clone(), &x.clone());
 
-                  let loss_activ = loss::get_loss(loss, &activ.data, &targets).unwrap();
+                  let loss_activ = loss::get_loss(loss, &activ, &targets).unwrap();
                   assert!(loss_activ < 1e-9
                           , "forward pass verification failed, error = {}"
                           , loss_activ);
@@ -251,7 +249,7 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
       v[rnd_index] = 1f64;
 
       // build an array
-      utils::vec_to_array::<f64>(v, 1, output_size)
+      utils::vec_to_array::<f64>(v, odims)
     },
 
     _ => initializations::uniform::<f64>(idims, 0.5f32),
@@ -262,10 +260,8 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                 {
                     // run a forward and then bkwd pass to extract the gradients
                     let params = param_manager.get_params(0);
-                    let activ = layer.forward(params.clone()
-                                              , &Input{data: x.clone(), activation: activation.to_owned()}
-                                              , true);
-                    let delta = loss::get_loss_derivative(loss, &activ.data, &targets).unwrap();
+                    let activ = layer.forward(params.clone(), &x.clone());
+                    let delta = loss::get_loss_derivative(loss, &activ, &targets).unwrap();
                     layer.backward(params.clone(), &delta);
                     let grads = param_manager.get_all_deltas();
                     let num_params = param_manager.num_arrays(0);
@@ -282,20 +278,14 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                         false => utils::verify_gradient_kinks(|i| {
                           // run forward pass using the modified array
                           param_manager.set_array_from_index(i.clone(), ind);
-                          let fwd_pass = layer.forward(params.clone()
-                                                       , &Input{data: x.clone()
-                                                                , activation: activation.to_owned()}
-                                                       , false);
-                          loss::get_loss(loss, &fwd_pass.data, &targets).unwrap() as f64
+                          let fwd_pass = layer.forward(params.clone(), &x.clone());
+                          loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
                         }, &arr_bkp, eps, &grad).unwrap(),
                         true  => utils::verify_gradient_smooth(|i| {
                           // run forward pass using the modified array
                           param_manager.set_array_from_index(i.clone(), ind);
-                          let fwd_pass = layer.forward(params.clone()
-                                                       , &Input{data: x.clone()
-                                                                , activation: activation.to_owned()}
-                                                       , false);
-                          loss::get_loss(loss, &fwd_pass.data, &targets).unwrap() as f64
+                          let fwd_pass = layer.forward(params.clone(), &x.clone());
+                          loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
                         }, &arr_bkp, eps, &grad).unwrap(),
                       };
                     }
@@ -303,15 +293,17 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
 }
 
 #[test]
-fn dense_forward() {
-  let idims = Dim4::new(&[1, 5, 1, 1]);
-  let odims = Dim4::new(&[1, 5, 1, 1]);
-  layer_forward_helper("Dense", idims, odims, "l2", 1e-4
-                       , "linear"                                      // activation
-                       , "ones"                                        // weight init
-                       , "zeros"                                       // bias init
-                       , vec![-0.01, 0.00, 1.10, 2.20, 3.15]           //input
-                       , vec![6.4400, 6.4400,6.4400, 6.4400, 6.4400]); //target
+fn dense_forward(){
+  timeit!({
+    let idims = Dim4::new(&[1, 5, 1, 1]);
+    let odims = Dim4::new(&[1, 5, 1, 1]);
+    layer_forward_helper("Dense", idims, odims, "l2", 1e-4
+                         , "linear"                                      // activation
+                         , "ones"                                        // weight init
+                         , "zeros"                                       // bias init
+                         , vec![-0.01, 0.00, 1.10, 2.20, 3.15]           //input
+                         , vec![6.4400, 6.4400,6.4400, 6.4400, 6.4400]); //target
+  });
 }
 
 #[test]

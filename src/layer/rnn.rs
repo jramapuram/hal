@@ -13,49 +13,57 @@ pub struct RNN {
 
 impl Layer for RNN
 {
-  fn forward(&self, params: &mut Params, inputs: &Input, train: bool) -> Input
+  fn forward(&self, params: Arc<Mutex<Params>>, inputs: &Input, train: bool) -> Input
   {
-    // calculate our index offsets for weights
-    let w_index = params.current_unroll;
-    let u_index = self.bptt_interval + 1;
+    // get a handle to the underlying params
+    let mut ltex = params.lock().unwrap();
 
     // h_t = Uh_{t-1} + Wx + b [the bias is added in parallel for batch]
     let wx = af::matmul(&inputs.data            //activated_input
-                        , &params.weights[w_index]
+                        , &ltex.weights[0]
                         , MatProp::NONE
                         , MatProp::NONE).unwrap();
-    let uhtm1 = af::matmul(&params.recurrences[params.current_unroll]
-                           , &params.weights[u_index]
+    let uhtm1 = af::matmul(&ltex.recurrences[ltex.current_unroll]
+                           , &ltex.weights[1]
                            , MatProp::NONE
                            , MatProp::NONE).unwrap();
     let h_t = af::transpose(&af::add(&af::transpose(&uhtm1, false).unwrap(),
                                      &af::add(&af::transpose(&wx, false).unwrap()
-                                              , &params.biases[0], true).unwrap(), false).unwrap()
+                                              , &ltex.biases[0], true).unwrap(), false).unwrap()
                             , false).unwrap();
 
     // a_t = sigma(z_t)
-    let a_t = Input{ data: activations::get_activation(&params.activations[0], &z_t).unwrap()
-                     , activation: params.activations[0].clone() };
+    let a_t = Input{ data: activations::get_activation(&ltex.activations[0], &z_t).unwrap()
+                     , activation: ltex.activations[0].clone() };
 
     // parameter manager keeps the outputs, inputs & recurrences
     // these are only needed for training, so dont store otherwise
     if train {
-      params.inputs[params.current_unroll] = inputs.clone();
-      params.outputs[params.current_unroll] = a_t.clone();
-      params.recurrences[params.current_unroll] = h_t.clone();
+      ltex.inputs[ltex.current_unroll] = inputs.clone();
+      ltex.outputs[ltex.current_unroll] = a_t.clone();
+      ltex.recurrences[ltex.current_unroll] = h_t.clone();
     }
 
-    params.current_unroll += 1;
+    ltex.current_unroll += 1;
     a_t.clone() // clone just increases the ref count
   }
 
-  // delta_b = delta
-  // delta_w = matmul(delta, activations_previous)
-  fn backward(&self, params: &mut Params, delta: &Array) -> Array {
+  fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array) -> Array {
+    // get a handle to the underlying params
+    let mut ltex = params.lock().unwrap();
+
     // delta_t     = (transpose(W_{t+1}) * d_{l+1}) .* dActivation(z)
     // delta_{t-1} = (transpose(W_{t}) * d_{l})
-    params.deltas = vec![af::mul(delta, &activations::get_activation_derivative(&params.activations[0]
-                                                                                , &params.outputs[0].data).unwrap(), false).unwrap()];
-    af::matmul(&params.deltas[0], &params.weights[0], af::MatProp::NONE, af::MatProp::TRANS).unwrap()
+    let dz = activations::get_derivative(&ltex.activations[0]
+                                         , &ltex.outputs[0].data).unwrap();
+    let delta_t = af::mul(delta, &dz, false);
+    let dw = af::matmul(&ltex.inputs[0].data, &delta_t // delta_w = delta_t * a_{t-1}
+                        , af::MatProp::TRANS
+                        , af::MatProp::NONE);
+    let db = af::transpose(&af::sum(&delta_t, 0), false); // delta_b = delta
+    ltex.deltas[0] = af::add(&ltex.deltas[0], &dw, false);
+    ltex.deltas[1] = af::add(&ltex.deltas[1], &db, false);
+
+    af::matmul(&delta_t, &ltex.weights[0], af::MatProp::NONE, af::MatProp::TRANS)
   }
 }

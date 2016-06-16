@@ -5,6 +5,7 @@ authors = ["Jason Ramapuram <jason.ramapuram@gmail.com>"]
 
 [dependencies]
 rustc-serialize = "0.3.19"
+timeit = "0.1.2"
 rand = "0.3.14"
 csv = "0.14.4"
 num = "0.1.31"
@@ -24,3 +25,7 @@ plugin = true
 [[example]]
 name = "autoencoder"
 path = "examples/autoencoder.rs"
+
+[[example]]
+name = "xor_rnn"
+path = "examples/xor_rnn.rs"
