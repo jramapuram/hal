@@ -12,7 +12,7 @@ use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::plot::{plot_vec, plot_array};
 use hal::device::{DeviceManagerFactory, Device};
-use af::{Backend, HasAfEnum};
+use af::{Backend, HasAfEnum, MatProp};
 
 
 fn main() {
@@ -75,8 +75,7 @@ fn main() {
 
   
   af::print(&batch_input);
-  //af::print(&batch_target);
-  
+  af::print(&batch_target);
   
   /*
   
@@ -119,6 +118,23 @@ fn main() {
   println!("{}", a);
   }
  */
+
+  /*
+  let dim = af::Dim4::new(&[2,1,3,1]);
+  let mut a = af::Array::new(&[0.,2.,3.,0.,5.,6.], dim);
+  let mut b = af::constant(0., dim);
+
+  af::print(&a);
+  af::print(&b);
+
+  let c = af::gt(&a, &b, false);
+
+  af::print(&c);
+  let d = af::select(&a, &c, &b);
+  af::print(&d);
+  */
+
+
 
 
 

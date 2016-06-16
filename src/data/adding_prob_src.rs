@@ -1,7 +1,7 @@
 extern crate rand;
 use rand::distributions::{Range, IndependentSample};
 use af;
-use af::{Array, Dim4};
+use af::{Array, Dim4, MatProp};
 use std::cell::{RefCell, Cell};
 
 use initializations::uniform_pos;
@@ -70,7 +70,16 @@ impl AddingProblemSource {
     }
 
     fn generate_target(&self, input: &Array, batch_size: u64, bptt_unroll: u64) -> Array {
-        af::constant(1, Dim4::new(&[1,1,1,1]))
+        let first = af::slices(&input, 0, bptt_unroll/2-1);
+        let second = af::slices(&input, bptt_unroll/2, bptt_unroll-1);
+        let zeros = af::constant(0. as f32, first.dims());
+        let ones = af::constant(1. as f32, first.dims());
+        let ar = af::mul(&first, &second, false);
+
+        af::product(&af::select(&ar, &af::gt(&ar, &zeros, false), &ones), 2)
+
+
+
     }
 }
 
@@ -80,7 +89,7 @@ impl DataSource for AddingProblemSource {
                                         , self.params.input_dims[2]);
         let tar = self.generate_target(&inp
                                        , num_batch
-                                       , self.params.target_dims[2]);
+                                       , self.params.input_dims[2]);
         let mut batch = Data {
             input: RefCell::new(Box::new(inp.clone())),
             target: RefCell::new(Box::new(tar.clone())),
