@@ -308,12 +308,14 @@ fn dense_forward(){
 
 #[test]
 fn dense_backward() {
-  let idims = Dim4::new(&[1, 5, 1, 1]);
-  let odims = Dim4::new(&[1, 5, 1, 1]);
-  layer_backward_helper("Dense", idims, odims
-                        , "l2"              // loss
-                        , 1e-4              // eps for numerical grad
-                        , "tanh"            // activation
-                        , "glorot_uniform"  // weight init
-                        , "zeros");         // bias init
+  timeit! ({
+    let idims = Dim4::new(&[1, 5, 1, 1]);
+    let odims = Dim4::new(&[1, 5, 1, 1]);
+    layer_backward_helper("Dense", idims, odims
+                          , "l2"              // loss
+                          , 1e-4              // eps for numerical grad
+                          , "tanh"            // activation
+                          , "glorot_uniform"  // weight init
+                          , "zeros");         // bias init
+  });
 }
