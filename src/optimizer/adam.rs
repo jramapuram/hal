@@ -4,6 +4,7 @@ use itertools::Zip;
 use std::collections::HashMap;
 use std::default::Default;
 
+use optimizer;
 use params::ParamManager;
 use initializations;
 use optimizer::Optimizer;
@@ -31,7 +32,7 @@ impl Default for Adam {
       beta2: 0.999,
       eps: 1e-8,
       lambda: 1.0 - 1e-8,
-      clip_grad: 0.0,
+      clip_grad: 5.0,
       iter: 0,
       mt: Vec::new(),
       vt: Vec::new(),
@@ -82,16 +83,22 @@ impl Optimizer for Adam {
                                                    , 0..num_params))                           // current index
     {
       running_type = arr.get_type();
+      let grad_update = match self.clip_grad > 0.0 {
+        false => delta.clone(),
+        true  => optimizer::clip_grads(&delta, self.clip_grad),
+      };
+
       *mt_i = af::add(&af::mul(&self.beta1, mt_i, false)
-                      , &af::mul(&(1.0 - self.beta1), delta, false)
+                      , &af::mul(&(1.0 - self.beta1), &grad_update, false)
                       , false);
       *vt_i = af::add(&af::mul(&self.beta2, vt_i, false)
-                      , &af::mul(&(1.0 - self.beta2), &af::mul(delta, delta, false), false)
+                      , &af::mul(&(1.0 - self.beta2), &af::mul(&grad_update, &grad_update, false), false)
                       , false);
       let mhat_i = af::div(mt_i, &(1.0 - self.beta1), false);
       let vhat_i = af::div(vt_i, &(1.0 - self.beta2), false);
       let update = af::mul(&self.learning_rate, &af::div(&mhat_i, &af::add(&af::sqrt(&vhat_i), &self.eps, false), false)
                            , false);
+
       parameter_manager.set_array_from_index(af::sub(arr, &update, false), ind);
     }
 

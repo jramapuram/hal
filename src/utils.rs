@@ -98,6 +98,10 @@ pub fn constant(dims: Dim4, aftype: DType, val: f32) -> Array {
 }
 
 pub fn cast(input: &Array, dest_type: DType) -> Array {
+  if input.get_type() == dest_type{
+    return input.clone()
+  }
+
   match dest_type
   {
     DType::F32 => input.cast::<f32>(),

@@ -4,9 +4,11 @@ mod sgd;
 pub use self::adam::Adam;
 mod adam;
 
-use af::Dim4;
+use af;
+use af::{Array, Dim4, NormType};
 use std::collections::HashMap;
 
+use utils;
 use error::HALError;
 use params::ParamManager;
 
@@ -32,4 +34,10 @@ pub fn get_optimizer_with_defaults(name: &str) -> Result<Box<Optimizer>, HALErro
     "adam" => Ok(Box::new(Adam::default())),
     _     => Err(HALError::UNKNOWN),
   }
+}
+
+pub fn clip_grads(input: &Array, rescale: f32) -> Array {
+  let norm = af::norm(input, NormType::VECTOR_2, 0f64, 0f64) as f32;
+  let scale = rescale / norm.max(rescale);
+  utils::cast(&af::mul(input, &scale, false), input.get_type())
 }
