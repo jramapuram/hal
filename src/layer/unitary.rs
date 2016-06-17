@@ -39,9 +39,8 @@ impl Unitary
 
         // R1*
         let h_temp = h.clone();
-        let mut r = af::Array::new(&[num::pow(af::norm(&params.weights[4], af::NormType::VECTOR_2, 1., 1.), 2) as f32]
-                               , Dim4::new(&[1,1,1,1])).clone();
-        r = af::div(&params.weights[4], &r, true);
+        let r = num::pow(af::norm(&params.weights[4], af::NormType::VECTOR_2, 1., 1.), 2);
+        let r = af::div(&params.weights[4], &r, true);
         h = af::matmul(&h
                        , &r
                        , MatProp::NONE
@@ -70,9 +69,8 @@ impl Unitary
 
         // R2
         let h_temp = h.clone();
-        let mut r = af::Array::new(&[num::pow(af::norm(&params.weights[5], af::NormType::VECTOR_2, 1., 1.), 2) as f32]
-                                   , Dim4::new(&[1,1,1,1]));
-        r = af::div(&params.weights[5], &r, true);
+        let r = num::pow(af::norm(&params.weights[5], af::NormType::VECTOR_2, 1., 1.), 2);
+        let r = af::div(&params.weights[5], &r, true);
         h = af::matmul(&h
                        , &r
                        , MatProp::NONE

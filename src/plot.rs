@@ -1,5 +1,5 @@
 use af;
-use af::{Array, HasAfEnum};
+use af::{Array, Dim4, HasAfEnum};
 
 use utils;
 //use error::HALError;
@@ -22,6 +22,7 @@ pub fn plot_array(values: &Array, title: &str, window_x: u16, window_y: u16) {
 pub fn plot_vec<T: HasAfEnum>(raw_values: Vec<T>, title: &str, window_x: u16, window_y: u16) {
   // copy from float vector to Array
   let num_rows = raw_values.len();
-  let values = utils::vec_to_array(raw_values, num_rows, 1);
+  let dims = Dim4::new(&[num_rows as u64, 1, 1, 1]);
+  let values = utils::vec_to_array(raw_values, dims);
   plot_array(&values, title, window_x, window_y);
 }

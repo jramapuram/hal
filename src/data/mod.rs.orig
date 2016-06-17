@@ -1,16 +1,20 @@
 pub use self::sin::SinSource;
 mod sin;
 
+<<<<<<< HEAD
 pub use self::copying_prob_src::CopyingProblemSource;
 mod copying_prob_src;
 
 pub use self::adding_prob_src::AddingProblemSource;
 mod adding_prob_src;
 
+use af::{Dim4, Array};
+=======
 pub use self::xor::XORSource;
 mod xor;
 
 use af::{Dim4, Array, DType};
+>>>>>>> upstream/feature/lstm
 use std::cell::{RefCell, Cell};
 
 use utils;

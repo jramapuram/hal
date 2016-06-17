@@ -17,7 +17,7 @@ use std::fs::File;
 use num::traits::Float;
 use num::{Complex, Num};
 use statistical::{standard_deviation, mean};
-use af::{Dim4, Array, DType, Seq, AfError, HasAfEnum};
+use af::{Dim4, Array, DType, Seq, HasAfEnum};
 use itertools::Zip;
 use rustc_serialize::Encodable;
 
@@ -97,15 +97,36 @@ pub fn constant(dims: Dim4, aftype: DType, val: f32) -> Array {
   }
 }
 
+pub fn cast(input: &Array, dest_type: DType) -> Array {
+  if input.get_type() == dest_type{
+    return input.clone()
+  }
+
+  match dest_type
+  {
+    DType::F32 => input.cast::<f32>(),
+    DType::F64 => input.cast::<f64>(),
+    DType::C32 => input.cast::<Complex<f32>>(),
+    DType::C64 => input.cast::<Complex<f64>>(),
+    DType::B8  => input.cast::<bool>(),
+    DType::S32 => input.cast::<i32>(),
+    DType::U32 => input.cast::<u32>(),
+    DType::U8  => input.cast::<u8>(),
+    DType::S64 => input.cast::<i64>(),
+    DType::U64 => input.cast::<u64>(),
+    DType::S16 => input.cast::<i64>(),
+    DType::U16 => input.cast::<u16>(),
+  }
+}
+
 
 /// Convert a vector of elements to a vector of Array
-pub fn vec_to_array<T: HasAfEnum>(vec_values: Vec<T>, rows: usize, cols: usize) -> Array {
-  raw_to_array(vec_values.as_ref(), rows, cols)
+pub fn vec_to_array<T: HasAfEnum>(vec_values: Vec<T>, dims: Dim4) -> Array {
+  raw_to_array(vec_values.as_ref(), dims)
 }
 
 /// Convert a generic vector to an Array
-pub fn raw_to_array<T: HasAfEnum>(raw_values: &[T], rows: usize, cols: usize) -> Array {
-  let dims = Dim4::new(&[rows as u64, cols as u64, 1, 1]);
+pub fn raw_to_array<T: HasAfEnum>(raw_values: &[T], dims: Dim4) -> Array {
   Array::new::<T>(raw_values, dims)
 }
 
@@ -414,7 +435,7 @@ pub fn verify_gradient_smooth<F>(fn_closure: F, input: &Array, eps: f64, grad: &
   println!("Relative error[smooth] = {}", rel);
   match rel {
     n if n > 1e-2 => Err(HALError::GRADIENT_ERROR),
-    n if n < 1e-4 => Err(HALError::GRADIENT_ERROR),
+    n if n < 1e-5 => Err(HALError::GRADIENT_ERROR),
     _             => Ok(rel),
   }
 }
@@ -456,6 +477,7 @@ pub fn numerical_gradient<F>(fn_closure: F, arr: &Array, eps: f64) -> Array
   let num_cols = arr.dims()[1] as usize;
   let mut grad_vec = vec![0f64; num_elems];
 
+  let target_dims = Dim4::new(&[num_rows as u64, num_cols as u64, 1, 1]);
   for i in 0..num_elems
   {
     // build a vec(matrix) of [0....eps...0] (same size as arr)
@@ -463,7 +485,7 @@ pub fn numerical_gradient<F>(fn_closure: F, arr: &Array, eps: f64) -> Array
     let mut eps_vec = vec![0f64; num_elems];
     eps_vec[i] = eps;
 
-    let eps_arr = vec_to_array::<f64>(eps_vec.clone(), num_rows, num_cols);
+    let eps_arr = vec_to_array::<f64>(eps_vec.clone(), target_dims);
     let arr_p_h = af::add(arr, &eps_arr, false);
     let arr_m_h = af::sub(arr, &eps_arr, false);
 
@@ -471,7 +493,7 @@ pub fn numerical_gradient<F>(fn_closure: F, arr: &Array, eps: f64) -> Array
     grad_vec[i] = (fn_closure(&arr_p_h) - fn_closure(&arr_m_h)) / (2f64 * eps);
   }
 
-  vec_to_array::<f64>(grad_vec, num_rows, num_cols)
+  vec_to_array::<f64>(grad_vec, target_dims)
 }
 
 

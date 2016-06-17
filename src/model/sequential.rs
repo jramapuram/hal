@@ -2,22 +2,21 @@ use af;
 use af::{Array, Backend, HasAfEnum};
 use std::cmp::max;
 use num::Zero;
+use itertools::Zip;
 use std::default::Default;
 use std::collections::HashMap;
 
-use utils;
 use loss;
-use layer::{Layer, Dense, Unitary};//, LSTM};
+use layer::{Layer, Dense, RNN, Unitary};//, LSTM};
 use data::{DataSource};
 use device::{Device, DeviceManager, DeviceManagerFactory};
 use model::Model;
 use optimizer::{Optimizer, SGD};
-use params::{ParamManager, DenseGenerator, LSTMGenerator, UnitaryGenerator, Input};
+use params::{ParamManager, DenseGenerator, LSTMGenerator, RNNGenerator, Input};
 
 pub struct Sequential {
   layers: Vec<Box<Layer>>,
-// Attention : drop the pub
-  pub  param_manager: ParamManager,
+  param_manager: ParamManager,
   optimizer: Box<Optimizer>,
   manager: DeviceManager,
   loss: String,
@@ -69,13 +68,23 @@ impl Model for Sequential {
     match layer {
       "dense" => {
         self.param_manager.add_dense::<T>(self.manager.clone(), self.device
-                                     , input_size, output_size
-                                     , params.get("activation").unwrap()
-                                     , params.get("w_init").unwrap()
-                                     , params.get("b_init").unwrap());
+                                          , input_size, output_size
+                                          , params.get("activation").unwrap()
+                                          , params.get("w_init").unwrap()
+                                          , params.get("b_init").unwrap());
         self.layers.push(Box::new(Dense{input_size: input_size
                                         , output_size: output_size}));
       },
+      "rnn" => {
+        self.param_manager.add_rnn::<T>(self.manager.clone(), self.device
+                                        , input_size, output_size
+                                        , params.get("activation").unwrap()
+                                        , params.get("w_init").unwrap()
+                                        , params.get("w_recurrent_init").unwrap()
+                                        , params.get("b_init").unwrap());
+        self.layers.push(Box::new(RNN{input_size: input_size
+                                      , output_size: output_size}));
+      }
       // "lstm"  => {
       //   self.param_manager.add_lstm::<T>(self.manager.clone(), self.device
       //                               , input_size, output_size
@@ -135,8 +144,7 @@ impl Model for Sequential {
 
   fn forward<T>(&mut self, activation: &Array
                 , src_device: Device
-                , dest_device: Device
-                , train: bool) -> Array
+                , dest_device: Device) -> Vec<Array>
     where T: HasAfEnum + Zero + Clone
   {
     // check & swap if the backend matches to runtime one (if not already)
@@ -145,22 +153,31 @@ impl Model for Sequential {
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
     let bptt_unroll = max(activ.dims()[2], 1);
-    let mut activate = Input {data: af::slice(&activ, 0)
-                              , activation: "ones".to_string()};
+    let mut activate;
+
     for t in 0..bptt_unroll {
-      activate.data = af::slice(&activ, t);
+      activate = af::slice(&activ, t);
       for i in 0..self.layers.len() {
         activate = self.layers[i].forward(self.param_manager.get_params(i)
-                                          , &activate, train);
+                                          , &activate);
       }
     }
 
+    // return the collected outputs of the last layer
+    let last_index = self.layers.len() - 1;
+    let mut outputs = self.param_manager.get_outputs(last_index);
+
     // return to the dest device
-    self.manager.swap_array_backend::<T>(&activate.data, self.device, dest_device)
+    for i in 0..outputs.len() {
+      outputs[i] = self.manager.swap_array_backend::<T>(&outputs[i], self.device, dest_device);
+    }
+
+    outputs
   }
 
   fn fit<T, E>(&mut self, source: &T, src_device: Device
-               , epochs: u64, batch_size: u64, verbose: bool) -> Vec<f32>
+               , epochs: u64, batch_size: u64, bptt_interval: Option<u64>
+               , verbose: bool) -> Vec<f32>
     where T: DataSource, E: HasAfEnum + Zero + Clone
   {
     // some simple data validity checks
@@ -171,10 +188,12 @@ impl Model for Sequential {
     println!("\ntrain samples: {:?} | target samples: {:?} | batch size: {}"
              , idims, tdims, batch_size);
     println!("epochs: {} | iterations[per epoch]: {}", epochs, iters);
-    assert!(tdims[0] == idims[0]);          // batches are of equal size
+    assert!(idims[0] == tdims[0]
+            , "batch sizes for inputs and targets much be equal");
+    assert!(idims[2] == tdims[2]
+            , "sequence lengths for inputs and targets must be equal");
 
     // loss vector current loss
-    let mut loss: f32;
     let mut lossvec = Vec::<f32>::new();
     let compute_device = self.device.clone();
 
@@ -202,35 +221,56 @@ impl Model for Sequential {
                                                            , src_device
                                                            , compute_device);
 
-        let a_t = self.forward::<E>(&batch_input, compute_device, compute_device, true);
-        loss = self.backward(&a_t, &batch_target);
-        self.optimizer.update(&mut self.param_manager, batch_size as u64);
-        lossvec.push(loss);
-
-        if verbose {
-          print!("{} ", loss);
+        // if bptt_interval is specified we slice our minibatch
+        // into bptt_interval number of slices and then forward pass on it
+        let mut current_loss_vec = Vec::new();
+        if let Some(bptt_interval) = bptt_interval {
+          let num_seqs = idims[2]/bptt_interval;
+          let start: Vec<_>  = (0..num_seqs).map(|x| x * bptt_interval).collect();
+          let finish: Vec<_> = (1..num_seqs+1).map(|x| x * bptt_interval).collect();
+          for (begin, end) in Zip::new((start, finish)) //TODO: fix when .step_by() becomes stable
+          {
+            let bptt_input_slice = af::slices(&batch_input, begin, end-1);
+            let bptt_target_slice = af::slices(&batch_target, begin, end-1);
+            let a_t = self.forward::<E>(&bptt_input_slice, compute_device, compute_device);
+            current_loss_vec = self.backward(&a_t, &bptt_target_slice);
+          }
+        }else{
+          let a_t = self.forward::<E>(&batch_input, compute_device, compute_device);
+          current_loss_vec = self.backward(&a_t, &batch_target);
         }
+
+        self.optimizer.update(&mut self.param_manager, batch_size as u64);
+
+        // cache and print loss (if verbose)
+        if verbose {
+          print!("{} ", current_loss_vec.last().unwrap());
+        }
+        lossvec.extend(current_loss_vec);
       }
     }
 
-    utils::write_csv::<f32>("loss.csv", &lossvec);
+    //utils::write_csv::<f32>("loss.csv", &lossvec);
     self.manager.swap_device(src_device); // return to src device
     lossvec
   }
 
-  fn backward(&mut self, prediction: &Array, target: &Array) -> f32 {
+  fn backward(&mut self, predictions: &Vec<Array>, targets: &Array) -> Vec<f32> {
     // setup the optimizer parameters (if not already setup)
     self.optimizer.setup(self.param_manager.get_all_dims());
+    let mut loss_vec = Vec::with_capacity(predictions.len());
 
-    // Note: a requirement here is that the output activation is
-    // the last element of the activation's vector of the last layer
-    let last_index = self.layers.len() - 1;
-    let last_layer_activations = self.param_manager.get_activations(last_index);
-    let mut delta = loss::get_loss_derivative(&self.loss, prediction, target).unwrap();
-    for i in (0..last_index + 1).rev() {
-      delta = self.layers[i].backward(self.param_manager.get_params(i), &delta);
+    for (pred, ind) in Zip::new((predictions.iter().rev(), (0..predictions.len()).rev()))
+    {
+      let tar = af::slice(&targets, ind as u64);
+      let last_index = self.layers.len();
+      let mut delta = loss::get_loss_derivative(&self.loss, pred, &tar).unwrap();
+      for i in (0..last_index).rev() {
+        delta = self.layers[i].backward(self.param_manager.get_params(i), &delta);
+      }
+      loss_vec.push(loss::get_loss(&self.loss, pred, &tar).unwrap());
     }
 
-    loss::get_loss(&self.loss, prediction, target).unwrap()
+    loss_vec
   }
 }
