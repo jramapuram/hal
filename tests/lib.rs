@@ -169,6 +169,7 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
   where F: FnMut(&ParamManager, Box<Layer>)
 {
   // [batch_size, input_size, temporal_size, 1]
+  let batch_size: usize = idims[0] as usize;
   let input_size: usize = idims[1] as usize;
   let output_size: usize = odims[1] as usize;
   let temporal_size: usize = idims[2] as usize;
@@ -199,11 +200,17 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
                                               , activation
                                               , w_init
                                               , b_init),
-    "rnn"  => param_manager.add_rnn::<f64>(device_manager, device
-                                             , input_size, output_size
-                                             , activation
-                                             , w_init, w_init // just dupe it
-                                             , b_init),
+    "rnn"  => {
+      param_manager.add_rnn::<f64>(device_manager, device
+                                   , input_size, output_size
+                                   , activation
+                                   , w_init, w_init // just dupe it
+                                   , b_init);
+      // make it such that we are within an unrolling
+      let hdims = Dim4::new(&[batch_size as u64, output_size as u64, 1, 1]);
+      let h_t = utils::constant(hdims, DType::F64, 0.5f32);
+      param_manager.set_recurrences(0, vec![h_t]);
+    }
   //todo: lstm, etc
     _      => panic!("unknown layer type specified"),
   };
@@ -352,7 +359,7 @@ fn rnn_forward(){
                          , "ones"                                        // weight init
                          , "zeros"                                       // bias init
                          , vec![-0.01, 0.00, 1.10, 2.20, 3.15]           //input
-                         , vec![6.4400, 6.4400,6.4400, 6.4400, 6.4400]); //target
+                         , vec![ 8.94000053, 8.94000053, 8.94000053, 8.94000053, 8.94000053]); //target
   });
 }
 
