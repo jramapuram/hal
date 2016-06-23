@@ -83,6 +83,7 @@ pub struct Params {
   pub inputs: Vec<Array>,
   pub outputs: Vec<Array>,
   pub recurrences: Vec<Array>,
+  pub deltaRec: Vec<Array>,
   pub current_unroll: usize,
   pub optional: Vec<Array>,
 }
@@ -164,6 +165,7 @@ impl ParamManager {
       inputs: inputs,
       outputs: outputs,
       recurrences: recurrences,
+      deltaRec: Vec::new(),
       current_unroll: 0,
       optional: optional,
     })));
