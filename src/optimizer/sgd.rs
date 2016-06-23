@@ -6,6 +6,7 @@ use std::default::Default;
 
 use params::ParamManager;
 use initializations;
+use optimizer;
 use optimizer::Optimizer;
 
 #[allow(non_snake_case)]
@@ -72,12 +73,17 @@ impl Optimizer for SGD {
                                                  , self.velocity.iter_mut()                  // velocity of above
                                                  , 0..num_params))                           // current index
     {
+      running_type = arr.get_type();
+      let grad_update = match self.clip_grad > 0.0 {
+        false => delta.clone(),
+        true  => optimizer::clip_grads(&delta, self.clip_grad),
+      };
+
       // v   = momemtum * v + learning_rate * d_w (or d_b)
       // p   = p - v
       *velocity = af::add(&af::mul(&self.momemtum, velocity, false),
-                          &af::mul(&alpha, delta, false), false);
+                          &af::mul(&alpha, &grad_update, false), false);
       assert!(velocity.dims().get() == arr.dims().get());
-      running_type = arr.get_type();
       parameter_manager.set_array_from_index(af::sub(arr, velocity, false), ind);
     }
 

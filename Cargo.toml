@@ -1,10 +1,15 @@
 [package]
-name = "hal"
-version = "0.2.0"
-authors = ["Jason Ramapuram <jason.ramapuram@gmail.com>"]
+name        = "hal-ml"
+version     = "0.2.0"
+description = "HAL: a machine learning library that is able to run on Nvidia, OpenCL or CPU BLAS based compute backends. It currently provides stackable classical neural networks, RNN's and soon to be LSTM's. A differentiation of this package is that we are looking to implement RTRL (instead of just BPTT) for the recurrent layers in order to provide a solid framework for online learning. We will also (in the future) be implementing various layers such as unitary RNN's, NTM's and Adaptive Computation time based LSTM's. HAL also comes with the ability to plot and do many basic math operations on arrays."
+license     = "BSD-3-Clause"
+repository  = "https://github.com/jramapuram/hal"
+homepage    = "https://github.com/jramapuram/hal"
+authors     = ["Jason Ramapuram <jason.ramapuram@gmail.com>"]
 
 [dependencies]
 rustc-serialize = "0.3.19"
+timeit = "0.1.2"
 rand = "0.3.14"
 csv = "0.14.4"
 num = "0.1.31"
@@ -27,3 +32,7 @@ plugin = true
 [[example]]
 name = "autoencoder"
 path = "examples/autoencoder.rs"
+
+[[example]]
+name = "xor_rnn"
+path = "examples/xor_rnn.rs"

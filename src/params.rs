@@ -73,12 +73,6 @@ macro_rules! get_param_func {
 }
 
 #[derive(Clone)]
-pub struct Input {
-  pub data: Array,
-  pub activation: String,
-}
-
-#[derive(Clone)]
 pub struct Params {
   pub layer_type: String,
   pub device: Device,
@@ -86,8 +80,8 @@ pub struct Params {
   pub biases: Vec<Array>,
   pub activations: Vec<String>,
   pub deltas: Vec<Array>,
-  pub inputs: Vec<Input>,
-  pub outputs: Vec<Input>,
+  pub inputs: Vec<Array>,
+  pub outputs: Vec<Array>,
   pub recurrences: Vec<Array>,
   pub current_unroll: usize,
   pub optional: Vec<Array>,
@@ -107,14 +101,14 @@ impl Default for ParamManager {
 
 impl ParamManager {
   pub fn add<T: HasAfEnum>(&mut self
-             , manager: DeviceManager
-             , device: Device
-             , layer_type: &str
-             , weight_params: Vec<(&str, (usize, usize))> //(init, (i, o))
-             , biases_params: Vec<(&str, (usize, usize))> //(init, (i, o))
-             , activations: Vec<&str>
-             , recurrence_dims: Option<Vec<(&str, (usize, usize))>>
-             , optional_dims: Option<Vec<(&str, (usize, usize))>>)
+                           , manager: DeviceManager
+                           , device: Device
+                           , layer_type: &str
+                           , weight_params: Vec<(&str, (usize, usize))> //(init, (i, o))
+                           , biases_params: Vec<(&str, (usize, usize))> //(init, (i, o))
+                           , activations: Vec<&str>
+                           , recurrence_dims: Option<Vec<(&str, (usize, usize))>>
+                           , optional_dims: Option<Vec<(&str, (usize, usize))>>)
   {
     // toggle device to appropriate one
     manager.swap_device(device);
@@ -138,11 +132,17 @@ impl ParamManager {
     }
 
     // generate recurrence vectors
+    // if the length of the recurrences are > 0 then init the inp/outputs
     let mut recurrences: Vec<Array> = Vec::new();
+    let mut inputs: Vec<Array> = Vec::new();
+    let mut outputs: Vec<Array> = Vec::new();
     if let Some(r) = recurrence_dims{
       for (r_init, r_dims) in r {
         recurrences.push(self.generate::<T>(r_init, r_dims));
+        inputs.push(self.generate::<T>("zeros", (1, 1)));
+        outputs.push(self.generate::<T>("zeros", (1, 1)));
       }
+
     }
 
     // some elements have optional params
@@ -161,8 +161,8 @@ impl ParamManager {
       biases: biases,
       activations: owned_activations,
       deltas: deltas,
-      inputs: Vec::new(),
-      outputs: Vec::new(),
+      inputs: inputs,
+      outputs: outputs,
       recurrences: recurrences,
       current_unroll: 0,
       optional: optional,
@@ -300,8 +300,8 @@ impl ParamManager {
   get_param_func!(get_bias, biases, Array);
   get_param_func!(get_activation, activations, String);
   get_param_func!(get_delta, deltas, Array);
-  get_param_func!(get_input, inputs, Input);
-  get_param_func!(get_output, outputs, Input);
+  get_param_func!(get_input, inputs, Array);
+  get_param_func!(get_output, outputs, Array);
   get_param_func!(get_recurrence, recurrences, Array);
   get_param_func!(get_optional, optional, Array);
 
@@ -309,8 +309,8 @@ impl ParamManager {
   get_param_vec_func!(get_biases, biases, Array);
   get_param_vec_func!(get_activations, activations, String);
   get_param_vec_func!(get_deltas, deltas, Array);
-  get_param_vec_func!(get_inputs, inputs, Input);
-  get_param_vec_func!(get_outputs, outputs, Input);
+  get_param_vec_func!(get_inputs, inputs, Array);
+  get_param_vec_func!(get_outputs, outputs, Array);
   get_param_vec_func!(get_recurrences, recurrences, Array);
   get_param_vec_func!(get_optionals, optional, Array);
 
@@ -318,8 +318,8 @@ impl ParamManager {
   with_mut_param_vec_func!(with_mut_biases, biases, Array);
   with_mut_param_vec_func!(with_mut_activations, activations, String);
   with_mut_param_vec_func!(with_mut_deltas, deltas, Array);
-  with_mut_param_vec_func!(with_mut_inputs, inputs, Input);
-  with_mut_param_vec_func!(with_mut_outputs, outputs, Input);
+  with_mut_param_vec_func!(with_mut_inputs, inputs, Array);
+  with_mut_param_vec_func!(with_mut_outputs, outputs, Array);
   with_mut_param_vec_func!(with_mut_recurrences, recurrences, Array);
   with_mut_param_vec_func!(with_mut_optionals, optional, Array);
 
@@ -327,8 +327,8 @@ impl ParamManager {
   set_param_func!(set_bias, biases, Array);
   set_param_func!(set_activation, activations, String);
   set_param_func!(set_delta, deltas, Array);
-  set_param_func!(set_input, inputs, Input);
-  set_param_func!(set_output, outputs, Input);
+  set_param_func!(set_input, inputs, Array);
+  set_param_func!(set_output, outputs, Array);
   set_param_func!(set_recurrence, recurrences, Array);
   set_param_func!(set_optional, optional, Array);
 
@@ -336,8 +336,8 @@ impl ParamManager {
   set_param_vec_func!(set_biases, biases, Array);
   set_param_vec_func!(set_activations, activations, String);
   set_param_vec_func!(set_deltas, deltas, Array);
-  set_param_vec_func!(set_inputs, inputs, Input);
-  set_param_vec_func!(set_outputs, outputs, Input);
+  set_param_vec_func!(set_inputs, inputs, Array);
+  set_param_vec_func!(set_outputs, outputs, Array);
   set_param_vec_func!(set_recurrences, recurrences, Array);
   set_param_vec_func!(set_optionals, optional, Array);
 
@@ -457,27 +457,27 @@ impl ParamManager {
 /** Custom Layer Traits **/
 pub trait DenseGenerator {
   fn add_dense<T: HasAfEnum>(&mut self
-               , manager: DeviceManager
-               , device: Device
-               , input_size: usize
-               , output_size: usize
-               , activation: &str
-               , w_init: &str
-               , b_init: &str);
+                             , manager: DeviceManager
+                             , device: Device
+                             , input_size: usize
+                             , output_size: usize
+                             , activation: &str
+                             , w_init: &str
+                             , b_init: &str);
 
 }
 
 pub trait RNNGenerator {
   fn add_rnn<T: HasAfEnum>(&mut self
-             , manager: DeviceManager
-             , device: Device
-             , input_size: usize
-             , output_size: usize
-             , max_seq_size: usize
-             , activation: &str
-             , w_init: &str
-             , w_recurrent_init: &str
-             , b_init: &str);
+                           , manager: DeviceManager
+                           , device: Device
+                           , input_size: usize
+                           , output_size: usize
+                           //, bptt_interval: usize
+                           , activation: &str
+                           , w_init: &str
+                           , w_recurrent_init: &str
+                           , b_init: &str);
 }
 
 pub enum LSTMIndex {
@@ -491,64 +491,64 @@ pub enum LSTMIndex {
 
 pub trait LSTMGenerator {
   fn add_lstm<T: HasAfEnum>(&mut self
-              , manager: DeviceManager
-              , device: Device
-              , input_size: usize
-              , output_size: usize
-              , max_seq_size: usize
-              , input_activation: &str
-              , output_activation: &str
-              , w_inner_init: &str
-              , w_outer_init: &str
-              , forget_bias_init: &str
-              , b_init: &str);
+                            , manager: DeviceManager
+                            , device: Device
+                            , input_size: usize
+                            , output_size: usize
+                            , bptt_interval: usize
+                            , input_activation: &str
+                            , output_activation: &str
+                            , w_init: &str
+                            , w_recurrent_init: &str
+                            , forget_bias_init: &str
+                            , b_init: &str);
 }
 
 /** Custom Layer Impls **/
-impl<'a> DenseGenerator for ParamManager {
+impl DenseGenerator for ParamManager {
   fn add_dense<T: HasAfEnum>(&mut self
-               , manager: DeviceManager
-               , device: Device
-               , input_size: usize
-               , output_size: usize
-               , activation: &str
-               , w_init: &str
-               , b_init: &str)
+                             , manager: DeviceManager
+                             , device: Device
+                             , input_size: usize
+                             , output_size: usize
+                             , activation: &str
+                             , w_init: &str
+                             , b_init: &str)
   {
     self.add::<T>(manager, device, "dense"
-             , vec![(w_init, (input_size, output_size))]
-             , vec![(b_init, (output_size, 1))]
-             , vec![activation]
-             , None, None);
+                  , vec![(w_init, (input_size, output_size))]
+                  , vec![(b_init, (output_size, 1))]
+                  , vec![activation]
+                  , None, None);
   }
 }
 
-impl<'a> RNNGenerator for ParamManager {
+impl RNNGenerator for ParamManager {
   fn add_rnn<T: HasAfEnum>(&mut self
-             , manager: DeviceManager
-             , device: Device
-             , input_size: usize
-             , output_size: usize
-             , max_seq_size: usize
-             , activation: &str
-             , w_init: &str
-             , w_recurrent_init: &str
-             , b_init: &str)
+                           , manager: DeviceManager
+                           , device: Device
+                           , input_size: usize
+                           , output_size: usize
+                           //, bptt_interval: usize
+                           , activation: &str
+                           , w_init: &str
+                           , w_recurrent_init: &str
+                           , b_init: &str)
   {
     let recurrent_weight_dims = (output_size, output_size);
     let input_dims = (input_size, output_size);
     let bias_dims = (output_size, 1);
 
-    let mut weights = vec![(w_init, input_dims); max_seq_size]; //clone this max_seq_size times
-    let recurrent_weights = vec![(w_recurrent_init, recurrent_weight_dims); max_seq_size]; // ^
+    let mut weights = vec![(w_init, input_dims)];
+    let recurrent_weights = vec![(w_recurrent_init, recurrent_weight_dims)];
     weights.extend(recurrent_weights); // all weights are passed as one to the add func
 
     self.add::<T>(manager, device, "rnn"
-             , weights                                        // houses weights & recurrent weights
-             , vec![(b_init, bias_dims); max_seq_size]        // need max_seq_size clones
-             , vec![activation]                               // std rnn has only one activation
-             , Some(vec![("zeros", bias_dims); max_seq_size]) // h_tm1 = sizeof(bias)
-             , None);
+                  , weights                                            // weight dims
+                  , vec![(b_init, bias_dims)]                          // bias dims
+                  , vec![activation]                                   // activation vector
+                  , None//, Some(vec![("zeros", bias_dims); bptt_interval + 1]) // h_tm1 = sizeof(bias)
+                  , None);
   }
 }
 
@@ -558,7 +558,7 @@ impl LSTMGenerator for ParamManager {
               , device: Device
               , input_size: usize
               , output_size: usize
-              , max_seq_size: usize
+              , bptt_interval: usize
               , inner_activation: &str
               , outer_activation: &str
               , w_init: &str

@@ -1,4 +1,6 @@
 use af;
+use rand;
+use rand::Rng;
 use af::{Dim4, Array, HasAfEnum};
 
 use utils;
@@ -20,6 +22,10 @@ pub fn get_fans(dims: Dim4) -> (f32, f32){
 
 /// A helper to return a normal shape with the provided scale
 pub fn normal<T: HasAfEnum>(dims: Dim4, scale: f32) -> Array {
+  // seed device
+  let mut rng = rand::thread_rng();
+  af::set_seed(rng.gen::<u64>());
+
   let src_type = T::get_af_dtype();
   let scale_vec = utils::constant(dims, src_type, scale);
   let u = af::mul(&af::randn::<T>(dims), &scale_vec, false);
@@ -32,6 +38,10 @@ pub fn normal<T: HasAfEnum>(dims: Dim4, scale: f32) -> Array {
 
 /// A helper to provide a uniform shape with the provided scale
 pub fn uniform<T: HasAfEnum>(dims: Dim4, scale: f32) -> Array{
+  // seed device
+  let mut rng = rand::thread_rng();
+  af::set_seed(rng.gen::<u64>());
+
   let src_type = T::get_af_dtype();
   let scale_vec = utils::constant(dims, src_type, scale);
   let u = af::sub(&af::mul(&af::randu::<T>(dims), &scale_vec, false)

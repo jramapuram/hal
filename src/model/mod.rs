@@ -16,15 +16,16 @@ pub trait Model {
          , device: Device) -> Self;
 
   fn fit<T, E>(&mut self, source: &T, src_device: Device
-               , epochs: u64, batch_size: u64
+               , epochs: u64, batch_size: u64, bptt_interval: Option<u64>
                , verbose: bool) -> Vec<f32>
     where T: DataSource, E: HasAfEnum + Zero + Clone;
 
-  fn forward<T: HasAfEnum + Zero + Clone>(&mut self, activation: &Array
-                                          , src_device: Device
-                                          , dest_device: Device
-                                          , train: bool) -> Array;
-  fn backward(&mut self, prediction: &Array, target: &Array) -> f32;
+  fn forward<T>(&mut self, activation: &Array
+                , src_device: Device
+                , dest_device: Device) -> Vec<Array>
+    where T: HasAfEnum + Zero + Clone;
+
+  fn backward(&mut self, predictions: &Vec<Array>, targets: &Array) -> Vec<f32>;
 
   fn add<T: HasAfEnum>(&mut self, layer: &str, params: HashMap<&str, String>);
   fn info(&self);

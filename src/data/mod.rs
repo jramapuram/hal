@@ -1,7 +1,10 @@
 pub use self::sin::SinSource;
 mod sin;
 
-use af::{Dim4, Array};
+pub use self::xor::XORSource;
+mod xor;
+
+use af::{Dim4, Array, DType};
 use std::cell::{RefCell, Cell};
 
 use utils;
@@ -14,11 +17,12 @@ pub struct Data {
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct DataParams {
-  pub input_dims: Dim4,   // [batch_size, feature_x, feature_y, time]
-  pub target_dims: Dim4,  // [batch_size, feature_x, feature_y, time]
-  pub shuffle: bool,      // whether the data is shuffled
-  pub normalize: bool,    // whether the data is normalized
+  pub input_dims: Dim4,         // [batch_size, feature_x, feature_y, time]
+  pub target_dims: Dim4,        // [batch_size, feature_x, feature_y, time]
+  pub shuffle: bool,            // whether the data is shuffled
+  pub normalize: bool,          // whether the data is normalized
   pub current_epoch: Cell<u64>, // for internal tracking of what the current epoch is
+  pub dtype: DType,             // the type of data generated
   pub num_samples: u64,
   pub num_train: u64,
   pub num_test: u64,
