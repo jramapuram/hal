@@ -319,6 +319,12 @@ pub fn normalize<T: Float + Sub>(src: &[T], num_std_dev: T) -> Vec<T> {
   src.iter().map(|&x| (x - mean) / (num_std_dev * std_dev)).collect()
 }
 
+pub fn clip_by_value(src: &Array, clip_min: f64, clip_max: f64) -> Array {
+  let min_clipped = cast(&af::selectl(clip_min, &af::lt(src, &clip_min, false), src), src.get_type());
+  let max_clipped = af::selectl(clip_max, &af::gt(&min_clipped, &clip_max, false), &min_clipped);
+  cast(&max_clipped, src.get_type())
+}
+
 // Normalize an array based on mean & num_std_dev deviations of the variance
 pub fn normalize_array(src: &Array, num_std_dev: f32) -> Array {
   let mean = af::mean_all(src).0 as f32;
