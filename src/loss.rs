@@ -19,10 +19,10 @@ pub fn mse_vec(pred: &Array, target: &Array) -> Array {
 /// Return a vector form of cross entropy
 /// -ylnx - [1-y]ln[1-x]
 pub fn cross_entropy_vec(pred: &Array, target: &Array) -> Array {
-  let pos = af::mul(&af::mul(&-1.0, target, false)
+  let pos = af::mul(&af::mul(&-1.0f32, target, false)
                     , &af::log(&pred), false); // -ylnx
-  let neg = af::mul(&af::sub(&1.0, target, false)       //[1-y]ln[1-x]
-                    , &af::log(&(af::sub(&1.0, pred, false))), false);
+  let neg = af::mul(&af::sub(&1.0f32, target, false)       //[1-y]ln[1-x]
+                    , &af::log(&(af::sub(&1.0f32, pred, false))), false);
   af::sub(&pos, &neg, false)
 }
 
