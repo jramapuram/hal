@@ -22,13 +22,13 @@ pub fn mse_vec(pred: &Array, target: &Array) -> Array {
 pub fn cross_entropy_vec(pred: &Array, target: &Array) -> Array {
   // -yln x
   let pos = af::mul(&af::mul(&-1.0f32, target, false)
-                    , &af::log(&utils::clip_by_value(pred, 0.0, 1.0)), false);
+                    , &af::log(&utils::clip_by_value(pred, 1e-10, 1.0)), false);
   //[1-y]ln[1-x]
   let neg = af::mul(&af::sub(&1.0f32, target, false)
                     , &af::log(&utils::clip_by_value(&af::sub(&1.0f32
                                                               , pred
                                                               , false)
-                                                     , 0.0, 1.0)), false);
+                                                     , 1e-10, 1.0)), false);
   af::sub(&pos, &neg, false)
 }
 
