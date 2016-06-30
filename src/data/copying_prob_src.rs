@@ -1,7 +1,7 @@
 extern crate rand;
 use rand::distributions::{Range, IndependentSample};
 use af;
-use af::{Array, Dim4};
+use af::{Array, Dim4, DType};
 use std::cell::{RefCell, Cell};
 
 use initializations;
@@ -18,7 +18,7 @@ pub struct CopyingProblemSource {
 
 impl CopyingProblemSource {
     pub fn new(input_size: u64, batch_size: u64, seq_size: u64
-               , bptt_unroll: u64, max_samples: u64) -> CopyingProblemSource
+               , bptt_unroll: u64, dtype: DType, max_samples: u64) -> CopyingProblemSource
     {
         let input_dims = Dim4::new(&[batch_size, input_size, bptt_unroll, 1]);
         //let output_dims = Dim4::new(&[batch_size, output_size, bptt_unroll, 1]);
@@ -29,6 +29,7 @@ impl CopyingProblemSource {
             params : DataParams {
                 input_dims: input_dims,
                 target_dims: input_dims,
+                dtype: dtype,
                 normalize: false,
                 shuffle: false,
                 current_epoch: Cell::new(0),
@@ -48,10 +49,10 @@ impl CopyingProblemSource {
 
         let between = Range::new(0,input_size-2);
         let mut rng = rand::thread_rng();
-        let mut ar1 = af::constant(0, af::Dim4::new(&[batch_size,input_size,seq_size,1]));
-        let mut ar2 = af::constant(0, af::Dim4::new(&[batch_size,input_size,bptt_unroll-2*seq_size,1]));
-        let mut ar3 = af::constant(0, af::Dim4::new(&[batch_size,input_size,seq_size,1]));
-        let one = af::constant(1, af::Dim4::new(&[1,1,1,1]));
+        let mut ar1 = af::constant(0f32, af::Dim4::new(&[batch_size,input_size,seq_size,1]));
+        let mut ar2 = af::constant(0f32, af::Dim4::new(&[batch_size,input_size,bptt_unroll-2*seq_size,1]));
+        let mut ar3 = af::constant(0f32, af::Dim4::new(&[batch_size,input_size,seq_size,1]));
+        let one = af::constant(1f32, af::Dim4::new(&[1,1,1,1]));
 
         for i in 0..seq_size {
             for j in 0..batch_size {
@@ -85,8 +86,8 @@ impl CopyingProblemSource {
     }
 
     fn generate_target(&self, input: &Array, batch_size: u64, input_size: u64, bptt_unroll: u64, seq_size: u64) -> Array {
-        let mut first = af::constant(0, af::Dim4::new(&[batch_size, input_size, bptt_unroll-seq_size,1]));
-        let ones = af::constant(1, af::Dim4::new(&[batch_size, 1, 1, 1]));
+        let mut first = af::constant(0f32, af::Dim4::new(&[batch_size, input_size, bptt_unroll-seq_size,1]));
+        let ones = af::constant(1f32, af::Dim4::new(&[batch_size, 1, 1, 1]));
 
         for i in 0..bptt_unroll-seq_size {
             first = af::set_slice(&first, &af::set_col(&af::slice(&first, i), &ones, input_size-2), i);

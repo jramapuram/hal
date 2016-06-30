@@ -1,7 +1,7 @@
 extern crate rand;
 use rand::distributions::{Range, IndependentSample};
 use af;
-use af::{Array, Dim4, MatProp};
+use af::{Array, Dim4, MatProp, DType};
 use std::cell::{RefCell, Cell};
 
 use initializations::uniform_pos;
@@ -16,7 +16,7 @@ pub struct AddingProblemSource {
 }
 
 impl AddingProblemSource {
-    pub fn new(batch_size: u64, bptt_unroll: u64, max_samples: u64) -> AddingProblemSource
+    pub fn new(batch_size: u64, bptt_unroll: u64, max_samples: u64, dtype: DType) -> AddingProblemSource
     {
         let input_dims = Dim4::new(&[batch_size, 1, bptt_unroll, 1]);
         let target_dims = Dim4::new(&[batch_size, 1, 1, 1]);
@@ -27,6 +27,7 @@ impl AddingProblemSource {
             params : DataParams {
                 input_dims: input_dims,
                 target_dims: target_dims,
+                dtype: dtype,
                 normalize: false,
                 shuffle: false,
                 current_epoch: Cell::new(0),

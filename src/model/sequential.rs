@@ -12,7 +12,7 @@ use data::{DataSource};
 use device::{Device, DeviceManager, DeviceManagerFactory};
 use model::Model;
 use optimizer::{Optimizer, SGD};
-use params::{ParamManager, DenseGenerator, LSTMGenerator, RNNGenerator, Input};
+use params::{ParamManager, DenseGenerator, LSTMGenerator, RNNGenerator, UnitaryGenerator};
 
 pub struct Sequential {
   layers: Vec<Box<Layer>>,
@@ -63,8 +63,6 @@ impl Model for Sequential {
     //TODO: Error handling for hashmap
     let input_size = params.get("input_size").unwrap().parse::<u64>().unwrap() as usize;
     let output_size = params.get("output_size").unwrap().parse::<u64>().unwrap() as usize;
-    let hidden_size = params.get("hidden_size").unwrap().parse::<u64>().unwrap() as usize;
-
     match layer {
       "dense" => {
         self.param_manager.add_dense::<T>(self.manager.clone(), self.device
@@ -101,7 +99,8 @@ impl Model for Sequential {
       //                                  , return_sequences: params.get("return_sequences").unwrap()}));
       // },
       
-      "unitary" => {
+      "unitary" => { 
+          let hidden_size = params.get("hidden_size").unwrap().parse::<u64>().unwrap() as usize;
           self.param_manager.add_unitary::<T>(self.manager.clone(), self.device
                                             , input_size, output_size, hidden_size 
 
@@ -221,6 +220,14 @@ impl Model for Sequential {
                                                            , src_device
                                                            , compute_device);
 
+        /*
+        {
+            let param = self.param_manager.get_params(0);
+            let ltex = param.lock().unwrap();
+            af::print(&ltex.weights[0]);
+            af::print(&ltex.deltas[0]);
+        }
+        */
         // if bptt_interval is specified we slice our minibatch
         // into bptt_interval number of slices and then forward pass on it
         let mut current_loss_vec = Vec::new();
@@ -244,7 +251,11 @@ impl Model for Sequential {
 
         // cache and print loss (if verbose)
         if verbose {
-          print!("{} ", current_loss_vec.last().unwrap());
+          let mut total = 0f32;
+          for i in &current_loss_vec{
+              total += *i;
+          }
+          print!("{} ", total);
         }
         lossvec.extend(current_loss_vec);
       }

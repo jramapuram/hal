@@ -86,6 +86,7 @@ pub struct Params {
   pub inputs: Vec<Array>,
   pub outputs: Vec<Array>,
   pub recurrences: Vec<Array>,
+  pub d_rec: Array,
   pub current_unroll: usize,
   pub optional: Vec<Array>,
 }
@@ -166,7 +167,8 @@ impl ParamManager {
       deltas: deltas,
       inputs: inputs,
       outputs: outputs,
-      recurrences: recurrences,
+      recurrences: recurrences, 
+      d_rec: Array::new(&[0], Dim4::new(&[1,1,1,1])),
       current_unroll: 0,
       optional: optional,
     })));
@@ -644,18 +646,28 @@ impl<'a> UnitaryGenerator for ParamManager {
 
         // weights first
         let mut weights: Vec<Array> = Vec::with_capacity(7);
+        let mut deltas: Vec<Array> = Vec::with_capacity(9);
         weights.push(self.generate::<Complex<f32>>(v_init, (input_size, hidden_size)));
+        deltas.push(self.generate::<Complex<f32>>("zeros", (input_size, hidden_size)));
         weights.push(self.generate::<T>(phase_init, (1, hidden_size)));
+        deltas.push(self.generate::<T>("zeros", (1, hidden_size)));
         weights.push(self.generate::<T>(phase_init, (1, hidden_size)));
+        deltas.push(self.generate::<T>("zeros", (1, hidden_size)));
         weights.push(self.generate::<T>(phase_init, (1, hidden_size)));
-        weights.push(self.generate::<Complex<f32>>(householder_init, (hidden_size, 1)));
-        weights.push(self.generate::<Complex<f32>>(householder_init, (hidden_size, 1)));
+        deltas.push(self.generate::<T>("zeros", (1, hidden_size)));
+        weights.push(self.generate::<Complex<f32>>(householder_init, (1, hidden_size)));
+        deltas.push(self.generate::<Complex<f32>>("zeros", (1, hidden_size)));
+        weights.push(self.generate::<Complex<f32>>(householder_init, (1, hidden_size)));
+        deltas.push(self.generate::<Complex<f32>>("zeros", (1, hidden_size)));
         weights.push(self.generate::<T>(u_init, (2*hidden_size, output_size)));
+        deltas.push(self.generate::<T>("zeros", (2*hidden_size, output_size)));
             
         // biases next
         let mut biases: Vec<Array> = Vec::with_capacity(2);
         biases.push(self.generate::<Complex<f32>>(h_bias_init, (1, hidden_size)));
+        deltas.push(self.generate::<Complex<f32>>("zeros", (1, hidden_size)));
         biases.push(self.generate::<T>(o_bias_init, (1, output_size)));
+        deltas.push(self.generate::<T>("zeros", (1, output_size)));
 
         // activations
         let activations = vec![h_activation, o_activation];
@@ -669,7 +681,6 @@ impl<'a> UnitaryGenerator for ParamManager {
         optional.push(self.generate::<i32>(permut_init, (hidden_size, 1)));
         
         let owned_activations = activations.iter().map(|x| x.to_string()).collect::<Vec<String>>();
-        let mut deltas: Vec<Array> = Vec::with_capacity(9);
 
         self.layer_storage.push(Arc::new(Mutex::new(Params{
             layer_type: "unitary".to_string(),
@@ -680,7 +691,8 @@ impl<'a> UnitaryGenerator for ParamManager {
             deltas: deltas,
             inputs: Vec::new(),
             outputs: Vec::new(),
-            recurrences: recurrences,
+            recurrences: recurrences, 
+            d_rec: Array::new(&[0], Dim4::new(&[1,1,1,1])),
             current_unroll: 0,
             optional: optional,
         })));
