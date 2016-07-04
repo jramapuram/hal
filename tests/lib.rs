@@ -235,7 +235,7 @@ pub fn layer_forward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &s
                 {
                   // run a forward pass and verify it is within tolerance
                   let params = param_manager.get_params(0);
-                  let activ = layer.forward(params.clone(), &x.clone());
+                  let (activ, state) = layer.forward(params.clone(), &x.clone(), None);
 
                   let loss_activ = loss::get_loss(loss, &activ, &targets).unwrap();
                   assert!(loss_activ < 1e-9
@@ -276,7 +276,7 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                 {
                   // run a forward and then bkwd pass to extract the gradients
                   let params = param_manager.get_params(0);
-                  let activ = layer.forward(params.clone(), &x.clone());
+                  let (activ, state) = layer.forward(params.clone(), &x.clone(), None);
                   let delta = loss::get_loss_derivative(loss, &activ, &targets).unwrap();
                   layer.backward(params.clone(), &delta);
                   let grads = param_manager.get_all_deltas();
@@ -302,7 +302,7 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                         param_manager.set_inputs(0, bkp_input.clone());
                         param_manager.set_outputs(0, bkp_output.clone());
                         param_manager.set_recurrences(0, bkp_recur.clone());
-                        let fwd_pass = layer.forward(params.clone(), &x.clone());
+                        let (fwd_pass, state) = layer.forward(params.clone(), &x.clone(), None);
                         loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
                       }, &arr_bkp, eps, &grad).unwrap(),
                       true  => utils::verify_gradient_smooth(|i| {
@@ -313,7 +313,7 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                         param_manager.set_inputs(0, bkp_input.clone());
                         param_manager.set_outputs(0, bkp_output.clone());
                         param_manager.set_recurrences(0, bkp_recur.clone());
-                        let fwd_pass = layer.forward(params.clone(), &x.clone());
+                        let (fwd_pass, state) = layer.forward(params.clone(), &x.clone(), None);
                         loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
                       }, &arr_bkp, eps, &grad).unwrap(),
                     };

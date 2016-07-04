@@ -319,6 +319,11 @@ pub fn normalize<T: Float + Sub>(src: &[T], num_std_dev: T) -> Vec<T> {
   src.iter().map(|&x| (x - mean) / (num_std_dev * std_dev)).collect()
 }
 
+pub fn is_nan(input: &Array) -> bool {
+  let nan_array = af::isnan(&input);
+  return af::sum_all(&nan_array).0 > 0f64
+}
+
 pub fn clip_by_value(src: &Array, clip_min: f32, clip_max: f32) -> Array {
   let min_clipped = af::selectl(clip_min as f64, &af::lt(src, &clip_min, false), src);
   af::selectl(clip_max as f64, &af::gt(&min_clipped, &clip_max, false), &min_clipped)
