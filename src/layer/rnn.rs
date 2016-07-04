@@ -76,14 +76,6 @@ impl Layer for RNN
     (a_t.clone(), Some(h_t.clone())) // clone just increases the ref count
   }
 
-  // x, prev_h, Wx, Wh, next_h = cache
-  // dout_dnext_h = dnext_h * (1 - np.power(next_h, 2))
-  // dx = dout_dnext_h.dot(Wx.T)
-  // dprev_h = dout_dnext_h.(Wh.T)
-  // dWx = x.T.dot(dout_dnext_h)
-  // dWh = prev_h.T.dot(dout_dnext_h)
-  // db = dout_dnext_h.sum(axis=0)
-
   fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array) -> Array
   {
     // get a handle to the underlying params
