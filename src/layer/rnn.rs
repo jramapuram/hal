@@ -84,7 +84,7 @@ impl Layer for RNN
   // dWh = prev_h.T.dot(dout_dnext_h)
   // db = dout_dnext_h.sum(axis=0)
 
-  fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array, state_delta: Option<Array>) -> (Array, Option<Array>)
+  fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array) -> Array
   {
     // get a handle to the underlying params
     let mut ltex = params.lock().unwrap();
@@ -102,10 +102,16 @@ impl Layer for RNN
     let dz = activations::get_derivative(&ltex.activations[0]
                                          , &ltex.outputs[current_unroll - 1]).unwrap();
 
-    let delta_t = match state_delta {
-      Some(dh_tm1) => af::mul(&af::add(&dh_tm1, delta, false), &dz, false),
-      None         => af::mul(delta, &dz, false),
-    };
+    // check to see if we already have a state derivative, else add one
+    if ltex.state_derivatives.len() == 0 {
+      let h_size = ltex.recurrences[current_unroll - 1].dims();
+      let h_type = ltex.recurrences[current_unroll - 1].get_type();
+      ltex.state_derivatives.push(utils::constant(h_size, h_type, 0.0f32));
+    }
+
+    // update the delta for the current time-step by combining with state derivative
+    let delta_t = af::mul(&af::add(&ltex.state_derivatives[0]
+                                   , delta, false), &dz, false);
 
     //println!("dh dims = {:?} | delta dims = {:?} | delta prop dims = {:?}", dh.dims(), delta_t.dims(), delta.dims());
     let dw = af::matmul(&ltex.inputs[current_unroll - 1], &delta_t       // delta_w = delta_t * a_{t}
@@ -119,11 +125,13 @@ impl Layer for RNN
     ltex.deltas[1] = af::add(&ltex.deltas[1], &du, false);
     ltex.deltas[2] = af::add(&ltex.deltas[2], &db, false);
 
+    // add the current state derivative in
+    ltex.state_derivatives[0] = af::matmul(&delta_t, &ltex.weights[1], af::MatProp::NONE, af::MatProp::TRANS);
+
     // update location in vector
     ltex.current_unroll -= 1;
 
     //println!("dims = {:?}", af::matmul(&delta_t, &ltex.weights[0], af::MatProp::NONE, af::MatProp::TRANS).dims());
-    (af::matmul(&delta_t, &ltex.weights[0], af::MatProp::NONE, af::MatProp::TRANS),        // delta_{t-1}
-     Some(af::matmul(&delta_t, &ltex.weights[1], af::MatProp::NONE, af::MatProp::TRANS)))  // delta_state_{t-1}
+    af::matmul(&delta_t, &ltex.weights[0], af::MatProp::NONE, af::MatProp::TRANS)    // delta_{t-1}
   }
 }

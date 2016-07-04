@@ -46,7 +46,7 @@ impl Layer for Dense
     (a_t.clone(), None) // clone just increases the ref count
   }
 
-  fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array, state_delta: Option<Array>) -> (Array, Option<Array>)
+  fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array) -> Array
   {
     // get a handle to the underlying params
     let mut ltex = params.lock().unwrap();
@@ -70,6 +70,6 @@ impl Layer for Dense
 
     ltex.current_unroll -= 1;
 
-    (af::matmul(&delta_t, &ltex.weights[0], af::MatProp::NONE, af::MatProp::TRANS), None)
+    af::matmul(&delta_t, &ltex.weights[0], af::MatProp::NONE, af::MatProp::TRANS)
   }
 }

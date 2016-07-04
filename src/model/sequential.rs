@@ -235,11 +235,8 @@ impl Model for Sequential {
       let tar = af::slice(&targets, ind as u64);
       let last_index = self.layers.len();
       let mut delta = loss::get_loss_derivative(&self.loss, pred, &tar).unwrap();
-      let mut state_delta: Option<Array> = None;
       for i in (0..last_index).rev() {
-        let (d, sd) = self.layers[i].backward(self.param_manager.get_params(i), &delta, state_delta);
-        delta = d;
-        state_delta = sd;
+        delta = self.layers[i].backward(self.param_manager.get_params(i), &delta);
       }
       loss_vec.push(loss::get_loss(&self.loss, pred, &tar).unwrap());
     }

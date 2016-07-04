@@ -13,7 +13,11 @@ use std::sync::{Arc, Mutex};
 
 pub trait Layer {
   fn forward(&self, params: Arc<Mutex<Params>>, inputs: &Array, state: Option<Array>) -> (Array, Option<Array>);
-  fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array, state_delta: Option<Array>) -> (Array, Option<Array>);
+  fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array) -> Array;
+}
+
+pub trait RecurrentLayer {
+  fn state_size(self) -> usize;
 }
 
 pub trait RTRL{
