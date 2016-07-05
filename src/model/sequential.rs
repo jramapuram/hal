@@ -249,6 +249,7 @@ impl Model for Sequential {
 
         self.optimizer.update(&mut self.param_manager, batch_size as u64);
 
+
         // cache and print loss (if verbose)
         if verbose {
           let mut total = 0f32;

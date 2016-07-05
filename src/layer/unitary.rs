@@ -41,26 +41,30 @@ fn h_pi(param: Array, ar: Array) -> Array {
 
 fn h_r(param: Array, mut ar: Array) -> Array {
         let ar_temp = ar.clone();
-        ar = af::matmul(&ar
-                       , &param
+        ar = af::matmul(&param
+                       , &ar
                        , MatProp::NONE
-                       , MatProp::CTRANS);
-        ar = af::matmul(&ar
-                       , &param
-                       , MatProp::NONE
+                       , MatProp::TRANS);
+        ar = af::matmul(&param
+                       , &ar
+                       , MatProp::CTRANS
                        , MatProp::NONE);
-        af::sub(&ar_temp, &ar, false)
+        ar = af::transpose(&ar, false);
+        ar = af::mul(&ar, &2, true);
+        ar = af::sub(&ar_temp, &ar, false);
+        ar
 
 }
 
 // Wh = (D3 R2 F-1 D2 Pi R1 F D1) h
 fn wh(p1: Array, p2: Array, p3: Array, p4: Array, p5: Array, p6: Array, ar: Array) -> Array { 
-        h_d(p6
+    h_d(p6
             , h_r(p5
                   , h_ifft(h_d(p4
                                , h_pi(p3
                                     , h_r(p2
                                           , h_fft(h_d(p1, ar))))))))
+
            
 }
 
@@ -140,6 +144,7 @@ impl Layer for Unitary
             ltex.outputs.push(out.clone());
         }
         ltex.current_unroll += 1;
+
         out.clone()
     }
 
@@ -164,9 +169,12 @@ impl Layer for Unitary
         
         // We write d_ to say dL/d_
         // do => dz2
+        /*
         let d_z2 = af::mul(delta
                          , &activations::get_derivative(&ltex.activations[1], &ltex.outputs[t]).unwrap()
                           , false);
+        */
+        let d_z2 = delta;
 
         // dz2 => dh_{t}
         let prod = af::matmul(&d_z2, &ltex.weights[6], MatProp::NONE, MatProp::TRANS);

@@ -38,5 +38,9 @@ name = "xor_rnn"
 path = "examples/xor_rnn.rs"
 
 [[example]]
+name = "copyingProblem"
+path = "examples/copyingProblem.rs"
+
+[[example]]
 name = "test"
 path = "examples/test.rs"

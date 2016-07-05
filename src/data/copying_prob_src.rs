@@ -5,6 +5,7 @@ use af::{Array, Dim4, DType};
 use std::cell::{RefCell, Cell};
 
 use initializations;
+use utils;
 
 use data::{Data, DataSource, DataParams, Normalize, Shuffle};
 
@@ -49,40 +50,43 @@ impl CopyingProblemSource {
 
         let between = Range::new(0,input_size-2);
         let mut rng = rand::thread_rng();
-        let mut ar1 = af::constant(0f32, af::Dim4::new(&[batch_size,input_size,seq_size,1]));
-        let mut ar2 = af::constant(0f32, af::Dim4::new(&[batch_size,input_size,bptt_unroll-2*seq_size,1]));
-        let mut ar3 = af::constant(0f32, af::Dim4::new(&[batch_size,input_size,seq_size,1]));
-        let one = af::constant(1f32, af::Dim4::new(&[1,1,1,1]));
+        
+        let mut vec_total = Vec::new();
+        let vec = vec!(0f32; input_size as usize);
 
         for i in 0..seq_size {
             for j in 0..batch_size {
-                let index = between.ind_sample(&mut rng);
-                let seqs1 = &[af::Seq::new(j as f64,j as f64,1.0)
-                    , af::Seq::new(index as f64,index as f64,1.0)
-                    , af::Seq::new(i as f64,i as f64,1.0)];
-                ar1 = af::assign_seq(&ar1, seqs1, &one);
-
-                let seqs3 = &[af::Seq::new(j as f64,j as f64,1.0)
-                    , af::Seq::new((input_size-2) as f64,(input_size-2) as f64,1.0)
-                    , af::Seq::new(i as f64,i as f64,1.0)];
-                ar3 = af::assign_seq(&ar3, seqs3, &one);
+                let index = between.ind_sample(&mut rng) as usize;
+                let mut vec_temp = vec.clone();
+                vec_temp[index] = 1f32;
+                vec_total.append(&mut vec_temp);
             }
         }
-        for i in 0..(bptt_unroll-2*seq_size-1) {
+
+        for i in 0..bptt_unroll-2*seq_size-1 {
             for j in 0..batch_size {
-                let seqs2 = &[af::Seq::new(j as f64,j as f64,1.0)
-                    , af::Seq::new((input_size-2) as f64, (input_size-2) as f64,1.0)
-                    , af::Seq::new(i as f64,i as f64,1.0)];
-                ar2 = af::assign_seq(&ar2, seqs2, &one);
+                let mut vec_temp = vec.clone();
+                vec_temp[(input_size-2) as usize] = 1f32;
+                vec_total.append(&mut vec_temp);
             }
         }
 
-        let seq = &[af::Seq::new(0.0,(batch_size-1) as f64, 1.0)
-            , af::Seq::new((input_size-1) as f64,(input_size-1) as f64,1.0)
-            , af::Seq::new((bptt_unroll-2*seq_size-1) as f64, (bptt_unroll-2*seq_size-1) as f64, 1.0)];
-        ar2 = af::assign_seq(&ar2, seq, &one);
+        for j in 0..batch_size {
+            let mut vec_temp = vec.clone();
+            vec_temp[(input_size-1) as usize] = 1f32;
+            vec_total.append(&mut vec_temp);
+        }
 
-        af::join_many(2, vec!(&ar1,&ar2,&ar3))    
+        for i in 0..seq_size {
+            for j in 0..batch_size {
+                let mut vec_temp = vec.clone();
+                vec_temp[(input_size-2) as usize] = 1f32;
+                vec_total.append(&mut vec_temp);
+            }
+        }
+
+        let ar_dims = Dim4::new(&[input_size, batch_size, bptt_unroll, 1]);
+        af::transpose(&utils::vec_to_array::<f32>(vec_total, ar_dims), false)
     }
 
     fn generate_target(&self, input: &Array, batch_size: u64, input_size: u64, bptt_unroll: u64, seq_size: u64) -> Array {

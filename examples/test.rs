@@ -17,12 +17,12 @@ use af::{Backend, HasAfEnum, MatProp, DType};
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 10;
+  let input_dims = 5;
   let seq_size = 3;
   let hidden_dims = 10;
   let output_dims = 10;
   let num_train_samples = 32000;
-  let batch_size = 1;
+  let batch_size = 2;
   let optimizer_type = "SGD";
   let epochs = 5;
   let bptt_unroll = 10;
@@ -36,7 +36,7 @@ fn main() {
   let optimizer = get_optimizer_with_defaults(optimizer_type).unwrap();
   let mut model = Box::new(Sequential::new(manager.clone()
                                            , optimizer         // optimizer
-                                           , "mse"             // loss
+                                           , "cross_entropy"             // loss
                                            , gpu_device));     // device for model
 
   // Let's add a few layers why don't we?
@@ -44,7 +44,7 @@ fn main() {
                                      , "output_size"  => output_dims.to_string()
                                      , "hidden_size"  => hidden_dims.to_string()
                                      , "h_activation" => "relu".to_string()
-                                     , "o_activation" => "softmax".to_string()
+                                     , "o_activation" => "sigmoid".to_string()
                                      , "h_init"       => "glorot_uniform".to_string()
                                      , "v_init"       => "glorot_uniform".to_string()
                                      , "phase_init"      => "glorot_uniform".to_string()
@@ -55,9 +55,6 @@ fn main() {
                                      , "o_bias_init"      => "zeros".to_string()]);
 
 
-  model.info();
-  manager.swap_device(cpu_device);
-
   let uniform_generator = CopyingProblemSource::new(input_dims
                                                  , batch_size
                                                  , seq_size
@@ -65,21 +62,15 @@ fn main() {
                                                  , DType::F32
                                                  , num_train_samples);
 
-  let loss = model.fit::<CopyingProblemSource, f32>(&uniform_generator
-                                                    , cpu_device
-                                                    , epochs
-                                                    , batch_size
-                                                    , Some(bptt_unroll)
-                                                    , true);
-  /*
-  let params_arc = model.param_manager.get_params(0);
 
-  let params = params_arc.lock().unwrap();
+  let minibatch = uniform_generator.get_train_iter(batch_size);
 
+  let batch_input = minibatch.input.into_inner();
+  let batch_target = minibatch.target.into_inner();
   
   af::print(&batch_input);
   af::print(&batch_target);
-  
+/*  
   /*
   
   for i in 0..params.weights.len() {

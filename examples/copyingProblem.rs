@@ -17,15 +17,15 @@ use af::{Backend, HasAfEnum, MatProp, DType};
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 10;
+  let input_dims = 8;
   let seq_size = 3;
   let hidden_dims = 10;
-  let output_dims = 10;
+  let output_dims = 8;
   let num_train_samples = 32000;
   let batch_size = 1;
   let optimizer_type = "SGD";
   let epochs = 5;
-  let bptt_unroll = 10;
+  let bptt_unroll = 12;
 
   // Now, let's build a model with an device manager on a specific device
   // an optimizer and a loss function. For this example we demonstrate a simple autoencoder
@@ -36,7 +36,7 @@ fn main() {
   let optimizer = get_optimizer_with_defaults(optimizer_type).unwrap();
   let mut model = Box::new(Sequential::new(manager.clone()
                                            , optimizer         // optimizer
-                                           , "mse"             // loss
+                                           , "cross_entropy"             // loss
                                            , gpu_device));     // device for model
 
   // Let's add a few layers why don't we?
@@ -44,7 +44,7 @@ fn main() {
                                      , "output_size"  => output_dims.to_string()
                                      , "hidden_size"  => hidden_dims.to_string()
                                      , "h_activation" => "relu".to_string()
-                                     , "o_activation" => "tanh".to_string()
+                                     , "o_activation" => "sigmoid".to_string()
                                      , "h_init"       => "glorot_uniform".to_string()
                                      , "v_init"       => "glorot_uniform".to_string()
                                      , "phase_init"      => "glorot_uniform".to_string()
