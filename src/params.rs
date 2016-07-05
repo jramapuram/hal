@@ -143,11 +143,11 @@ impl ParamManager {
     if let Some(r) = recurrence_dims{
       for (r_init, r_dims) in r {
         recurrences.push(self.generate::<T>(r_init, r_dims));
-        inputs.push(self.generate::<T>("zeros", (1, 1)));
-        outputs.push(self.generate::<T>("zeros", (1, 1)));
+        //inputs.push(self.generate::<T>("zeros", (1, 1)));
+        //outputs.push(self.generate::<T>("zeros", (1, 1)));
       }
-
     }
+    
 
     // some elements have optional params
     let mut optional: Vec<Array> = Vec::new();
@@ -165,8 +165,10 @@ impl ParamManager {
       biases: biases,
       activations: owned_activations,
       deltas: deltas,
-      inputs: inputs,
-      outputs: outputs,
+      //inputs: inputs,
+      //outputs: outputs,
+      inputs: Vec::new(),
+      outputs: Vec::new(),
       recurrences: recurrences, 
       d_rec: Array::new(&[0], Dim4::new(&[1,1,1,1])),
       current_unroll: 0,
@@ -645,56 +647,32 @@ impl<'a> UnitaryGenerator for ParamManager {
         manager.swap_device(device);
 
         // weights first
-        let mut weights: Vec<Array> = Vec::with_capacity(7);
-        let mut deltas: Vec<Array> = Vec::with_capacity(9);
-        weights.push(self.generate::<Complex<f32>>(v_init, (input_size, hidden_size)));
-        deltas.push(self.generate::<Complex<f32>>("zeros", (input_size, hidden_size)));
-        weights.push(self.generate::<T>(phase_init, (1, hidden_size)));
-        deltas.push(self.generate::<T>("zeros", (1, hidden_size)));
-        weights.push(self.generate::<T>(phase_init, (1, hidden_size)));
-        deltas.push(self.generate::<T>("zeros", (1, hidden_size)));
-        weights.push(self.generate::<T>(phase_init, (1, hidden_size)));
-        deltas.push(self.generate::<T>("zeros", (1, hidden_size)));
-        weights.push(self.generate::<Complex<f32>>(householder_init, (1, hidden_size)));
-        deltas.push(self.generate::<Complex<f32>>("zeros", (1, hidden_size)));
-        weights.push(self.generate::<Complex<f32>>(householder_init, (1, hidden_size)));
-        deltas.push(self.generate::<Complex<f32>>("zeros", (1, hidden_size)));
-        weights.push(self.generate::<T>(u_init, (2*hidden_size, output_size)));
-        deltas.push(self.generate::<T>("zeros", (2*hidden_size, output_size)));
-            
+        let weights = vec![(v_init, (input_size, 2*hidden_size))
+                           , ("zeros", (1, hidden_size))
+                           , ("zeros", (1, hidden_size))
+                           , ("zeros", (1, hidden_size))
+                           , (householder_init, (1, 2*hidden_size))
+                           , (householder_init, (1, 2*hidden_size))
+                           , (u_init, (2*hidden_size, output_size))];
+
         // biases next
-        let mut biases: Vec<Array> = Vec::with_capacity(2);
-        biases.push(self.generate::<Complex<f32>>(h_bias_init, (1, hidden_size)));
-        deltas.push(self.generate::<Complex<f32>>("zeros", (1, hidden_size)));
-        biases.push(self.generate::<T>(o_bias_init, (1, output_size)));
-        deltas.push(self.generate::<T>("zeros", (1, output_size)));
+        let biases = vec![(h_bias_init, (1, 2*hidden_size))
+                          , (o_bias_init, (1, output_size))];
 
         // activations
         let activations = vec![h_activation, o_activation];
         
         // hidden unit
-        let mut recurrences: Vec<Array> = Vec::new();
-        recurrences.push(self.generate::<Complex<f32>>(h_init, (1, hidden_size)));
+        let recurrences = Some(vec![(h_init,(1, 2*hidden_size))]);
 
         // we won't minimize trough the permutation params so we store them in optional
-        let mut optional: Vec<Array> = Vec::with_capacity(1);
-        optional.push(self.generate::<i32>(permut_init, (hidden_size, 1)));
+        let optionals = Some(vec![(permut_init, (hidden_size, 1))]);
         
-        let owned_activations = activations.iter().map(|x| x.to_string()).collect::<Vec<String>>();
-
-        self.layer_storage.push(Arc::new(Mutex::new(Params{
-            layer_type: "unitary".to_string(),
-            device: device,
-            weights: weights,
-            biases: biases,
-            activations: owned_activations,
-            deltas: deltas,
-            inputs: Vec::new(),
-            outputs: Vec::new(),
-            recurrences: recurrences, 
-            d_rec: Array::new(&[0], Dim4::new(&[1,1,1,1])),
-            current_unroll: 0,
-            optional: optional,
-        })));
-    }
+        self.add::<T>(manager, device, "unitary"
+                      , weights
+                      , biases
+                      , activations
+                      , recurrences
+                      , optionals);
+  }
 }
