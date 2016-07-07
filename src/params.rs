@@ -86,7 +86,7 @@ pub struct Params {
   pub inputs: Vec<Array>,
   pub outputs: Vec<Array>,
   pub recurrences: Vec<Array>,
-  pub d_rec: Array,
+  pub state_derivatives: Vec<Array>,
   pub current_unroll: usize,
   pub optional: Vec<Array>,
 }
@@ -169,8 +169,8 @@ impl ParamManager {
       //outputs: outputs,
       inputs: Vec::new(),
       outputs: Vec::new(),
-      recurrences: recurrences, 
-      d_rec: Array::new(&[0], Dim4::new(&[1,1,1,1])),
+      recurrences: recurrences,
+      state_derivatives: Vec::new(),
       current_unroll: 0,
       optional: optional,
     })));

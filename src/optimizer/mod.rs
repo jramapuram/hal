@@ -40,4 +40,5 @@ pub fn clip_grads(input: &Array, rescale: f32) -> Array {
   let norm = af::norm(input, NormType::VECTOR_2, 0f64, 0f64) as f32;
   let scale = rescale / norm.max(rescale);
   utils::cast(&af::mul(input, &scale, false), input.get_type())
+  //utils::clip_by_value(input, -5.0f32, 5.0f32)
 }
