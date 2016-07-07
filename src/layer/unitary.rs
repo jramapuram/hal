@@ -83,7 +83,7 @@ fn to_real(ar: Array) -> Array {
 
 impl Layer for Unitary
 {
-    fn forward(&self, params:  Arc<Mutex<Params>>, inputs: &Array) -> Array
+    fn forward(&self, params:  Arc<Mutex<Params>>, inputs: &Array, state: Option<Array>) -> (Array, Option<Array>)
     {
         let mut ltex = params.lock().unwrap();
         let t = ltex.current_unroll;
@@ -176,7 +176,7 @@ impl Layer for Unitary
         //println!("{}", &(af::norm(&ltex.recurrences[t], af::NormType::VECTOR_2, 1.,1.)as f32));
         ltex.current_unroll += 1;
 
-        out.clone()
+        (out.clone(), None)
     }
 
 
@@ -241,11 +241,15 @@ impl Layer for Unitary
 
         let mut d_rec = d_h1.clone();
         if t == t_max {
-            ltex.d_rec = to_real(d_rec.clone());
+            // Check to see if we already have a state derivative, else add one
+            if ltex.state_derivatives.len() == 0 {
+                ltex.state_derivatives.push(af::constant(0, Dim4::new(&[1, 1, 1, 1])));
+            }
+            ltex.state_derivatives[0]= to_real(d_rec.clone());
         }
         else {
             // dh_{t+1} => dh_{t}
-            d_rec = to_complex(ltex.d_rec.clone());
+            d_rec = to_complex(ltex.state_derivatives[0].clone());
             let mut rec_t2 = to_complex(ltex.recurrences[t+2].clone());
             let d_activ = activations::get_derivative(&ltex.activations[0], &rec_t2).unwrap();
             let d_h2 = af::mul(&h_d(p1.clone()
@@ -258,7 +262,7 @@ impl Layer for Unitary
                                , false);
             // dz2 & dh_{t+1} => dh_{t}
             d_rec = af::add(&d_h1, &d_h2, false);
-            ltex.d_rec = to_real(d_rec.clone());
+            ltex.state_derivatives[0] = to_real(d_rec.clone());
         }
 
         // dh_{t} => dz
