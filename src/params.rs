@@ -204,6 +204,13 @@ impl ParamManager {
     self.num_biases(layer_index) + self.num_weights(layer_index)
   }
 
+  pub fn num_recurrences(&self, layer_index: usize) -> usize {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    let layer = self.layer_storage[layer_index].clone();
+    let ltex = layer.lock().unwrap();
+    ltex.recurrences.len()
+  }
+
   pub fn get_params(&self, layer_index: usize) -> Arc<Mutex<Params>> {
     assert!(self.layer_storage.len() - 1>= layer_index);
     self.layer_storage[layer_index].clone()
@@ -299,6 +306,22 @@ impl ParamManager {
         let delta_dims = self.get_delta(layer_num, delta_num).dims();
         let zero_tensor = utils::constant(delta_dims, dtype, 0.0f32);
         self.set_delta(layer_num, delta_num, zero_tensor);
+      }
+    }
+  }
+
+  pub fn zero_all_states(&self, dtype:DType, default_state: Option<Array>)
+  {
+    for layer_num in 0..self.num_layers() {
+      for recurrence_num in 0..self.num_recurrences(layer_num) {
+        let recurrence_dims = self.get_recurrence(layer_num, recurrence_num).dims();
+        match default_state {
+          Some(ref st)  => self.set_recurrence(layer_num, recurrence_num, st.copy()),
+          None          => {
+            let zero_tensor = utils::constant(recurrence_dims, dtype, 0.0f32);
+            self.set_recurrence(layer_num, recurrence_num, zero_tensor);
+          },
+        };
       }
     }
   }
@@ -502,7 +525,7 @@ pub trait LSTMGenerator {
                             , device: Device
                             , input_size: usize
                             , output_size: usize
-                            , bptt_interval: usize
+                            //, bptt_interval: usize
                             , input_activation: &str
                             , output_activation: &str
                             , w_init: &str
@@ -556,7 +579,6 @@ impl RNNGenerator for ParamManager {
                            , device: Device
                            , input_size: usize
                            , output_size: usize
-                           //, bptt_interval: usize
                            , activation: &str
                            , w_init: &str
                            , w_recurrent_init: &str
@@ -585,7 +607,7 @@ impl LSTMGenerator for ParamManager {
               , device: Device
               , input_size: usize
               , output_size: usize
-              , bptt_interval: usize
+              //, bptt_interval: usize
               , inner_activation: &str
               , outer_activation: &str
               , w_init: &str

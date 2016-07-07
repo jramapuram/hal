@@ -37,15 +37,15 @@ pub fn normal<T: HasAfEnum>(dims: Dim4, scale: f32) -> Array {
 }
 
 /// A helper to provide a uniform shape with the provided scale
-pub fn uniform<T: HasAfEnum>(dims: Dim4, scale: f32) -> Array{
+pub fn uniform<T: HasAfEnum>(dims: Dim4, min: f32, max: f32) -> Array{
   // seed device
   let mut rng = rand::thread_rng();
   af::set_seed(rng.gen::<u64>());
 
   let src_type = T::get_af_dtype();
-  let scale_vec = utils::constant(dims, src_type, scale);
-  let u = af::sub(&af::mul(&af::randu::<T>(dims), &scale_vec, false)
-                  , &scale, false);
+  let range = max - min;
+  let u = af::add(&af::mul(&af::randu::<T>(dims), &range, false)
+                  , &min, false);
   let dst_type = u.get_type();
   assert!(src_type == dst_type
           , "type mismatch detected in uniform, {:?} vs {:?}"
@@ -74,7 +74,7 @@ pub fn ones<T: HasAfEnum>(dims: Dim4) -> Array {
 pub fn glorot_uniform<T: HasAfEnum>(dims: Dim4) -> Array {
   let (fan_in, fan_out) = get_fans(dims);
   let s = (6.0f32 / (fan_in + fan_out)).sqrt();
-  uniform::<T>(dims, s)
+  uniform::<T>(dims, -s, s)
 }
 
 /// A helper to provide a shape of glorot normal initialized values
@@ -88,7 +88,7 @@ pub fn glorot_normal<T: HasAfEnum>(dims: Dim4) -> Array {
 pub fn lecun_uniform<T: HasAfEnum>(dims: Dim4) -> Array {
   let (fan_in, _) = get_fans(dims);
   let s = 3.0f32 / fan_in;
-  uniform::<T>(dims, s)
+  uniform::<T>(dims, -s, s)
 }
 
 //TODO: permut
@@ -104,8 +104,8 @@ pub fn get_initialization<T: HasAfEnum>(name: &str, dims: Dim4) -> Result<Array,
     "glorot_uniform" => Ok(glorot_uniform::<T>(dims)),
     "glorot_normal"  => Ok(glorot_normal::<T>(dims)),
     "lecun_uniform"  => Ok(lecun_uniform::<T>(dims)),
-    "normal"         => Ok(normal::<T>(dims, 0.05f32)),  //TODO: Parameterize
-    "uniform"        => Ok(uniform::<T>(dims, 0.05f32)), //TODO: Parameterize
+    "normal"         => Ok(normal::<T>(dims, 0.05f32)),            //TODO: Parameterize
+    "uniform"        => Ok(uniform::<T>(dims, -0.05f32, 0.05f32)), //TODO: Parameterize
     "zeros"          => Ok(zeros::<T>(dims)),
     "ones"           => Ok(ones::<T>(dims)),
     "permut"         => Ok(permut::<T>(dims)),

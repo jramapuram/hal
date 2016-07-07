@@ -5,12 +5,19 @@ use std::sync::{Arc, Mutex};
 use utils;
 use activations;
 use params::Params;
-use layer::Layer;
+use layer::{Layer, RecurrentLayer};
 
 pub struct RNN {
   pub input_size: usize,
   pub output_size: usize,
 }
+
+impl RecurrentLayer for RNN {
+  fn state_size(self) -> usize {
+    self.output_size
+  }
+}
+
 
 impl Layer for RNN
 {
@@ -26,29 +33,32 @@ impl Layer for RNN
                         , MatProp::NONE
                         , MatProp::NONE);
 
-    // uh_tm1 = htm1 U [bias added in h_t]
     // handle case where time = 0
-    let uhtm1 = match ltex.recurrences.len(){
+    let htm1 = match ltex.recurrences.len(){
       0 => {
-        let output_size = ltex.weights[1].dims()[0]; // is [M x M]
-        let init_h_dims = Dim4::new(&[inputs.dims()[0], output_size, 1, 1]);
         if let Some(init_state) = state {
           ltex.recurrences.push(init_state);
         }else {
+          let output_size = ltex.weights[1].dims()[0]; // is [M x M]
+          let init_h_dims = Dim4::new(&[inputs.dims()[0], output_size, 1, 1]);
           ltex.recurrences.push(utils::constant(init_h_dims, inputs.get_type(), 0f32));
         }
-        af::matmul(&ltex.recurrences.last().unwrap()
-                   , &ltex.weights[1]
-                   , MatProp::NONE
-                   , MatProp::NONE)
+        ltex.recurrences.last().unwrap().clone()
       },
       _ => {
-        af::matmul(&ltex.recurrences[ltex.current_unroll]
-                   , &ltex.weights[1]
-                   , MatProp::NONE
-                   , MatProp::NONE)
-      }
+        if let Some(init_state) = state {
+          init_state
+        }else {
+          ltex.recurrences[ltex.current_unroll].clone()
+        }
+      },
     };
+
+    // uh_tm1 = htm1 U [bias added in h_t]
+    let uhtm1 = af::matmul(&htm1
+                           , &ltex.weights[1]
+                           , MatProp::NONE
+                           , MatProp::NONE);
 
     // h_t = uh_tm1 + wx + b
     let h_t = af::transpose(&af::add(&af::transpose(&uhtm1, false),
@@ -63,7 +73,7 @@ impl Layer for RNN
     if ltex.inputs.len() > current_unroll { // store in existing
       ltex.inputs[current_unroll] = inputs.clone();
       ltex.outputs[current_unroll] = a_t.clone();
-      ltex.recurrences[current_unroll] = h_t.clone();
+      ltex.recurrences[current_unroll + 1] = h_t.clone();
     }else{                                  // add new
       ltex.inputs.push(inputs.clone());
       ltex.outputs.push(a_t.clone());
@@ -84,6 +94,8 @@ impl Layer for RNN
     assert!(current_unroll > 0
             , "Cannot call backward pass without at least 1 forward pass");
 
+    //af::print(&ltex.recurrences[current_unroll]);
+
     // dz          = grad(a_t)
     // delta_t     = (delta_{t+1} + dh{t+1}) .* dz
     // dh          = delta_{t} * U
@@ -96,8 +108,8 @@ impl Layer for RNN
 
     // check to see if we already have a state derivative, else add one
     if ltex.state_derivatives.len() == 0 {
-      let h_size = ltex.recurrences[current_unroll - 1].dims();
-      let h_type = ltex.recurrences[current_unroll - 1].get_type();
+      let h_size = ltex.recurrences[0].dims();
+      let h_type = ltex.recurrences[0].get_type();
       ltex.state_derivatives.push(utils::constant(h_size, h_type, 0.0f32));
     }
 
@@ -109,7 +121,7 @@ impl Layer for RNN
     let dw = af::matmul(&ltex.inputs[current_unroll - 1], &delta_t       // delta_w = delta_t * a_{t}
                         , af::MatProp::TRANS
                         , af::MatProp::NONE);
-    let du = af::matmul(&ltex.recurrences[current_unroll - 1], &delta_t  // delta_u = delta_t * h_{t-1}
+    let du = af::matmul(&ltex.recurrences[current_unroll], &delta_t  // delta_u = delta_t * h_{t-1}
                         , af::MatProp::TRANS
                         , af::MatProp::NONE);
     let db = af::transpose(&af::sum(&delta_t, 0), false);                // delta_b = \sum_{batch} delta
