@@ -17,15 +17,15 @@ use af::{Backend, HasAfEnum, MatProp, DType};
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 6;
+  let input_dims = 8;
   let seq_size = 3;
-  let hidden_dims = 5;
-  let output_dims = 6;
+  let hidden_dims = 8;
+  let output_dims = 8;
   let num_train_samples = 32000;
-  let batch_size = 3;
+  let batch_size = 1;
   let optimizer_type = "Adam";
   let epochs = 5;
-  let bptt_unroll = 10;
+  let bptt_unroll = 100;
 
   // Now, let's build a model with an device manager on a specific device
   // an optimizer and a loss function. For this example we demonstrate a simple autoencoder
@@ -44,7 +44,7 @@ fn main() {
                                      , "output_size"  => output_dims.to_string()
                                      , "hidden_size"  => hidden_dims.to_string()
                                      , "h_activation" => "relu".to_string()
-                                     , "o_activation" => "sigmoid".to_string()
+                                     , "o_activation" => "softmax".to_string()
                                      , "h_init"       => "glorot_uniform".to_string()
                                      , "v_init"       => "glorot_uniform".to_string()
                                      , "phase_init"      => "glorot_uniform".to_string()

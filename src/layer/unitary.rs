@@ -58,13 +58,16 @@ fn h_r(param: Array, mut ar: Array) -> Array {
 
 // Wh = (D3 R2 F-1 D2 Pi R1 F D1) h
 fn wh(p1: Array, p2: Array, p3: Array, p4: Array, p5: Array, p6: Array, ar: Array) -> Array { 
-    h_d(p6
-            , h_r(p5
-                  , h_ifft(h_d(p4
-                               , h_pi(p3
-                                    , h_r(p2
-                                          , h_fft(h_d(p1, ar))))))))
-
+    let mut current = ar;
+    current = h_d(p1, current);
+    current = h_fft(current);
+    current = h_r(p2, current);
+    current = h_pi(p3, current);
+    current = h_d(p4, current);
+    current = h_ifft(current);
+    current = h_r(p5, current);
+    current = h_d(p6, current);
+    current
            
 }
 
@@ -141,6 +144,7 @@ impl Layer for Unitary
         let new_h = af::add(&af::add(&wh, &vx, true)
                             , &bias0
                             , true);
+
         let sigma_result = activations::get_activation(&ltex.activations[0]
                                                        , &new_h).unwrap();
 
@@ -169,6 +173,7 @@ impl Layer for Unitary
             ltex.recurrences.push(to_real(sigma_result.clone()));
             ltex.outputs.push(out.clone());
         }
+        //println!("{}", &(af::norm(&ltex.recurrences[t], af::NormType::VECTOR_2, 1.,1.)as f32));
         ltex.current_unroll += 1;
 
         out.clone()

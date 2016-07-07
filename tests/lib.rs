@@ -211,6 +211,24 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
       let h_t = utils::constant(hdims, DType::F64, 0.5f32);
       param_manager.set_recurrences(0, vec![h_t]);
     }
+
+    "unitary" => 
+        let hidden_size = 10;
+        let h_activation = "relu";
+        let h_init = "glorot_uniform";
+        let v_init = "glorot_uniform";
+        let phase_init = "glorot_uniform";
+        let householder_init = "glorot_uniform";
+        let permut_init = "permut";
+        let u_init = "glorot_uniform";
+        let h_bias_init = "zeros";
+        let o_bias_init = "zeros";
+        param_manager.add_unitary::<f64>(device_manager, device
+                                                  , input_size, output_size, hidden_size
+                                                  , h_activation, activation
+                                                  , h_init, v_init, phase_init, householder_init
+                                                  , permut_init, u_init
+                                                  , h_bias_init, o_bias_init),
   //todo: lstm, etc
     _      => panic!("unknown layer type specified"),
   };
@@ -361,6 +379,23 @@ fn rnn_forward(){
                          , vec![-0.01, 0.00, 1.10, 2.20, 3.15]           //input
                          , vec![ 8.94000053, 8.94000053, 8.94000053, 8.94000053, 8.94000053]); //target
   });
+}
+
+#[test]
+fn unitary_forward() {
+    let idims = Dim4::new(&[2, 2, 2, 1]);
+    let odims = Dim4::new(&[2, 2, 2, 1]);
+    layer_forward_helper("unitary", idims, odims, "cross_entropy", 1e-4
+                         , "softmax"
+                         , " "
+                         , " "
+                         , vec![0.4, -1.2, -0.55, 0.15, -0.55, 3.2, -2.5, 3.2]
+                         , vec![]);
+
+}
+
+#[test]
+fn unitary_backward() {
 }
 
 #[test]
