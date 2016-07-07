@@ -254,7 +254,7 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
   let output_size: usize = odims[1] as usize;
   let temporal_size: usize = idims[2] as usize;
 
-  let x = initializations::uniform::<f64>(idims, 0.5f32);
+  let x = initializations::uniform::<f64>(idims, -0.5f32, 0.5f32);
   let targets = match activation {
     "softmax" => {
       // randomly pick one of K indexes to set to 1
@@ -268,7 +268,7 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
       utils::vec_to_array::<f64>(v, odims)
     },
 
-    _ => initializations::uniform::<f64>(idims, 0.5f32),
+    _ => initializations::uniform::<f64>(idims, -0.5f32, 0.5f32),
   };
 
   layer_builder(layer_type, idims, odims, loss

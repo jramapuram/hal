@@ -121,16 +121,17 @@ impl Model for Sequential {
     // we will need to unwind at least once for non RNNs
     let bptt_unroll = max(activ.dims()[2], 1);
     let mut activate;
-    let mut state: Option<Array> = None;
 
     for t in 0..bptt_unroll {
       activate = af::slice(&activ, t);
       for i in 0..self.layers.len() {
-        let (a, s) = self.layers[i].forward(self.param_manager.get_params(i)
-                                            , &activate, state);
+        let (a, _) = self.layers[i].forward(self.param_manager.get_params(i)
+                                            , &activate, None);
         activate = a;
-        state = s;
       }
+
+      // zero the states
+      //self.param_manager.zero_all_states(activation.get_type(), None);
     }
 
     // return the collected outputs of the last layer

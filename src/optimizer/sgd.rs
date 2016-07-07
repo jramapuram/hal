@@ -29,7 +29,7 @@ impl Default for SGD {
       momemtum: 0.0,
       decay: 0.0,
       nesterov: false,
-      clip_grad: 0.0,
+      clip_grad: 5.0,
       iter: 0,
       velocity: Vec::new(),
     }
