@@ -13,7 +13,7 @@ pub struct Dense {
 
 impl Layer for Dense
 {
-  fn forward(&self, params: Arc<Mutex<Params>>, inputs: &Array)-> Array
+  fn forward(&self, params: Arc<Mutex<Params>>, inputs: &Array, state: Option<Array>) -> (Array, Option<Array>)
   {
     // get a handle to the underlying params
     let mut ltex = params.lock().unwrap();
@@ -43,10 +43,11 @@ impl Layer for Dense
     // update location in vector
     ltex.current_unroll += 1;
 
-    a_t.clone() // clone just increases the ref count
+    (a_t.clone(), None) // clone just increases the ref count
   }
 
-  fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array) -> Array {
+  fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array) -> Array
+  {
     // get a handle to the underlying params
     let mut ltex = params.lock().unwrap();
     let current_unroll = ltex.current_unroll;
