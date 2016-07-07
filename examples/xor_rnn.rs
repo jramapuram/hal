@@ -14,8 +14,8 @@ use af::{Backend, DType};
 fn main() {
   // First we need to parameterize our network
   let input_dims = 32;
-  let batch_size = 128;
-  let seq_len = 32;
+  let batch_size = 20;
+  let seq_len = 10;
   let hidden_dims = 64;
   let output_dims = 32;
   let num_train_samples = 65536;
@@ -30,9 +30,9 @@ fn main() {
   let cpu_device = Device{backend: Backend::CPU, id: 0};
   let optimizer = get_optimizer_with_defaults(optimizer_type).unwrap();
   let mut model = Box::new(Sequential::new(manager.clone()
-                                           , optimizer         // optimizer
-                                           , "cross_entropy"   // loss
-                                           , gpu_device));     // device for model
+                                           , optimizer                 // optimizer
+                                           , "cross_entropy_softmax"   // loss
+                                           , gpu_device));             // device for model
 
   // Let's add a few layers why don't we?
   model.add::<f32>("rnn", hashmap!["activation"          => "tanh".to_string()
@@ -41,7 +41,7 @@ fn main() {
                                    , "w_init"            => "glorot_uniform".to_string()
                                    , "w_recurrent_init"  => "glorot_uniform".to_string()
                                    , "b_init"            => "zeros".to_string()]);
-  model.add::<f32>("dense", hashmap!["activation"        => "softmax".to_string()  // classification
+  model.add::<f32>("dense", hashmap!["activation"        => "linear".to_string()  // softmax is in loss
                                      , "input_size"      => hidden_dims.to_string()
                                      , "output_size"     => output_dims.to_string()
                                      , "w_init"          => "glorot_uniform".to_string()

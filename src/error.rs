@@ -14,6 +14,10 @@ pub enum HALError {
   ///
   GRADIENT_ERROR     =   1,
   ///
+  /// Unknown loss requested
+  ///
+  UNKNOWN_LOSS       =   2,
+  ///
   /// Unknown Error
   ///
   UNKNOWN            =   999
@@ -30,6 +34,7 @@ impl Error for HALError {
     match *self {
       HALError::SUCCESS        => "Function returned successfully",
       HALError::GRADIENT_ERROR => "Gradient check error",
+      HALError::UNKNOWN_LOSS   => "Unknown loss requested",
       HALError::UNKNOWN        => "Unkown Error",
     }
   }

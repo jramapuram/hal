@@ -22,10 +22,12 @@ pub fn sigmoid(x: &Array) -> Array {
   a
 }
 
-/// Return the softmax activated value
+/// Return the softmax activated value [numerical stable]
 /// exp(x_i) / sum(exp(x))
 pub fn softmax(x: &Array) -> Array {
-  let exponentiated = af::exp(&x);
+  // page 185 of http://www.deeplearningbook.org/contents/mlp.html
+  let z = x - af::max_all(x).0 as f32;
+  let exponentiated = af::exp(&z);
   let sum_epx_x = af::sum_all(&exponentiated).0 as f32;
   let sum_exp_x_vec = utils::constant(x.dims(), x.get_type(), sum_epx_x);
   let a = af::div(&exponentiated, &sum_exp_x_vec, false);
@@ -97,6 +99,13 @@ pub fn sigmoid_derivative(x: &Array) -> Array {
 /// Returns the derivative of softmax [assumes that it was already applied]
 /// x * (1 - x)
 pub fn softmax_derivative(x: &Array) -> Array {
+  // let orig_dims = x.dims();
+  // let slide_dims = orig_dims;
+  // slide_dims[2] = slide_dims[1];
+  // slide_dims[1] = 1;
+  // let j = af::mul(x, &af::moddims(x, slide_dims));
+  // let diag = sigmoid_derivative(x);
+  // af::print(&af::diag_extract(&j, 1))
   sigmoid_derivative(x)
 }
 
