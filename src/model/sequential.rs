@@ -129,10 +129,11 @@ impl Model for Sequential {
                                             , &activate, None);
         activate = a;
       }
-
-      // zero the states
-      //self.param_manager.zero_all_states(activation.get_type(), None);
     }
+
+    // TODO: Parameterize
+    // zero the states
+    // self.param_manager.zero_all_states(None);
 
     // return the collected outputs of the last layer
     let last_index = self.layers.len() - 1;

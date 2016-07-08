@@ -135,13 +135,9 @@ impl ParamManager {
     // generate recurrence vectors
     // if the length of the recurrences are > 0 then init the inp/outputs
     let mut recurrences: Vec<Array> = Vec::new();
-    let mut inputs: Vec<Array> = Vec::new();
-    let mut outputs: Vec<Array> = Vec::new();
     if let Some(r) = recurrence_dims{
       for (r_init, r_dims) in r {
         recurrences.push(self.generate::<T>(r_init, r_dims));
-        inputs.push(self.generate::<T>("zeros", (1, 1)));
-        outputs.push(self.generate::<T>("zeros", (1, 1)));
       }
     }
 
@@ -161,8 +157,8 @@ impl ParamManager {
       biases: biases,
       activations: owned_activations,
       deltas: deltas,
-      inputs: inputs,
-      outputs: outputs,
+      inputs: Vec::new(),
+      outputs: Vec::new(),
       recurrences: recurrences,
       state_derivatives: Vec::new(),
       current_unroll: 0,
@@ -204,6 +200,14 @@ impl ParamManager {
     let ltex = layer.lock().unwrap();
     ltex.recurrences.len()
   }
+
+  pub fn num_state_derivatives(&self, layer_index: usize) -> usize {
+    assert!(self.layer_storage.len() - 1 >= layer_index);
+    let layer = self.layer_storage[layer_index].clone();
+    let ltex = layer.lock().unwrap();
+    ltex.state_derivatives.len()
+  }
+
 
   pub fn get_params(&self, layer_index: usize) -> Arc<Mutex<Params>> {
     assert!(self.layer_storage.len() - 1>= layer_index);
@@ -294,24 +298,41 @@ impl ParamManager {
     d
   }
 
-  pub fn zero_all_deltas(&self, dtype: DType) {
+  pub fn zero_all_deltas(&self) {
     for layer_num in 0..self.num_layers() {
       for delta_num in 0..self.num_arrays(layer_num) {
-        let delta_dims = self.get_delta(layer_num, delta_num).dims();
+        let delta = self.get_delta(layer_num, delta_num);
+        let delta_dims = delta.dims();
+        let dtype = delta.get_type();
         let zero_tensor = utils::constant(delta_dims, dtype, 0.0f32);
         self.set_delta(layer_num, delta_num, zero_tensor);
       }
     }
   }
 
-  pub fn zero_all_states(&self, dtype:DType, default_state: Option<Array>)
+  pub fn zero_all_state_derivatives(&self) {
+    for layer_num in 0..self.num_layers() {
+      for state_num in 0..self.num_state_derivatives(layer_num) {
+        let state_derivative = self.get_state_derivative(layer_num, state_num);
+        let state_dims = state_derivative.dims();
+        let dtype = state_derivative.get_type();
+        let zero_tensor = utils::constant(state_dims, dtype, 0.0f32);
+        self.set_state_derivative(layer_num, state_num, zero_tensor);
+      }
+    }
+  }
+
+
+  pub fn zero_all_states(&self, default_state: Option<Array>)
   {
     for layer_num in 0..self.num_layers() {
       for recurrence_num in 0..self.num_recurrences(layer_num) {
-        let recurrence_dims = self.get_recurrence(layer_num, recurrence_num).dims();
         match default_state {
           Some(ref st)  => self.set_recurrence(layer_num, recurrence_num, st.copy()),
           None          => {
+            let recurrence = self.get_recurrence(layer_num, recurrence_num);
+            let recurrence_dims = recurrence.dims();
+            let dtype = recurrence.get_type();
             let zero_tensor = utils::constant(recurrence_dims, dtype, 0.0f32);
             self.set_recurrence(layer_num, recurrence_num, zero_tensor);
           },
@@ -327,6 +348,7 @@ impl ParamManager {
   get_param_func!(get_input, inputs, Array);
   get_param_func!(get_output, outputs, Array);
   get_param_func!(get_recurrence, recurrences, Array);
+  get_param_func!(get_state_derivative, state_derivatives, Array);
   get_param_func!(get_optional, optional, Array);
 
   get_param_vec_func!(get_weights, weights, Array);
@@ -336,6 +358,7 @@ impl ParamManager {
   get_param_vec_func!(get_inputs, inputs, Array);
   get_param_vec_func!(get_outputs, outputs, Array);
   get_param_vec_func!(get_recurrences, recurrences, Array);
+  get_param_vec_func!(get_state_derivatives, state_derivatives, Array);
   get_param_vec_func!(get_optionals, optional, Array);
 
   with_mut_param_vec_func!(with_mut_weights, weights, Array);
@@ -345,6 +368,7 @@ impl ParamManager {
   with_mut_param_vec_func!(with_mut_inputs, inputs, Array);
   with_mut_param_vec_func!(with_mut_outputs, outputs, Array);
   with_mut_param_vec_func!(with_mut_recurrences, recurrences, Array);
+  with_mut_param_vec_func!(with_mut_state_derivatives, state_derivatives, Array);
   with_mut_param_vec_func!(with_mut_optionals, optional, Array);
 
   set_param_func!(set_weight, weights, Array);
@@ -354,6 +378,7 @@ impl ParamManager {
   set_param_func!(set_input, inputs, Array);
   set_param_func!(set_output, outputs, Array);
   set_param_func!(set_recurrence, recurrences, Array);
+  set_param_func!(set_state_derivative, state_derivatives, Array);
   set_param_func!(set_optional, optional, Array);
 
   set_param_vec_func!(set_weights, weights, Array);
@@ -363,6 +388,7 @@ impl ParamManager {
   set_param_vec_func!(set_inputs, inputs, Array);
   set_param_vec_func!(set_outputs, outputs, Array);
   set_param_vec_func!(set_recurrences, recurrences, Array);
+  set_param_vec_func!(set_state_derivatives, state_derivatives, Array);
   set_param_vec_func!(set_optionals, optional, Array);
 
   pub fn get_bias_dims(&self, layer_index: usize) -> Vec<Dim4> {

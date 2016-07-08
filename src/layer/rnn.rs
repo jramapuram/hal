@@ -27,7 +27,7 @@ impl Layer for RNN
     let mut ltex = params.lock().unwrap();
     let current_unroll = ltex.current_unroll;
 
-    // z_t = xW [bias added in h_t]
+    // z_t = x*W [bias added in h_t]
     let wx = af::matmul(&inputs            //activated_input
                         , &ltex.weights[0]
                         , MatProp::NONE
@@ -43,11 +43,11 @@ impl Layer for RNN
           let init_h_dims = Dim4::new(&[inputs.dims()[0], output_size, 1, 1]);
           utils::constant(init_h_dims, inputs.get_type(), 0f32)
         }
-        _ => ltex.recurrences[ltex.current_unroll].clone()
+        _ => ltex.recurrences.last().unwrap().clone()
       }
     };
 
-    // uh_tm1 = htm1 U [bias added in h_t]
+    // uh_tm1 = htm1*U [bias added in h_t]
     let uhtm1 = af::matmul(&htm1
                            , &ltex.weights[1]
                            , MatProp::NONE
@@ -66,11 +66,11 @@ impl Layer for RNN
     if ltex.inputs.len() > current_unroll { // store in existing
       ltex.inputs[current_unroll] = inputs.clone();
       ltex.outputs[current_unroll] = a_t.clone();
-      ltex.recurrences[current_unroll] = h_t.clone();
+      ltex.recurrences[current_unroll] = htm1.clone();
     }else{                                  // add new
       ltex.inputs.push(inputs.clone());
       ltex.outputs.push(a_t.clone());
-      ltex.recurrences.push(h_t.clone());
+      ltex.recurrences.push(htm1.clone());
     }
 
     // update location in vector
@@ -86,8 +86,6 @@ impl Layer for RNN
     let current_unroll = ltex.current_unroll;
     assert!(current_unroll > 0
             , "Cannot call backward pass without at least 1 forward pass");
-
-    //af::print(&ltex.recurrences[current_unroll]);
 
     // dz          = grad(a_t)
     // delta_t     = (delta_{t+1} + dh{t+1}) .* dz
