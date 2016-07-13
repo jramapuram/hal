@@ -27,34 +27,27 @@ impl Layer for RNN
     let mut ltex = params.lock().unwrap();
     let current_unroll = ltex.current_unroll;
 
-    // z_t = xW [bias added in h_t]
+    // z_t = x*W [bias added in h_t]
     let wx = af::matmul(&inputs            //activated_input
                         , &ltex.weights[0]
                         , MatProp::NONE
                         , MatProp::NONE);
 
-    // handle case where time = 0
-    let htm1 = match ltex.recurrences.len(){
-      0 => {
-        if let Some(init_state) = state {
-          ltex.recurrences.push(init_state);
-        }else {
+    // set h_{t-1} to the given state (if provided)
+    // also handle case where time = 0
+    let htm1 = match state {
+      Some(init_state)  => init_state,
+      None              => match ltex.recurrences.len() {
+        0 => {
           let output_size = ltex.weights[1].dims()[0]; // is [M x M]
           let init_h_dims = Dim4::new(&[inputs.dims()[0], output_size, 1, 1]);
-          ltex.recurrences.push(utils::constant(init_h_dims, inputs.get_type(), 0f32));
+          utils::constant(init_h_dims, inputs.get_type(), 0f32)
         }
-        ltex.recurrences.last().unwrap().clone()
-      },
-      _ => {
-        if let Some(init_state) = state {
-          init_state
-        }else {
-          ltex.recurrences[ltex.current_unroll].clone()
-        }
-      },
+        _ => ltex.recurrences.last().unwrap().clone()
+      }
     };
 
-    // uh_tm1 = htm1 U [bias added in h_t]
+    // uh_tm1 = htm1*U [bias added in h_t]
     let uhtm1 = af::matmul(&htm1
                            , &ltex.weights[1]
                            , MatProp::NONE
@@ -73,11 +66,11 @@ impl Layer for RNN
     if ltex.inputs.len() > current_unroll { // store in existing
       ltex.inputs[current_unroll] = inputs.clone();
       ltex.outputs[current_unroll] = a_t.clone();
-      ltex.recurrences[current_unroll + 1] = h_t.clone();
+      ltex.recurrences[current_unroll] = htm1.clone();
     }else{                                  // add new
       ltex.inputs.push(inputs.clone());
       ltex.outputs.push(a_t.clone());
-      ltex.recurrences.push(h_t.clone());
+      ltex.recurrences.push(htm1.clone());
     }
 
     // update location in vector
@@ -93,8 +86,6 @@ impl Layer for RNN
     let current_unroll = ltex.current_unroll;
     assert!(current_unroll > 0
             , "Cannot call backward pass without at least 1 forward pass");
-
-    //af::print(&ltex.recurrences[current_unroll]);
 
     // dz          = grad(a_t)
     // delta_t     = (delta_{t+1} + dh{t+1}) .* dz
@@ -117,11 +108,10 @@ impl Layer for RNN
     let delta_t = af::mul(&af::add(&ltex.state_derivatives[0]
                                    , delta, false), &dz, false);
 
-    //println!("dh dims = {:?} | delta dims = {:?} | delta prop dims = {:?}", dh.dims(), delta_t.dims(), delta.dims());
     let dw = af::matmul(&ltex.inputs[current_unroll - 1], &delta_t       // delta_w = delta_t * a_{t}
                         , af::MatProp::TRANS
                         , af::MatProp::NONE);
-    let du = af::matmul(&ltex.recurrences[current_unroll], &delta_t  // delta_u = delta_t * h_{t-1}
+    let du = af::matmul(&ltex.recurrences[current_unroll - 1], &delta_t  // delta_u = delta_t * h_{t-1}
                         , af::MatProp::TRANS
                         , af::MatProp::NONE);
     let db = af::transpose(&af::sum(&delta_t, 0), false);                // delta_b = \sum_{batch} delta
@@ -135,7 +125,7 @@ impl Layer for RNN
     // update location in vector
     ltex.current_unroll -= 1;
 
-    //println!("dims = {:?}", af::matmul(&delta_t, &ltex.weights[0], af::MatProp::NONE, af::MatProp::TRANS).dims());
-    af::matmul(&delta_t, &ltex.weights[0], af::MatProp::NONE, af::MatProp::TRANS)    // delta_{t-1}
+    // delta_{t-1}
+    af::matmul(&delta_t, &ltex.weights[0], af::MatProp::NONE, af::MatProp::TRANS)
   }
 }
