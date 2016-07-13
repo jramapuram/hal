@@ -19,13 +19,13 @@ fn main() {
   // First we need to parameterize our network
   let input_dims = 8;
   let seq_size = 10;
-  let hidden_dims = 60;
+  let hidden_dims = 50;
   let output_dims = 8;
   let num_train_samples = 32000;
-  let batch_size = 10;
+  let batch_size = 50;
   let optimizer_type = "Adam";
   let epochs = 5;
-  let bptt_unroll = 40;
+  let bptt_unroll = 100;
 
   // Now, let's build a model with an device manager on a specific device
   // an optimizer and a loss function. For this example we demonstrate a simple autoencoder
@@ -36,7 +36,7 @@ fn main() {
   let optimizer = get_optimizer_with_defaults(optimizer_type).unwrap();
   let mut model = Box::new(Sequential::new(manager.clone()
                                            , optimizer         // optimizer
-                                           , "cross_entropy"             // loss
+                                           , "mse"             // loss
                                            , gpu_device));     // device for model
 
   // Let's add a few layers why don't we?
@@ -44,7 +44,7 @@ fn main() {
                                      , "output_size"  => output_dims.to_string()
                                      , "hidden_size"  => hidden_dims.to_string()
                                      , "h_activation" => "relu".to_string()
-                                     , "o_activation" => "sigmoid".to_string()
+                                     , "o_activation" => "ones".to_string()
                                      , "h_init"       => "glorot_uniform".to_string()
                                      , "v_init"       => "glorot_uniform".to_string()
                                      , "phase_init"      => "glorot_uniform".to_string()

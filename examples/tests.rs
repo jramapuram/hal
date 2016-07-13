@@ -30,7 +30,7 @@ fn main() {
     let b = 2f32;
     a = af::div (&b, &a, false);
 
-    println!("{}", &a.dims(2));
+    //println!("{}", &a.dims(2));
 
 
 

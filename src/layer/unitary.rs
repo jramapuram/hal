@@ -159,9 +159,11 @@ impl Layer for Unitary
                             , MatProp::NONE);
 
         let new_o = af::add(&uh, &bias1, true);
-        
+       
+         
         let out = activations::get_activation(&ltex.activations[1]
                                               , &new_o).unwrap(); 
+        
 
         if ltex.inputs.len() > t {
             ltex.inputs[t] = c_inputs.clone();
@@ -226,13 +228,11 @@ impl Layer for Unitary
         
         // We write d_ to say dL/d_
         // do => dz2
-        /*
+        
         let d_z2 = af::mul(delta
                          , &activations::get_derivative(&ltex.activations[1], &ltex.outputs[t]).unwrap()
                           , false);
-        */
-        let d_z2 = delta;
-
+        
         // dz2 => dh_{t}
         let prod = af::matmul(&d_z2, &weight6, MatProp::NONE, MatProp::TRANS);
         let d_h1 = af::cplx2(&af::cols(&prod, 0, dim_h-1)

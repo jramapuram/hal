@@ -12,7 +12,7 @@ use rand::distributions::{IndependentSample, Range};
 use hal::{utils, activations, initializations, loss};
 use hal::layer;
 use hal::layer::{Layer};
-use hal::params::{DenseGenerator, RNNGenerator, ParamManager};
+use hal::params::{DenseGenerator, RNNGenerator, UnitaryGenerator, ParamManager};
 use hal::device::{DeviceManagerFactory, Device};
 use hal::error::HALError;
 
@@ -189,6 +189,10 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
       input_size: input_size,
       output_size: output_size,
     }),
+    "unitary" => Box::new(layer::Unitary {
+      input_size: input_size,
+      output_size: output_size,
+    }),
     //todo: lstm, etc
     _      => panic!("unknown layer type specified"),
   };
@@ -212,7 +216,7 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
       param_manager.set_recurrences(0, vec![h_t]);
     }
 
-    "unitary" => 
+    "unitary" => { 
         let hidden_size = 10;
         let h_activation = "relu";
         let h_init = "glorot_uniform";
@@ -228,7 +232,11 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
                                                   , h_activation, activation
                                                   , h_init, v_init, phase_init, householder_init
                                                   , permut_init, u_init
-                                                  , h_bias_init, o_bias_init),
+                                                  , h_bias_init, o_bias_init);
+      let hdims = Dim4::new(&[batch_size as u64, 2*hidden_size as u64, 1, 1]);
+      let h_t = utils::constant(hdims, DType::F64, 0.5f32);
+      param_manager.set_recurrences(0, vec![h_t]);
+    }
   //todo: lstm, etc
     _      => panic!("unknown layer type specified"),
   };
@@ -382,23 +390,6 @@ fn rnn_forward(){
 }
 
 #[test]
-fn unitary_forward() {
-    let idims = Dim4::new(&[2, 2, 2, 1]);
-    let odims = Dim4::new(&[2, 2, 2, 1]);
-    layer_forward_helper("unitary", idims, odims, "cross_entropy", 1e-4
-                         , "softmax"
-                         , " "
-                         , " "
-                         , vec![0.4, -1.2, -0.55, 0.15, -0.55, 3.2, -2.5, 3.2]
-                         , vec![]);
-
-}
-
-#[test]
-fn unitary_backward() {
-}
-
-#[test]
 fn rnn_backward() {
   timeit! ({
     let idims = Dim4::new(&[1, 5, 1, 1]); // single time slice
@@ -411,3 +402,27 @@ fn rnn_backward() {
                           , "zeros");         // bias init
   });
 }
+
+#[test]
+fn unitary_forward() {
+    let idims = Dim4::new(&[1, 8, 1, 1]);
+    let odims = Dim4::new(&[1, 8, 1, 1]);
+    layer_forward_helper("unitary", idims, odims, "cross_entropy_softmax", 1e-4
+                         , "ones"
+                         , " "
+                         , " "
+                         , vec![0.4, -1.2, -0.55, 0.15, -0.55, 3.2, -2.5, 3.2]
+                         , vec![0., 0., 0., 0., 0., 0., 0., 0.]);
+
+}
+
+#[test]
+fn unitary_backward() {
+    let idims = Dim4::new(&[1, 8, 1, 1]);
+    let odims = Dim4::new(&[1, 8, 1, 1]);
+    layer_backward_helper("unitary", idims, odims, "cross_entropy_softmax", 1e-4
+                          , "ones"
+                          , " "
+                          , " ");
+}
+
