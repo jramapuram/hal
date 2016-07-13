@@ -25,8 +25,12 @@ pub fn sigmoid(x: &Array) -> Array {
 /// Return the softmax activated value [numerical stable]
 /// exp(x_i) / sum(exp(x))
 pub fn softmax(x: &Array) -> Array {
-  // page 185 of http://www.deeplearningbook.org/contents/mlp.html
-  let z = x - af::max_all(x).0 as f32;
+  // http://www.deeplearningbook.org/contents/mlp.html page 185
+  let z = match x.numdims() {
+    1 => x.clone(),
+    _ => af::sub(x, &af::max(x, 1), true),
+  };
+
   let exponentiated = af::exp(&z);
   let sum_epx_x = af::sum_all(&exponentiated).0 as f32;
   let sum_exp_x_vec = utils::constant(x.dims(), x.get_type(), sum_epx_x);

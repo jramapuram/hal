@@ -63,7 +63,6 @@ impl Optimizer for SGD {
     self.iter += 1;
     let lr = self.learning_rate * (1.0 / (1.0 + self.decay * (self.iter as f32)));
     let alpha = lr / batch_size as f32;
-    let mut running_type = DType::F32;
 
     // all arrays are returned as [W0, b0, .. WN, bN, ..] (note this is per layer)
     // deltas are returned in the same way
@@ -73,7 +72,6 @@ impl Optimizer for SGD {
                                                  , self.velocity.iter_mut()                  // velocity of above
                                                  , 0..num_params))                           // current index
     {
-      running_type = arr.get_type();
       let grad_update = match self.clip_grad > 0.0 {
         false => delta.clone(),
         true  => optimizer::clip_grads(&delta, self.clip_grad),
@@ -88,7 +86,8 @@ impl Optimizer for SGD {
     }
 
     // zero out the deltas
-    parameter_manager.zero_all_deltas(running_type);
+    parameter_manager.zero_all_deltas();
+    parameter_manager.zero_all_state_derivatives();
   }
 
   fn info(&self){
