@@ -17,15 +17,15 @@ use af::{Backend, HasAfEnum, MatProp, DType};
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 8;
+  let input_dims = 10;
   let seq_size = 10;
-  let hidden_dims = 50;
-  let output_dims = 8;
+  let hidden_dims = 30;
+  let output_dims = 10;
   let num_train_samples = 32000;
-  let batch_size = 50;
+  let batch_size = 20;
   let optimizer_type = "Adam";
   let epochs = 5;
-  let bptt_unroll = 100;
+  let bptt_unroll = 50;
 
   // Now, let's build a model with an device manager on a specific device
   // an optimizer and a loss function. For this example we demonstrate a simple autoencoder

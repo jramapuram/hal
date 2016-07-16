@@ -23,15 +23,34 @@ fn h_d(param: Array, ar: Array) -> Array {
     af::mul(&D, &ar, true)
 }
 
+fn r_d(param: Array, ar: Array) -> Array {
+    let D = af::cplx2(&af::cos(&param)
+                      , &af::mul(&af::sin(&param), &-1, true)
+                      ,false);
+    af::mul(&D, &ar, true)
+}
+
 fn h_fft(ar: Array) -> Array {
         let ar_size = ar.dims()[1];
         af::transpose(&af::fft(&af::transpose(&ar, false), 1.0, ar_size as i64)
                       , false)
 }
 
+fn r_fft(ar: Array) -> Array {
+        let ar_size = ar.dims()[1];
+        af::transpose(&af::ifft(&af::transpose(&ar, false), 1.0, ar_size as i64)
+                      , false)
+}
+
 fn h_ifft(ar: Array) -> Array {
         let ar_size = ar.dims()[1];
         af::transpose(&af::ifft(&af::transpose(&ar, false), 1.0/(ar_size as f64), ar_size as i64)
+                              , false)
+}
+
+fn r_ifft(ar: Array) -> Array {
+        let ar_size = ar.dims()[1];
+        af::transpose(&af::fft(&af::transpose(&ar, false), 1.0/(ar_size as f64), ar_size as i64)
                               , false)
 }
 
@@ -45,11 +64,10 @@ fn h_r(param: Array, mut ar: Array) -> Array {
                        , &ar
                        , MatProp::NONE
                        , MatProp::TRANS);
-        ar = af::matmul(&param
-                       , &ar
-                       , MatProp::CTRANS
+        ar = af::matmul(&ar
+                       , &af::conjg(&param)
+                       , MatProp::TRANS
                        , MatProp::NONE);
-        ar = af::transpose(&ar, false);
         ar = af::mul(&ar, &2, true);
         ar = af::sub(&ar_temp, &ar, false);
         ar
@@ -118,8 +136,8 @@ impl Layer for Unitary
             let sqrNorm = af::norm(&weight5, af::NormType::VECTOR_2, 1., 1.)as f32;
             weight5 = af::div(&weight5, &sqrNorm, true);
             ltex.weights[5] = to_real(weight5.clone());
-
         }
+        
         
         
       
@@ -187,6 +205,7 @@ impl Layer for Unitary
         let mut ltex = params.lock().unwrap();
         ltex.current_unroll -= 1;
         let t = ltex.current_unroll;
+        let t_max = ltex.outputs.len()-1;
         
         // Transformation of complex parameters
         let mut weight0 = to_complex(ltex.weights[0].clone());
@@ -214,6 +233,17 @@ impl Layer for Unitary
         let mut delta6 = ltex.deltas[6].clone();
         let mut delta8 = ltex.deltas[8].clone();
 
+        if t == t_max {
+            // We normalize Householder parameters;
+            let sqrNorm = af::norm(&weight4, af::NormType::VECTOR_2, 1., 1.)as f32;
+            weight4 = af::div(&weight4, &sqrNorm, true);
+            ltex.weights[4] = to_real(weight4.clone());
+            
+            let sqrNorm = af::norm(&weight5, af::NormType::VECTOR_2, 1., 1.)as f32;
+            weight5 = af::div(&weight5, &sqrNorm, true);
+            ltex.weights[5] = to_real(weight5.clone());
+        }
+
         let p1 = weight1.clone();
         let p2 = weight4.clone();
         let p3 = ltex.optional[0].clone();
@@ -221,11 +251,11 @@ impl Layer for Unitary
         let p5 = weight5.clone();
         let p6 = weight3.clone();
 
-        let t_max = ltex.outputs.len()-1;
         let dim_h = rec_t0.dims()[1];
         assert!(t >= 0
                 , "Cannot call backward pass without at least 1 forward pass");
-        
+       
+
         // We write d_ to say dL/d_
         // do => dz2
         
@@ -252,12 +282,12 @@ impl Layer for Unitary
             d_rec = to_complex(ltex.state_derivatives[0].clone());
             let mut rec_t2 = to_complex(ltex.recurrences[t+2].clone());
             let d_activ = activations::get_derivative(&ltex.activations[0], &rec_t2).unwrap();
-            let d_h2 = af::mul(&h_d(p1.clone()
-                                    , h_fft(h_r(p2.clone()
+            let d_h2 = af::mul(&r_d(p1.clone()
+                                    , r_fft(h_r(p2.clone()
                                                 , h_pi(p3.clone()
-                                                       , h_d(p4.clone()
-                                                             , h_ifft(h_r(p5.clone()
-                                                                          , h_d(p6.clone(), d_rec.clone()))))))))
+                                                       , r_d(p4.clone()
+                                                             , r_ifft(h_r(p5.clone()
+                                                                          , r_d(p6.clone(), d_rec.clone()))))))))
                                , &d_activ
                                , false);
             // dz2 & dh_{t+1} => dh_{t}
@@ -277,28 +307,34 @@ impl Layer for Unitary
 
         // D1
         let dd1_left = rec_t0.clone();
-        let dd1_right = h_fft(h_r(p2.clone()
+        let dd1_right = r_fft(h_r(p2.clone()
                                   , h_pi(p3.clone()
-                                         , h_d(p4.clone()
-                                               , h_ifft(h_r(p5.clone()
-                                                            , h_d(p6.clone(), d_z.clone())))))));
-        let dd1 = af::mul(&dd1_left, &dd1_right, false);
+                                         , r_d(p4.clone()
+                                               , r_ifft(h_r(p5.clone()
+                                                            , r_d(p6.clone(), d_z.clone())))))));
         // We add the derivatives from the real and imaginary parts
-        let dd1_real = af::mul(&af::real(&dd1), &af::mul(&af::sin(&weight1), &-1, true), true);
-        let dd1_imag = af::mul(&af::imag(&dd1), &af::cos(&weight1), true);
-        let dd1_phase = af::add(&dd1_real, &dd1_imag, false);
+        let dd1_sin = af::sin(&weight1);
+        let dd1_cos = af::cos(&weight1);
+        let dd1_real = af::mul(&af::add(&af::mul(&af::real(&dd1_left), &dd1_sin, true), &af::mul(&af::imag(&dd1_left), &dd1_cos, true), false), &-1, true);
+        let dd1_imag = af::sub(&af::mul(&af::real(&dd1_left), &dd1_cos, true), &af::mul(&af::imag(&dd1_left), &dd1_sin, true), false);
+        let dd1_phase = af::add(&af::mul(&dd1_real, &af::real(&dd1_right), false)
+                                , &af::mul(&dd1_imag, &af::imag(&dd1_right), false)
+                                , false);
         ltex.deltas[1] = af::add(&delta1, &af::sum(&dd1_phase, 0), false);
         
         // D2
         let dd2_left = h_pi(p3.clone()
                             , h_r(p2.clone()
                                   , h_fft(h_d(p1.clone(), rec_t0.clone()))));   
-        let dd2_right = h_ifft(h_r(p5.clone()
-                                   , h_d(p6.clone(), d_z.clone())));
-        let dd2 = af::mul(&dd2_left, &dd2_right, false);
-        let dd2_real = af::mul(&af::real(&dd2), &af::mul(&af::sin(&weight2), &-1, true), true);
-        let dd2_imag = af::mul(&af::imag(&dd2), &af::cos(&weight2), true);
-        let dd2_phase = af::add(&dd2_real, &dd2_imag, false);
+        let dd2_right = r_ifft(h_r(p5.clone()
+                                   , r_d(p6.clone(), d_z.clone())));
+        let dd2_sin = af::sin(&weight2);
+        let dd2_cos = af::cos(&weight2);
+        let dd2_real = af::mul(&af::add(&af::mul(&af::real(&dd2_left), &dd2_sin, true), &af::mul(&af::imag(&dd2_left), &dd2_cos, true), false), &-1, true);
+        let dd2_imag = af::sub(&af::mul(&af::real(&dd2_left), &dd2_cos, true), &af::mul(&af::imag(&dd2_left), &dd2_sin, true), false);
+        let dd2_phase = af::add(&af::mul(&dd2_real, &af::real(&dd2_right), false)
+                                , &af::mul(&dd2_imag, &af::imag(&dd2_right), false)
+                                , false);
         ltex.deltas[2] = af::add(&delta2, &af::sum(&dd2_phase, 0), false);
 
         // D3
@@ -308,10 +344,13 @@ impl Layer for Unitary
                                                , h_r(p2.clone()
                                                      , h_fft(h_d(p1.clone(), rec_t0.clone())))))));
         let dd3_right = d_z.clone();
-        let dd3 = af::mul(&dd3_left, &dd3_right, false);
-        let dd3_real = af::mul(&af::real(&dd3), &af::mul(&af::sin(&weight3), &-1, true), true);
-        let dd3_imag = af::mul(&af::imag(&dd3), &af::cos(&weight3), true);
-        let dd3_phase = af::add(&dd3_real, &dd3_imag, false);
+        let dd3_sin = af::sin(&weight3);
+        let dd3_cos = af::cos(&weight3);
+        let dd3_real = af::mul(&af::add(&af::mul(&af::real(&dd3_left), &dd3_sin, true), &af::mul(&af::imag(&dd3_left), &dd3_cos, true), false), &-1, true);
+        let dd3_imag = af::sub(&af::mul(&af::real(&dd3_left), &dd3_cos, true), &af::mul(&af::imag(&dd3_left), &dd3_sin, true), false);
+        let dd3_phase = af::add(&af::mul(&dd3_real, &af::real(&dd3_right), false)
+                                , &af::mul(&dd3_imag, &af::imag(&dd3_right), false)
+                                , false);
         ltex.deltas[3] = af::add(&delta3, &af::sum(&dd3_phase, 0), false);
 
         
@@ -321,36 +360,71 @@ impl Layer for Unitary
         // R1
         let dr1_left = h_fft(h_d(p1.clone(), rec_t0.clone()));
         let dr1_right = h_pi(p3.clone()
-                         , h_d(p4.clone()
-                         , h_ifft(h_r(p5.clone()
-                                      , h_d(p6.clone(), d_z.clone())))));
-        let dr1 = af::mul(&af::mul(&af::matmul(&dr1_left
-                                               , &weight4
-                                               , MatProp::NONE
-                                               , MatProp::CTRANS), &-2, true), &dr1_right, true);
+                         , r_d(p4.clone()
+                         , r_ifft(h_r(p5.clone()
+                                      , r_d(p6.clone(), d_z.clone())))));
+        
+        let w = weight4.clone();
+        let dh = dr1_right.clone();
+        let dh2 = dh.clone();
+        let h0 = dr1_left.clone();
+        let h1 = af::matmul(&w, &h0, MatProp::NONE, MatProp::TRANS);
+        let h2 = af::matmul(&h1, &af::conjg(&w), MatProp::TRANS, MatProp::NONE);
+
+        let dh1 = af::transpose(&af::matmul(&w, &dh2, MatProp::NONE, MatProp::TRANS), false);
+        let dr11 = af::mul(&af::conjg(&h0), &dh1, true);
+        
+        let dr12 = af::conjg(&af::mul(&af::transpose(&af::conjg(&h1), false), &dh2, true));
+
+        let dh3 = af::sum(&af::mul(&dh, &af::conjg(&h2), false), 1);
+        let dr13 = af::matmul(&dh3 , &w, MatProp::NONE, MatProp::NONE);
+        
+        let dr14 = af::conjg(&af::matmul(&dh3 , &af::conjg(&w), MatProp::NONE, MatProp::NONE));
+
+        let dr1 = af::mul(&af::sub(&af::sub(&af::add(&dr11, &dr12, false), &dr13, false), &dr14, false), &-2, true);
+
         delta4 = af::add(&delta4, &af::sum(&dr1, 0), false);
         ltex.deltas[4] = to_real(delta4.clone());
 
         // R2
+
         let dr2_left = h_ifft(h_d(p4.clone()
                                   , h_pi(p3.clone()
                                          , h_r(p2.clone()
-                                               , h_d(p1.clone(), rec_t0.clone())))));
-        let dr2_right = h_d(p6.clone(), d_z.clone());
-        let dr2 = af::mul(&af::mul(&af::matmul(&dr2_left
-                                               , &weight4
-                                               , MatProp::NONE
-                                               , MatProp::CTRANS), &-2, true), &dr2_right, true);
+                                               , h_fft(h_d(p1.clone(), rec_t0.clone()))))));
+        let dr2_right = r_d(p6.clone(), d_z.clone());
+
+        let w = weight5.clone();
+        let dh = dr2_right.clone();
+        let dh2 = dh.clone();
+        let h0 = dr2_left.clone();
+        let h1 = af::matmul(&w, &h0, MatProp::NONE, MatProp::TRANS);
+        let h2 = af::matmul(&h1, &af::conjg(&w), MatProp::TRANS, MatProp::NONE);
+
+        let dh1 = af::transpose(&af::matmul(&w, &dh2, MatProp::NONE, MatProp::TRANS), false);
+        let dr21 = af::mul(&af::conjg(&h0), &dh1, true);
+        
+        let dr22 = af::conjg(&af::mul(&af::transpose(&af::conjg(&h1), false), &dh2, true));
+
+        let dh3 = af::sum(&af::mul(&dh, &af::conjg(&h2), false), 1);
+        let dr23 = af::matmul(&dh3 , &w, MatProp::NONE, MatProp::NONE);
+        
+        let dr24 = af::conjg(&af::matmul(&dh3 , &af::conjg(&w), MatProp::NONE, MatProp::NONE));
+
+        let dr2 = af::mul(&af::sub(&af::sub(&af::add(&dr21, &dr22, false), &dr23, false), &dr24, false), &-2, true);
+
         delta5 = af::add(&delta5, &af::sum(&dr2, 0), false);
         ltex.deltas[5] = to_real(delta5.clone());
 
+
+       
         
-        
+        // TO DO : fix the name of parameters to be coherent with the one of params.rs 
         //-----------------------------------------------------------------------------
         // dz => dU
         let d_u = af::matmul(&ltex.inputs[t]
                          , &d_z
-                         , MatProp::TRANS
+                         , MatProp::CTRANS
                          , MatProp::NONE);
         delta0 = af::add(&delta0, &d_u, false);
         ltex.deltas[0] = to_real(delta0.clone());

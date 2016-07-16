@@ -698,9 +698,9 @@ impl<'a> UnitaryGenerator for ParamManager {
 
         // weights first
         let weights = vec![(v_init, (input_size, 2*hidden_size))
-                           , ("zeros", (1, hidden_size))
-                           , ("zeros", (1, hidden_size))
-                           , ("zeros", (1, hidden_size))
+                           , (phase_init, (1, hidden_size))
+                           , (phase_init, (1, hidden_size))
+                           , (phase_init, (1, hidden_size))
                            , (householder_init, (1, 2*hidden_size))
                            , (householder_init, (1, 2*hidden_size))
                            , (u_init, (2*hidden_size, output_size))];

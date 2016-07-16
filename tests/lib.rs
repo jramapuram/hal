@@ -213,8 +213,8 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
     }
 
     "unitary" => { 
-        let hidden_size = 10;
-        let h_activation = "relu";
+        let hidden_size = 5;
+        let h_activation = "ones";
         let h_init = "glorot_uniform";
         let v_init = "glorot_uniform";
         let phase_init = "glorot_uniform";
@@ -409,11 +409,11 @@ fn rnn_backward() {
 fn unitary_forward() {
     let idims = Dim4::new(&[1, 8, 1, 1]);
     let odims = Dim4::new(&[1, 8, 1, 1]);
-    layer_forward_helper("unitary", idims, odims, "cross_entropy_softmax", 1e-4
-                         , "ones"
+    layer_forward_helper("unitary", idims, odims, "l2", 1e-4
+                         , "tanh"
                          , " "
                          , " "
-                         , vec![0.4, -1.2, -0.55, 0.15, -0.55, 3.2, -2.5, 3.2]
+                         , vec![0.4f64, -1.2, -0.55, 0.15, -0.55, 3.2, -2.5, 3.2]
                          , vec![0., 0., 0., 0., 0., 0., 0., 0.]);
 
 }
@@ -422,8 +422,8 @@ fn unitary_forward() {
 fn unitary_backward() {
     let idims = Dim4::new(&[1, 8, 1, 1]);
     let odims = Dim4::new(&[1, 8, 1, 1]);
-    layer_backward_helper("unitary", idims, odims, "cross_entropy_softmax", 1e-4
-                          , "ones"
+    layer_backward_helper("unitary", idims, odims, "l2", 1e-4
+                          , "tanh"
                           , " "
                           , " ");
 }
