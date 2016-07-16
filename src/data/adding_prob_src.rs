@@ -5,6 +5,7 @@ use af::{Array, Dim4, MatProp, DType};
 use std::cell::{RefCell, Cell};
 
 use initializations::uniform_pos;
+use utils;
 
 use data::{Data, DataSource, DataParams, Normalize, Shuffle};
 
@@ -16,7 +17,7 @@ pub struct AddingProblemSource {
 }
 
 impl AddingProblemSource {
-    pub fn new(batch_size: u64, bptt_unroll: u64, max_samples: u64, dtype: DType) -> AddingProblemSource
+    pub fn new(batch_size: u64, bptt_unroll: u64, dtype: DType, max_samples: u64) -> AddingProblemSource
     {
         let input_dims = Dim4::new(&[batch_size, 1, bptt_unroll, 1]);
         let target_dims = Dim4::new(&[batch_size, 1, 1, 1]);
@@ -43,28 +44,28 @@ impl AddingProblemSource {
     }
 
     fn generate_input(&self, batch_size: u64, bptt_unroll: u64) -> Array {
-        let dim = Dim4::new(&[batch_size, 1, bptt_unroll/2, 1]);
-        let ar1 = uniform_pos::<f32>(dim, 1.0);
+        let dim1 = Dim4::new(&[batch_size, 1, bptt_unroll/2, 1]);
+        let ar1 = uniform_pos::<f32>(dim1, 1.0);
 
-        let between1 = Range::new(0, bptt_unroll/4-1);
-        let between2 = Range::new(bptt_unroll/4, bptt_unroll/2-1);
+        let between1 = Range::new(0, bptt_unroll/4);
+        let between2 = Range::new(bptt_unroll/4, bptt_unroll/2);
         let mut rng1 = rand::thread_rng();
         let mut rng2 = rand::thread_rng();
-        let mut ar2 = af::constant(0.0 as f32, dim);
-        let one = af::constant(1, Dim4::new(&[1,1,1,1]));
 
-        for i in 0..batch_size {
-            let index1 = between1.ind_sample(&mut rng1);
-            let index2 = between2.ind_sample(&mut rng2);
-            let seqs1 = &[af::Seq::new(i as f64, i as f64, 1.0)
-                , af::Seq::new(0.0, 0.0, 1.0)
-                , af::Seq::new(index1 as f64, index1 as f64, 1.0)];
-            let seqs2 = &[af::Seq::new(i as f64, i as f64, 1.0)
-                , af::Seq::new(0.0, 0.0, 1.0)
-                , af::Seq::new(index2 as f64, index2 as f64, 1.0)];
-            ar2 = af::assign_seq(&ar2, seqs1, &one);
-            ar2 = af::assign_seq(&ar2, seqs2, &one);
+        let mut vec_total = Vec::new();
+        let vec = vec!(0f32; (bptt_unroll/2) as usize);
+
+        for _ in 0..batch_size {
+            let index1 = between1.ind_sample(&mut rng1) as usize;
+            let index2 = between2.ind_sample(&mut rng2) as usize;
+            println!("{} {}", &index1, &index2);
+            let mut vec_temp = vec.clone();
+            vec_temp[index1] = 1f32;
+            vec_temp[index2] = 1f32;
+            vec_total.append(&mut vec_temp);
         }
+        let dim2 = Dim4::new(&[bptt_unroll/2, batch_size, 1, 1]);
+        let ar2 = af::moddims(&af::transpose(&utils::vec_to_array::<f32>(vec_total, dim2), false), dim1);
         af::join(2, &ar1, &ar2)
 
 
@@ -77,7 +78,7 @@ impl AddingProblemSource {
         let ones = af::constant(1. as f32, first.dims());
         let ar = af::mul(&first, &second, false);
 
-        af::product(&af::select(&ar, &af::gt(&ar, &zeros, false), &ones), 2)
+        af::sum(&ar, 2)
 
 
 

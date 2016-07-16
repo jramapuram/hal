@@ -48,7 +48,7 @@ impl CopyingProblemSource {
 
     fn generate_input(&self, batch_size: u64, input_size: u64, bptt_unroll: u64, seq_size: u64) -> Array {
 
-        let between = Range::new(0,input_size-2);
+        let between = Range::new(0,input_size-1);
         let mut rng = rand::thread_rng();
         
         let mut vec_total = Vec::new();

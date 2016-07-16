@@ -273,9 +273,11 @@ impl Layer for Unitary
         if t == t_max {
             // Check to see if we already have a state derivative, else add one
             if ltex.state_derivatives.len() == 0 {
-                ltex.state_derivatives.push(af::constant(0, Dim4::new(&[1, 1, 1, 1])));
+                ltex.state_derivatives.push(to_real(d_rec.clone()));
             }
-            ltex.state_derivatives[0]= to_real(d_rec.clone());
+            else{
+                ltex.state_derivatives[0]= to_real(d_rec.clone());
+            }
         }
         else {
             // dh_{t+1} => dh_{t}
