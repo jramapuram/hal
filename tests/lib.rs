@@ -134,7 +134,7 @@ fn lrelu(){
 fn softmax(){
   verify_func(activations::softmax
               , "softmax"
-              , &[0.0117, 0.0317, 0.0861, 0.2341, 0.6364]);
+              , &[1.0, 1.0, 1.0, 1.0, 1.0]);
 }
 
 #[test]
