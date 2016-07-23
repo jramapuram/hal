@@ -58,6 +58,15 @@ impl Model for Sequential {
     }
   }
 
+  /// Adds a new layer to the sequential model
+  ///
+  /// Given a layer type and provided parameters this function
+  /// will add the required parameters to the sequential model
+  ///
+  /// # Parameters
+  ///
+  /// - `layer` is the type of layer to add
+  /// - `params` is a hashmap of params for the provided layer
   fn add<T: HasAfEnum>(&mut self, layer: &str
          , params: HashMap<&str, String>)
   {
@@ -110,13 +119,27 @@ impl Model for Sequential {
     println!("loss:           {}\nnum_layers:     {}", self.loss, self.layers.len());
   }
 
-  fn forward<T>(&mut self, activation: &Array
+  /// Calculate the forward pass of all the layers
+  ///
+  /// Given an array of inputs this function computes the forward pass
+  /// on all the available layers and return the final model outputs
+  ///
+  /// # Parameters
+  ///
+  /// - `inputs` is an array of activations [batch, feature, time]
+  /// - `src_device` is the source device that the data is coming from
+  /// - `dest_device` is the destination device that the data should go to
+  ///
+  /// # Return Values
+  ///
+  /// Vector of activated outputs of the model
+  fn forward<T>(&mut self, inputs: &Array
                 , src_device: Device
                 , dest_device: Device) -> Vec<Array>
     where T: HasAfEnum + Zero + Clone
   {
     // check & swap if the backend matches to runtime one (if not already)
-    let activ = self.manager.swap_array_backend::<T>(&activation, src_device, self.device);
+    let activ = self.manager.swap_array_backend::<T>(&inputs, src_device, self.device);
 
     // if dim[3] > 1 we assume we have an RNN
     // we will need to unwind at least once for non RNNs
@@ -235,7 +258,9 @@ impl Model for Sequential {
 
         // cache and print loss (if verbose)
         if verbose {
-          print!("{} ", current_loss_vec.last().unwrap());
+          let loss_sum = current_loss_vec.iter().fold(0f32, |sum, val| sum + val);
+          let avg_loss = current_loss_vec.len() as f32 * loss_sum;
+          print!("{} ", avg_loss);
         }
         lossvec.extend(current_loss_vec);
       }
@@ -246,6 +271,21 @@ impl Model for Sequential {
     lossvec
   }
 
+
+  /// Calculate the layer gradients and return the loss vector
+  ///
+  /// Given predictions and output data, this function computes all the gradients for all
+  /// of the trainable parameters in the layers
+  ///
+  /// # Parameters
+  ///
+  /// - `predictions` are the model predictions
+  /// - `targets` are the true targets
+  /// - `loss_indices` are the optional indices of losses to use while computing the gradient
+  ///
+  /// # Return Values
+  ///
+  /// Vector of losses
   fn backward(&mut self, predictions: &Vec<Array>, targets: &Array, loss_indices: Option<&Vec<bool>>) -> Vec<f32> {
     // setup the optimizer parameters (if not already setup)
     self.optimizer.setup(self.param_manager.get_all_dims());

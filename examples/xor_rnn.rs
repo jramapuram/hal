@@ -13,11 +13,11 @@ use af::{Backend, DType};
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 32;
-  let batch_size = 20;
+  let input_dims = 1;
+  let batch_size = 8;
   let seq_len = 10;
   let hidden_dims = 64;
-  let output_dims = 32;
+  let output_dims = 1;
   let num_train_samples = 65536;
   let optimizer_type = "Adam";
   let epochs = 1000;
@@ -61,18 +61,6 @@ fn main() {
                                      , false             // normalized ?
                                      , false);           // shuffled ?
 
-  // let test_sample = xor_generator.get_train_iter(2);
-  // let inp = test_sample.input.into_inner();
-  // let tar = test_sample.target.into_inner();
-  // println!("inp dims = {:?} | tar dims = {:?}", inp.dims(), tar.dims());
-  // for i in 0..seq_len {
-  //   println!("t = {}", i);
-  //   let inp_s0 = af::slice(&inp, i);
-  //   let tar_s0 = af::slice(&tar, i);
-  //   af::print(&inp_s0);
-  //   af::print(&tar_s0);
-  // }
-
   // iterate our model in Verbose mode (printing loss)
   // Note: more manual control can be enacted by directly calling
   //       forward/backward & optimizer update
@@ -80,6 +68,7 @@ fn main() {
                                          , cpu_device          // source device
                                          , epochs, batch_size  // self explanatory :)
                                          , Some(seq_len)       // BPTT interval
+                                         , None                // Custom loss indices
                                          , true);              // verbose
 
   // plot our loss on a 512x512 grid with the provided title

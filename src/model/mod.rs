@@ -20,7 +20,7 @@ pub trait Model {
                , loss_indices: Option<&Vec<bool>>, verbose: bool) -> Vec<f32>
     where T: DataSource, E: HasAfEnum + Zero + Clone;
 
-  fn forward<T>(&mut self, activation: &Array
+  fn forward<T>(&mut self, inputs: &Array
                 , src_device: Device
                 , dest_device: Device) -> Vec<Array>
     where T: HasAfEnum + Zero + Clone;
