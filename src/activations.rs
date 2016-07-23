@@ -32,9 +32,8 @@ pub fn softmax(x: &Array) -> Array {
   };
 
   let exponentiated = af::exp(&z);
-  let sum_epx_x = af::sum_all(&exponentiated).0 as f32;
-  let sum_exp_x_vec = utils::constant(x.dims(), x.get_type(), sum_epx_x);
-  let a = af::div(&exponentiated, &sum_exp_x_vec, false);
+  let sum_exp_x_vec = af::sum(&exponentiated, 1);
+  let a = af::div(&exponentiated, &sum_exp_x_vec, true);
   utils::assert_types(vec![x, &a]);
   a
 }
