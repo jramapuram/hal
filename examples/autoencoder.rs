@@ -19,7 +19,7 @@ fn main() {
   let num_train_samples = 65536;
   let batch_size = 128;
   let optimizer_type = "Adam";
-  let epochs = 20;
+  let epochs = 5;
 
   // Now, let's build a model with an device manager on a specific device
   // an optimizer and a loss function. For this example we demonstrate a simple autoencoder
@@ -65,7 +65,8 @@ fn main() {
   let loss = model.fit::<SinSource, f32>(&sin_generator        // what data source to pull from
                                          , cpu_device          // source device
                                          , epochs, batch_size  // self explanatory :)
-                                         , None                // BPTT interval
+                                         , None                // BPTT interval [rnn only]
+                                         , None                // Custom loss indices
                                          , true);              // verbose
 
   // plot our loss on a 512x512 grid with the provided title
