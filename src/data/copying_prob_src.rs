@@ -21,6 +21,7 @@ impl CopyingProblemSource {
     pub fn new(input_size: u64, batch_size: u64, seq_size: u64
                , bptt_unroll: u64, dtype: DType, max_samples: u64) -> CopyingProblemSource
     {
+        assert!(bptt_unroll > 2*seq_size, "The number of time steps has to be bigger than the sequence size x2 for the copying problem");
         let input_dims = Dim4::new(&[batch_size, input_size, bptt_unroll, 1]);
         //let output_dims = Dim4::new(&[batch_size, output_size, bptt_unroll, 1]);
         let train_samples = 0.7 * max_samples as f32;
@@ -48,40 +49,40 @@ impl CopyingProblemSource {
 
     fn generate_input(&self, batch_size: u64, input_size: u64, bptt_unroll: u64, seq_size: u64) -> Array {
 
-        let between = Range::new(0,input_size-1);
+        let between = Range::new(0,input_size-2);
         let mut rng = rand::thread_rng();
         
-        let mut vec_total = Vec::new();
-        let vec = vec!(0f32; input_size as usize);
+        let mut vec_total = Vec::with_capacity((batch_size*input_size*bptt_unroll) as usize);
+        let vec_zeros = vec!(0f32; input_size as usize);
 
-        for i in 0..seq_size {
-            for j in 0..batch_size {
+        for _ in 0..seq_size {
+            for _ in 0..batch_size {
                 let index = between.ind_sample(&mut rng) as usize;
-                let mut vec_temp = vec.clone();
+                let mut vec_temp = vec_zeros.clone();
                 vec_temp[index] = 1f32;
-                vec_total.append(&mut vec_temp);
+                vec_total.extend(vec_temp);
             }
         }
 
-        for i in 0..bptt_unroll-2*seq_size-1 {
-            for j in 0..batch_size {
-                let mut vec_temp = vec.clone();
+        for _ in 0..bptt_unroll-2*seq_size-1 {
+            for _ in 0..batch_size {
+                let mut vec_temp = vec_zeros.clone();
                 vec_temp[(input_size-2) as usize] = 1f32;
-                vec_total.append(&mut vec_temp);
+                vec_total.extend(vec_temp);
             }
         }
 
-        for j in 0..batch_size {
-            let mut vec_temp = vec.clone();
+        for _ in 0..batch_size {
+            let mut vec_temp = vec_zeros.clone();
             vec_temp[(input_size-1) as usize] = 1f32;
-            vec_total.append(&mut vec_temp);
+            vec_total.extend(vec_temp);
         }
 
-        for i in 0..seq_size {
-            for j in 0..batch_size {
-                let mut vec_temp = vec.clone();
+        for _ in 0..seq_size {
+            for _ in 0..batch_size {
+                let mut vec_temp = vec_zeros.clone();
                 vec_temp[(input_size-2) as usize] = 1f32;
-                vec_total.append(&mut vec_temp);
+                vec_total.extend(vec_temp);
             }
         }
 
@@ -90,12 +91,21 @@ impl CopyingProblemSource {
     }
 
     fn generate_target(&self, input: &Array, batch_size: u64, input_size: u64, bptt_unroll: u64, seq_size: u64) -> Array {
-        let mut first = af::constant(0f32, af::Dim4::new(&[batch_size, input_size, bptt_unroll-seq_size,1]));
-        let ones = af::constant(1f32, af::Dim4::new(&[batch_size, 1, 1, 1]));
+        
+        let mut vec_total = Vec::with_capacity((batch_size*input_size*(bptt_unroll-seq_size)) as usize);
+        let vec_zeros = vec!(0f32; input_size as usize);
 
-        for i in 0..bptt_unroll-seq_size {
-            first = af::set_slice(&first, &af::set_col(&af::slice(&first, i), &ones, input_size-2), i);
+        for _ in 0..bptt_unroll-seq_size{
+            for _ in 0..batch_size {
+                let mut vec_temp = vec_zeros.clone();
+                vec_temp[(input_size-2) as usize] = 1f32;
+                vec_total.extend(vec_temp);
+            }
         }
+        
+        let dim_first = af::Dim4::new(&[input_size,batch_size, bptt_unroll-seq_size,1]);
+        let first = af::transpose(&utils::vec_to_array::<f32>(vec_total, dim_first), false);
+
         let second = af::slices(&input, 0, seq_size-1);
         af::join(2, &first, &second)
     }
