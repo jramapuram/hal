@@ -300,7 +300,7 @@ impl Model for Sequential {
         // cache and print loss (if verbose)
         if verbose {
           let loss_sum = current_loss_vec.iter().fold(0f32, |sum, val| sum + val);
-          let avg_loss = current_loss_vec.len() as f32 * loss_sum;
+          let avg_loss = loss_sum / current_loss_vec.len() as f32 ;
           print!("{} ", avg_loss);
         }
         lossvec.extend(current_loss_vec);

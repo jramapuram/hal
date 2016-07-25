@@ -71,5 +71,6 @@ fn main() {
                                                       , epochs
                                                       , batch_size
                                                       , Some(bptt_unroll)
+                                                      , None
                                                       , true);
 }

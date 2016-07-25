@@ -44,7 +44,3 @@ path = "examples/copying_problem.rs"
 [[example]]
 name = "adding_problem"
 path = "examples/adding_problem.rs"
-
-[[example]]
-name = "tests"
-path = "examples/tests.rs"

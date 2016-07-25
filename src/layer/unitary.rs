@@ -113,7 +113,7 @@ impl Layer for Unitary
         let mut weight4 = to_complex(ltex.weights[4].clone());
         let mut weight5 = to_complex(ltex.weights[5].clone());
         let mut bias0 = to_complex(ltex.biases[0].clone());
-        let mut rec_t0 = to_complex(ltex.recurrences[t].clone());
+        let mut rec_t = to_complex(ltex.recurrences[t].clone());
 
         // Not complex
         let mut weight1 = ltex.weights[1].clone();
@@ -128,7 +128,7 @@ impl Layer for Unitary
             let batch_size = inputs.dims()[0];
             let zero = af::constant(0f32, Dim4::new(&[batch_size, hidden_size, 1, 1]));
             ltex.recurrences[0] = af::add(&zero, &ltex.recurrences[0], true);
-            rec_t0 = to_complex(ltex.recurrences[0].clone());
+            rec_t = to_complex(ltex.recurrences[0].clone());
 
             // We normalize Householder parameters;
             let sqrNorm = af::norm(&weight4, af::NormType::VECTOR_2, 1., 1.)as f32;
@@ -139,10 +139,12 @@ impl Layer for Unitary
             weight5 = af::div(&weight5, &sqrNorm, true);
             ltex.weights[5] = to_real(weight5.clone());
         }
-        
-        
-        
-      
+
+        let rec_t = match state {
+            Some(init_state)    => init_state,
+            None                => rec_t
+        };
+         
         // we compute h_t+1 = sigma1(W*h_t + V*x_t + b1) 
         let wh = wh(weight1.clone()
                     , weight4.clone()
@@ -150,7 +152,7 @@ impl Layer for Unitary
                     , weight2.clone()
                     , weight5.clone()
                     , weight3.clone()
-                    , rec_t0.clone());
+                    , rec_t.clone());
 
         // In order to convert inputs.data into a complex array
         let c_zeros = initializations::zeros::<Complex<f32>>(inputs.dims()); 
