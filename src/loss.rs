@@ -75,10 +75,12 @@ pub fn l2_derivative(pred: &Array, target: &Array) -> Array {
 }
 
 /// Provides the vector derivative of the cross-entropy error
-/// (pred - truth) / (pred * (1 - pred))
+/// (pred - truth) / [(pred * (1 - pred)) + eps]
+/// eps is added for numerical stability
 pub fn cross_entropy_derivative(pred: &Array, target: &Array) -> Array {
   af::div(&mse_derivative(pred, target)
-          , &af::mul(pred, &af::sub(&1, pred, false), false), false)
+          , &af::add(&af::mul(pred, &af::sub(&1, pred, false), false), &1e-10, false)
+          , false)
 }
 
 /// Provides the vector derivative of the cross-entropy+softmax error
