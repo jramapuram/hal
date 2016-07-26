@@ -703,7 +703,8 @@ impl<'a> UnitaryGenerator for ParamManager {
                            , (phase_init, (1, hidden_size))
                            , (householder_init, (1, 2*hidden_size))
                            , (householder_init, (1, 2*hidden_size))
-                           , (u_init, (2*hidden_size, output_size))];
+                           , (u_init, (2*hidden_size, output_size))
+                           , (h_init, (1, 2*hidden_size))];      // + the initial hidden state
 
         // biases next
         let biases = vec![(h_bias_init, (1, 2*hidden_size))
@@ -712,9 +713,6 @@ impl<'a> UnitaryGenerator for ParamManager {
         // activations
         let activations = vec![h_activation, o_activation];
         
-        // hidden unit
-        let recurrences = Some(vec![(h_init,(1, 2*hidden_size))]);
-
         // we won't minimize trough the permutation params so we store them in optional
         let optionals = Some(vec![(permut_init, (hidden_size, 1))]);
         
@@ -722,7 +720,7 @@ impl<'a> UnitaryGenerator for ParamManager {
                       , weights
                       , biases
                       , activations
-                      , recurrences
+                      , None
                       , optionals);
   }
 }

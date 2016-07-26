@@ -108,12 +108,12 @@ impl Layer for Unitary
         let mut ltex = params.lock().unwrap();
         let t = ltex.current_unroll;
         
+        
         // Transformation of complex parameters
         let mut weight0 = to_complex(ltex.weights[0].clone());
         let mut weight4 = to_complex(ltex.weights[4].clone());
         let mut weight5 = to_complex(ltex.weights[5].clone());
         let mut bias0 = to_complex(ltex.biases[0].clone());
-        let mut rec_t = to_complex(ltex.recurrences[t].clone());
 
         // Not complex
         let mut weight1 = ltex.weights[1].clone();
@@ -124,11 +124,17 @@ impl Layer for Unitary
 
         if t == 0 {
             // Make a copy of h0 for all batch inputs
-            let hidden_size = ltex.weights[0].dims()[1];
+            if ltex.recurrences.len() == 0 {
+                let temp = ltex.weights[7].clone();
+                ltex.recurrences.push(temp);
+            }
+            else {
+                ltex.recurrences[0] = ltex.weights[7].clone();
+            }
+            let hidden_size = ltex.weights[7].dims()[1];
             let batch_size = inputs.dims()[0];
             let zero = af::constant(0f32, Dim4::new(&[batch_size, hidden_size, 1, 1]));
             ltex.recurrences[0] = af::add(&zero, &ltex.recurrences[0], true);
-            rec_t = to_complex(ltex.recurrences[0].clone());
 
             // We normalize Householder parameters;
             let sqrNorm = af::norm(&weight4, af::NormType::VECTOR_2, 1., 1.)as f32;
@@ -139,12 +145,15 @@ impl Layer for Unitary
             weight5 = af::div(&weight5, &sqrNorm, true);
             ltex.weights[5] = to_real(weight5.clone());
         }
+            let mut rec_t = to_complex(ltex.recurrences[t].clone());
 
-        let rec_t = match state {
+        rec_t = match state {
             Some(init_state)    => init_state,
             None                => rec_t
         };
          
+        af::print(&rec_t);
+        af::print(&weight1);
         // we compute h_t+1 = sigma1(W*h_t + V*x_t + b1) 
         let wh = wh(weight1.clone()
                     , weight4.clone()
@@ -221,6 +230,7 @@ impl Layer for Unitary
         let mut delta4 = to_complex(ltex.deltas[4].clone());
         let mut delta5 = to_complex(ltex.deltas[5].clone());
         let mut delta7 = to_complex(ltex.deltas[7].clone());
+        let mut delta8 = to_complex(ltex.deltas[8].clone());
 
         // Not complex
         let mut weight1 = ltex.weights[1].clone();
@@ -233,7 +243,7 @@ impl Layer for Unitary
         let mut delta2 = ltex.deltas[2].clone();
         let mut delta3 = ltex.deltas[3].clone();
         let mut delta6 = ltex.deltas[6].clone();
-        let mut delta8 = ltex.deltas[8].clone();
+        let mut delta9 = ltex.deltas[9].clone();
 
         let p1 = weight1.clone();
         let p2 = weight4.clone();
@@ -279,8 +289,8 @@ impl Layer for Unitary
                                           , r_d(p4.clone()
                                                 , r_ifft(h_r(p5.clone()
                                                              , r_d(p6.clone(), af::mul(&d_rec, &d_activ, false).clone()))))))));
-        ltex.state_derivatives[0] = to_real(new_d_h2.clone());
 
+        ltex.state_derivatives[0] = to_real(new_d_h2.clone());
 
         // dh_{t} => dz
         let d_z = af::mul(&d_rec, &d_activ, false);
@@ -418,14 +428,14 @@ impl Layer for Unitary
         
         //-----------------------------------------------------------------------------
         // dz => db
-        delta7 = af::add(&delta7, &af::sum(&d_z, 0), false);
-        ltex.deltas[7] = to_real(delta7.clone());
+        delta8 = af::add(&delta8, &af::sum(&d_z, 0), false);
+        ltex.deltas[8] = to_real(delta8.clone());
 
 
         
         //-----------------------------------------------------------------------------
         // dz2 => db2
-        ltex.deltas[8] = af::add(&delta8, &af::sum(&d_z2, 0), false);
+        ltex.deltas[9] = af::add(&delta9, &af::sum(&d_z2, 0), false);
 
         
         //-----------------------------------------------------------------------------
@@ -445,6 +455,11 @@ impl Layer for Unitary
         let new_delta = af::real(&af::matmul(&d_rec, &weight0, MatProp::NONE, MatProp::TRANS));
 
         //------------------------------------------------------------------------------
+        // dL => dh_{0}
+        if t == 1 {
+            delta7 = af::add(&delta7, &af::sum(&new_d_h2, 0), false);
+            ltex.deltas[7] = to_real(delta7.clone());
+        }
         ltex.current_unroll -= 1;
         new_delta
     }

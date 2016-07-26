@@ -229,9 +229,9 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
                                                   , h_init, v_init, phase_init, householder_init
                                                   , permut_init, u_init
                                                   , h_bias_init, o_bias_init);
-      let hdims = Dim4::new(&[batch_size as u64, 2*hidden_size as u64, 1, 1]);
-      let h_t = utils::constant(hdims, DType::F64, 0.5f32);
-      param_manager.set_recurrences(0, vec![h_t]);
+      //let hdims = Dim4::new(&[batch_size as u64, 2*hidden_size as u64, 1, 1]);
+      //let h_t = utils::constant(hdims, DType::F64, 0.5f32);
+      //param_manager.set_recurrences(0, vec![h_t]);
     }
     //todo: lstm, etc
     _      => panic!("unknown layer type specified"),
@@ -263,7 +263,10 @@ pub fn layer_forward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &s
                   let h_t = utils::constant(hdims, DType::F64, 0.5f32);
 
                   // run a forward pass
-                  let (activ, _) = layer.forward(params.clone(), &x.clone(), Some(h_t));
+                  let (activ, _) = match layer_type {
+                      "unitary" => layer.forward(params.clone(), &x.clone(), None),
+                      _         => layer.forward(params.clone(), &x.clone(),Some(h_t)),
+                  };
 
                   let loss_activ = loss::get_loss(loss, &activ, &targets).unwrap();
                   assert!(loss_activ < 1e-9
@@ -310,7 +313,10 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                   let h_t = utils::constant(hdims, DType::F64, 0.5f32);
 
                   // run a forward pass
-                  let (activ, _) = layer.forward(params.clone(), &x.clone(), Some(h_t.clone()));
+                  let (activ, _) = match layer_type {
+                      "unitary" => layer.forward(params.clone(), &x.clone(), None),
+                      _         => layer.forward(params.clone(), &x.clone(),Some(h_t.clone())),
+                  };
 
                   // get the derivative and save away all params
                   let delta = loss::get_loss_derivative(loss, &activ, &targets).unwrap();
@@ -333,7 +339,10 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                         let p = params.clone();
                         p.lock().unwrap().current_unroll = 0;
                         param_manager.set_array_from_index(i.clone(), ind);
-                        let (fwd_pass, _) = layer.forward(params.clone(), &x.clone(), Some(h_t.clone()));
+                        let (fwd_pass, _) = match layer_type {
+                            "unitary"   => layer.forward(params.clone(), &x.clone(), None),
+                            _           => layer.forward(params.clone(), &x.clone(), Some(h_t.clone())),
+                        };
                         loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
                       }, &arr_bkp, eps, &grad).unwrap(),
                       true  => utils::verify_gradient_smooth(|i| {
@@ -341,7 +350,10 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                         let p = params.clone();
                         p.lock().unwrap().current_unroll = 0;
                         param_manager.set_array_from_index(i.clone(), ind);
-                        let (fwd_pass, _) = layer.forward(params.clone(), &x.clone(), Some(h_t.clone()));
+                        let (fwd_pass, _) = match layer_type {
+                            "unitary"   => layer.forward(params.clone(), &x.clone(), None),
+                            _           => layer.forward(params.clone(), &x.clone(), Some(h_t.clone())),
+                        };
                         loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
                       }, &arr_bkp, eps, &grad).unwrap(),
                     };
