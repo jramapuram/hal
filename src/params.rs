@@ -707,7 +707,7 @@ impl<'a> UnitaryGenerator for ParamManager {
                            , (h_init, (1, 2*hidden_size))];      // + the initial hidden state
 
         // biases next
-        let biases = vec![(h_bias_init, (1, 2*hidden_size))
+        let biases = vec![(h_bias_init, (1, hidden_size))
                           , (o_bias_init, (1, output_size))];
 
         // activations

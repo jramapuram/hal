@@ -523,6 +523,8 @@ pub fn gradient_check<F>(fn_closure: F, input: &Array, eps: f64, grad: &Array) -
   let num_grad = numerical_gradient(fn_closure, input, eps);
   println!("numgrad = {:?}\ngrad = {:?}", array_to_vec(&num_grad), array_to_vec(grad));
 
+  af::print(&num_grad);
+  af::print(&grad);
   // now calculate the relative error
   let abs_diff_grads = af::abs(&af::sub(&grad.cast::<f64>(), &num_grad, false));
   let abs_num_grad = NonNan::new(af::sum_all(&af::abs(&num_grad)).0).unwrap();

@@ -100,6 +100,47 @@ fn to_real(ar: Array) -> Array {
     af::join(1, &af::real(&ar), &af::imag(&ar))
 }
 
+fn mod_relu(z: Array, b: Array) -> Array {
+    let module_z = af::root(&2f32, &af::real(&af::mul(&af::conjg(&z), &z, false)), true);
+    let new_module_z = activations::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
+    af::div(&af::mul(&z, &new_module_z, false), &module_z, false)
+}
+
+fn mod_relu_derivative_z(z: Array, b: Array, d_h: Array) -> Array {
+    let module_carre_z = af::real(&af::mul(&af::conjg(&z), &z, false));
+    let module_z = af::root(&2f32, &module_carre_z, true);
+    let new_module_z = activations::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
+    
+    let d_activ = activations::get_derivative("relu", &new_module_z).unwrap();
+    let mut d_z1 = af::div(&af::mul(&d_h, &af::conjg(&z), false), &module_z, false);
+    d_z1 = af::mul(&d_z1, &d_activ, false);
+    d_z1 = af::div(&d_z1, &module_z, false);
+    d_z1 = af::div(&d_z1, &2f32, false);
+    d_z1 = af::add(&af::mul(&z, &d_z1, false), &af::conjg(&af::mul(&af::conjg(&z), &d_z1, false)), false);
+    
+    let mut d_z2 = af::mul(&d_h, &new_module_z, false);
+    d_z2 = af::mul(&d_z2, &af::conjg(&z), false);
+    d_z2 = af::div(&d_z2, &module_carre_z, false);
+    d_z2 = af::div(&d_z2, &module_z, false);
+    d_z2 = af::div(&d_z2, &2f32, false);
+    d_z2 = af::add(&af::mul(&z, &d_z2, false), &af::conjg(&af::mul(&af::conjg(&z), &d_z2, false)), false);
+    
+
+    let mut d_z3 = af::mul(&d_h, &new_module_z, false);
+    d_z3 = af::div(&d_z3, &module_z, false);
+
+    af::add(&af::sub(&d_z1, &d_z2, false), &d_z3, false)
+}
+
+fn mod_relu_derivative_b(z: Array, b: Array, d_h: Array) -> Array {
+    let module_z = af::root(&2f32, &af::real(&af::mul(&af::conjg(&z), &z, false)), true);
+    let new_module_z = activations::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
+    let d_activ = activations::get_derivative("relu", &new_module_z).unwrap();
+
+    let d_b = af::div(&af::mul(&d_h, &af::conjg(&z), false), &module_z, false);
+    af::mul(&d_b, &d_activ, false)
+}
+
 
 impl Layer for Unitary
 {
@@ -113,13 +154,13 @@ impl Layer for Unitary
         let mut weight0 = to_complex(ltex.weights[0].clone());
         let mut weight4 = to_complex(ltex.weights[4].clone());
         let mut weight5 = to_complex(ltex.weights[5].clone());
-        let mut bias0 = to_complex(ltex.biases[0].clone());
 
         // Not complex
         let mut weight1 = ltex.weights[1].clone();
         let mut weight2 = ltex.weights[2].clone();
         let mut weight3 = ltex.weights[3].clone();
         let mut weight6 = ltex.weights[6].clone();
+        let mut bias0 = ltex.biases[0].clone();
         let mut bias1 = ltex.biases[1].clone();
 
         if t == 0 {
@@ -152,8 +193,6 @@ impl Layer for Unitary
             None                => rec_t
         };
          
-        af::print(&rec_t);
-        af::print(&weight1);
         // we compute h_t+1 = sigma1(W*h_t + V*x_t + b1) 
         let wh = wh(weight1.clone()
                     , weight4.clone()
@@ -172,17 +211,12 @@ impl Layer for Unitary
                              , MatProp::NONE
                              , MatProp::NONE);
 
-        let new_h = af::add(&af::add(&wh, &vx, true)
-                            , &bias0
-                            , true);
-
-        let sigma_result = activations::get_activation(&ltex.activations[0]
-                                                       , &new_h).unwrap();
-
+        let vx_wh = af::add(&vx, &wh, false);
+        let new_h = mod_relu(vx_wh.clone(), bias0.clone());
 
         // we compute o_t = sigma2(U*h_t + b2)
-        let r_h = af::real(&sigma_result);
-        let c_h = af::imag(&sigma_result);
+        let r_h = af::real(&new_h);
+        let c_h = af::imag(&new_h);
         let concat_h = af::join(1, &r_h, &c_h);
         let uh = af::matmul(&concat_h
                             , &weight6
@@ -198,13 +232,16 @@ impl Layer for Unitary
 
         if ltex.inputs.len() > t {
             ltex.inputs[t] = c_inputs.clone();
-            ltex.recurrences[t+1] = to_real(sigma_result.clone());
+            ltex.recurrences[t+1] = to_real(new_h.clone());
             ltex.outputs[t] = out.clone();
+            ltex.optional[t+1] = vx_wh.clone();
+            
         }
         else{
             ltex.inputs.push(c_inputs.clone());
-            ltex.recurrences.push(to_real(sigma_result.clone()));
+            ltex.recurrences.push(to_real(new_h.clone()));
             ltex.outputs.push(out.clone());
+            ltex.optional.push(vx_wh.clone());
         }
         //println!("{}", &(af::norm(&ltex.recurrences[t], af::NormType::VECTOR_2, 1.,1.)as f32));
         ltex.current_unroll += 1;
@@ -222,7 +259,6 @@ impl Layer for Unitary
         let mut weight0 = to_complex(ltex.weights[0].clone());
         let mut weight4 = to_complex(ltex.weights[4].clone());
         let mut weight5 = to_complex(ltex.weights[5].clone());
-        let mut bias0 = to_complex(ltex.biases[0].clone());
         let mut rec_t0 = to_complex(ltex.recurrences[t-1].clone());
         let mut rec_t1 = to_complex(ltex.recurrences[t].clone());
 
@@ -230,19 +266,20 @@ impl Layer for Unitary
         let mut delta4 = to_complex(ltex.deltas[4].clone());
         let mut delta5 = to_complex(ltex.deltas[5].clone());
         let mut delta7 = to_complex(ltex.deltas[7].clone());
-        let mut delta8 = to_complex(ltex.deltas[8].clone());
 
         // Not complex
         let mut weight1 = ltex.weights[1].clone();
         let mut weight2 = ltex.weights[2].clone();
         let mut weight3 = ltex.weights[3].clone();
         let mut weight6 = ltex.weights[6].clone();
+        let mut bias0 = ltex.biases[0].clone();
         let mut bias1 = ltex.biases[1].clone();
 
         let mut delta1 = ltex.deltas[1].clone();
         let mut delta2 = ltex.deltas[2].clone();
         let mut delta3 = ltex.deltas[3].clone();
         let mut delta6 = ltex.deltas[6].clone();
+        let mut delta8 = ltex.deltas[8].clone();
         let mut delta9 = ltex.deltas[9].clone();
 
         let p1 = weight1.clone();
@@ -281,22 +318,21 @@ impl Layer for Unitary
         let d_h2 = to_complex(ltex.state_derivatives[0].clone());
         let d_rec = af::add(&d_h1, &d_h2, false);
 
-        // dh_{t} => dh_{t-1} (used in the next step)
-        let d_activ = activations::get_derivative(&ltex.activations[0], &rec_t1).unwrap();
+        // dh_{t} => dz
+        let d_z = mod_relu_derivative_z(ltex.optional[t].clone()
+                                      , bias0.clone()
+                                      , d_rec.clone());
+
+        // dz => dh_{t-1} (used in the next step)
         let new_d_h2 = r_d(p1.clone()
                        , r_fft(h_r(p2.clone()
                                    , h_pi(p3.clone()
                                           , r_d(p4.clone()
                                                 , r_ifft(h_r(p5.clone()
-                                                             , r_d(p6.clone(), af::mul(&d_rec, &d_activ, false).clone()))))))));
+                                                             , r_d(p6.clone(), d_z.clone()))))))));
 
         ltex.state_derivatives[0] = to_real(new_d_h2.clone());
 
-        // dh_{t} => dz
-        let d_z = af::mul(&d_rec, &d_activ, false);
-
-         
-        
         //-----------------------------------------------------------------------------
         // dz => dW
         // dD
@@ -428,8 +464,13 @@ impl Layer for Unitary
         
         //-----------------------------------------------------------------------------
         // dz => db
-        delta8 = af::add(&delta8, &af::sum(&d_z, 0), false);
-        ltex.deltas[8] = to_real(delta8.clone());
+        let mut d_b = mod_relu_derivative_b(ltex.optional[t].clone()
+                                        , bias0.clone()
+                                        , d_rec.clone());
+        //d_b = af::add(&af::real(&d_b), &af::imag(&d_b), false);
+        d_b = af::real(&d_b);
+        delta8 = af::add(&delta8, &af::sum(&d_b, 0), false);
+        ltex.deltas[8] = delta8.clone();
 
 
         
@@ -451,8 +492,8 @@ impl Layer for Unitary
         
         
         //-----------------------------------------------------------------------------
-        // dh_{t} => dx
-        let new_delta = af::real(&af::matmul(&d_rec, &weight0, MatProp::NONE, MatProp::TRANS));
+        // dz => dx
+        let new_delta = af::real(&af::matmul(&d_z, &weight0, MatProp::NONE, MatProp::TRANS));
 
         //------------------------------------------------------------------------------
         // dL => dh_{0}
