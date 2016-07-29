@@ -86,7 +86,14 @@ pub fn lecun_uniform<T: HasAfEnum>(dims: Dim4) -> Array {
 
 //TODO: permut
 pub fn permut<T: HasAfEnum>(dims: Dim4) -> Array{
-    af::range::<T>(dims, 0)
+    
+    let seq: Vec<usize> = (0..dims[0] as usize).collect();
+    let mut permut: Vec<f32> = Vec::with_capacity(seq.len());
+    for e in &seq {
+        permut.push(*e as f32);
+    }
+    rand::thread_rng().shuffle(&mut permut);
+    utils::vec_to_array::<f32>(permut, dims)
 }
 //TODO: Orthogonal
 

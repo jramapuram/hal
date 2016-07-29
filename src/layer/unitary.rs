@@ -32,46 +32,46 @@ fn r_d(param: Array, ar: Array) -> Array {
 }
 
 fn h_fft(ar: Array) -> Array {
-        let ar_size = ar.dims()[1];
-        af::transpose(&af::fft(&af::transpose(&ar, false), 1.0, ar_size as i64)
-                      , false)
+    let ar_size = ar.dims()[1];
+    af::transpose(&af::fft(&af::transpose(&ar, false), 1.0, ar_size as i64)
+                  , false)
 }
 
 fn r_fft(ar: Array) -> Array {
-        let ar_size = ar.dims()[1];
-        af::transpose(&af::ifft(&af::transpose(&ar, false), 1.0, ar_size as i64)
-                      , false)
+    let ar_size = ar.dims()[1];
+    af::transpose(&af::ifft(&af::transpose(&ar, false), 1.0, ar_size as i64)
+                  , false)
 }
 
 fn h_ifft(ar: Array) -> Array {
-        let ar_size = ar.dims()[1];
-        af::transpose(&af::ifft(&af::transpose(&ar, false), 1.0/(ar_size as f64), ar_size as i64)
-                              , false)
+    let ar_size = ar.dims()[1];
+    af::transpose(&af::ifft(&af::transpose(&ar, false), 1.0/(ar_size as f64), ar_size as i64)
+                  , false)
 }
 
 fn r_ifft(ar: Array) -> Array {
-        let ar_size = ar.dims()[1];
-        af::transpose(&af::fft(&af::transpose(&ar, false), 1.0/(ar_size as f64), ar_size as i64)
-                              , false)
+    let ar_size = ar.dims()[1];
+    af::transpose(&af::fft(&af::transpose(&ar, false), 1.0/(ar_size as f64), ar_size as i64)
+                  , false)
 }
 
 fn h_pi(param: Array, ar: Array) -> Array {
-        af::lookup(&ar, &param, 1)
+    af::lookup(&ar, &param, 1)
 }
 
 fn h_r(param: Array, mut ar: Array) -> Array {
-        let ar_temp = ar.clone();
-        ar = af::matmul(&param
-                       , &ar
-                       , MatProp::NONE
-                       , MatProp::TRANS);
-        ar = af::matmul(&ar
-                       , &af::conjg(&param)
-                       , MatProp::TRANS
-                       , MatProp::NONE);
-        ar = af::mul(&ar, &2, true);
-        ar = af::sub(&ar_temp, &ar, false);
-        ar
+    let ar_temp = ar.clone();
+    ar = af::matmul(&param
+                    , &ar
+                    , MatProp::NONE
+                    , MatProp::TRANS);
+    ar = af::matmul(&ar
+                    , &af::conjg(&param)
+                    , MatProp::TRANS
+                    , MatProp::NONE);
+    ar = af::mul(&ar, &2, true);
+    ar = af::sub(&ar_temp, &ar, false);
+    ar
 
 }
 
@@ -87,7 +87,7 @@ fn wh(p1: Array, p2: Array, p3: Array, p4: Array, p5: Array, p6: Array, ar: Arra
     current = h_r(p5, current);
     current = h_d(p6, current);
     current
-           
+
 }
 
 fn to_complex(ar:Array) -> Array {  
@@ -110,21 +110,21 @@ fn mod_relu_derivative_z(z: Array, b: Array, d_h: Array) -> Array {
     let module_carre_z = af::real(&af::mul(&af::conjg(&z), &z, false));
     let module_z = af::root(&2f32, &module_carre_z, true);
     let new_module_z = activations::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
-    
+
     let d_activ = activations::get_derivative("relu", &new_module_z).unwrap();
     let mut d_z1 = af::div(&af::mul(&d_h, &af::conjg(&z), false), &module_z, false);
     d_z1 = af::mul(&d_z1, &d_activ, false);
     d_z1 = af::div(&d_z1, &module_z, false);
     d_z1 = af::div(&d_z1, &2f32, false);
     d_z1 = af::add(&af::mul(&z, &d_z1, false), &af::conjg(&af::mul(&af::conjg(&z), &d_z1, false)), false);
-    
+
     let mut d_z2 = af::mul(&d_h, &new_module_z, false);
     d_z2 = af::mul(&d_z2, &af::conjg(&z), false);
     d_z2 = af::div(&d_z2, &module_carre_z, false);
     d_z2 = af::div(&d_z2, &module_z, false);
     d_z2 = af::div(&d_z2, &2f32, false);
     d_z2 = af::add(&af::mul(&z, &d_z2, false), &af::conjg(&af::mul(&af::conjg(&z), &d_z2, false)), false);
-    
+
 
     let mut d_z3 = af::mul(&d_h, &new_module_z, false);
     d_z3 = af::div(&d_z3, &module_z, false);
@@ -148,8 +148,8 @@ impl Layer for Unitary
     {
         let mut ltex = params.lock().unwrap();
         let t = ltex.current_unroll;
-        
-        
+
+
         // Transformation of complex parameters
         let mut weight0 = to_complex(ltex.weights[0].clone());
         let mut weight4 = to_complex(ltex.weights[4].clone());
@@ -164,7 +164,7 @@ impl Layer for Unitary
         let mut bias1 = ltex.biases[1].clone();
 
         if t == 0 {
-            // Make a copy of h0 for all batch inputs
+            // Initialize hidden state in the first iteration
             if ltex.recurrences.len() == 0 {
                 let temp = ltex.weights[7].clone();
                 ltex.recurrences.push(temp);
@@ -174,6 +174,8 @@ impl Layer for Unitary
             }
             let hidden_size = ltex.weights[7].dims()[1];
             let batch_size = inputs.dims()[0];
+
+            // Make a copy of h0 for all batch inputs
             let zero = af::constant(0f32, Dim4::new(&[batch_size, hidden_size, 1, 1]));
             ltex.recurrences[0] = af::add(&zero, &ltex.recurrences[0], true);
 
@@ -181,18 +183,17 @@ impl Layer for Unitary
             let sqrNorm = af::norm(&weight4, af::NormType::VECTOR_2, 1., 1.)as f32;
             weight4 = af::div(&weight4, &sqrNorm, true);
             ltex.weights[4] = to_real(weight4.clone());
-            
             let sqrNorm = af::norm(&weight5, af::NormType::VECTOR_2, 1., 1.)as f32;
             weight5 = af::div(&weight5, &sqrNorm, true);
             ltex.weights[5] = to_real(weight5.clone());
         }
-            let mut rec_t = to_complex(ltex.recurrences[t].clone());
+        let mut rec_t = to_complex(ltex.recurrences[t].clone());
 
         rec_t = match state {
             Some(init_state)    => init_state,
             None                => rec_t
         };
-         
+
         // we compute h_t+1 = sigma1(W*h_t + V*x_t + b1) 
         let wh = wh(weight1.clone()
                     , weight4.clone()
@@ -207,9 +208,9 @@ impl Layer for Unitary
 
         let c_inputs = af::add(inputs, &c_zeros, false);
         let vx = af::matmul(&c_inputs
-                             , &weight0
-                             , MatProp::NONE
-                             , MatProp::NONE);
+                            , &weight0
+                            , MatProp::NONE
+                            , MatProp::NONE);
 
         let vx_wh = af::add(&vx, &wh, false);
         let new_h = mod_relu(vx_wh.clone(), bias0.clone());
@@ -224,18 +225,18 @@ impl Layer for Unitary
                             , MatProp::NONE);
 
         let new_o = af::add(&uh, &bias1, true);
-       
-         
+
+
         let out = activations::get_activation(&ltex.activations[1]
                                               , &new_o).unwrap(); 
-        
+
 
         if ltex.inputs.len() > t {
             ltex.inputs[t] = c_inputs.clone();
             ltex.recurrences[t+1] = to_real(new_h.clone());
             ltex.outputs[t] = out.clone();
-            ltex.optional[t+1] = vx_wh.clone();
-            
+            ltex.optional[t+2] = vx_wh.clone();
+
         }
         else{
             ltex.inputs.push(c_inputs.clone());
@@ -254,7 +255,7 @@ impl Layer for Unitary
     fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array) -> Array {
         let mut ltex = params.lock().unwrap();
         let t = ltex.current_unroll;
-        
+
         // Transformation of complex parameters
         let mut weight0 = to_complex(ltex.weights[0].clone());
         let mut weight4 = to_complex(ltex.weights[4].clone());
@@ -285,6 +286,7 @@ impl Layer for Unitary
         let p1 = weight1.clone();
         let p2 = weight4.clone();
         let p3 = ltex.optional[0].clone();
+        let p3_bis = ltex.optional[1].clone();
         let p4 = weight2.clone();
         let p5 = weight5.clone();
         let p6 = weight3.clone();
@@ -292,7 +294,7 @@ impl Layer for Unitary
         let dim_h = rec_t0.dims()[1];
         assert!(t >= 0
                 , "Cannot call backward pass without at least 1 forward pass");
-       
+
 
         // We write d_ to say dL/d_
         // do => dz2
@@ -305,31 +307,31 @@ impl Layer for Unitary
         }
 
         let d_z2 = af::mul(delta
-                         , &activations::get_derivative(&ltex.activations[1], &ltex.outputs[t-1]).unwrap()
-                          , false);
-        
+                           , &activations::get_derivative(&ltex.activations[1], &ltex.outputs[t-1]).unwrap()
+                           , false);
+
         // dz2 => dh_{t}
         let prod = af::matmul(&d_z2, &weight6, MatProp::NONE, MatProp::TRANS);
         let d_h1 = af::cplx2(&af::cols(&prod, 0, dim_h-1)
-                            , &af::cols(&prod, dim_h, 2*dim_h-1)
-                            , false);
+                             , &af::cols(&prod, dim_h, 2*dim_h-1)
+                             , false);
 
         // dz2 & dh_{t+1} => dh_{t}
         let d_h2 = to_complex(ltex.state_derivatives[0].clone());
         let d_rec = af::add(&d_h1, &d_h2, false);
 
         // dh_{t} => dz
-        let d_z = mod_relu_derivative_z(ltex.optional[t].clone()
-                                      , bias0.clone()
-                                      , d_rec.clone());
+        let d_z = mod_relu_derivative_z(ltex.optional[t+1].clone()
+                                        , bias0.clone()
+                                        , d_rec.clone());
 
         // dz => dh_{t-1} (used in the next step)
         let new_d_h2 = r_d(p1.clone()
-                       , r_fft(h_r(p2.clone()
-                                   , h_pi(p3.clone()
-                                          , r_d(p4.clone()
-                                                , r_ifft(h_r(p5.clone()
-                                                             , r_d(p6.clone(), d_z.clone()))))))));
+                           , r_fft(h_r(p2.clone()
+                                       , h_pi(p3_bis.clone()
+                                              , r_d(p4.clone()
+                                                    , r_ifft(h_r(p5.clone()
+                                                                 , r_d(p6.clone(), d_z.clone()))))))));
 
         ltex.state_derivatives[0] = to_real(new_d_h2.clone());
 
@@ -340,7 +342,7 @@ impl Layer for Unitary
         // D1
         let dd1_left = rec_t0.clone();
         let dd1_right = r_fft(h_r(p2.clone()
-                                  , h_pi(p3.clone()
+                                  , h_pi(p3_bis.clone()
                                          , r_d(p4.clone()
                                                , r_ifft(h_r(p5.clone()
                                                             , r_d(p6.clone(), d_z.clone())))))));
@@ -353,7 +355,7 @@ impl Layer for Unitary
                                 , &af::mul(&dd1_imag, &af::imag(&dd1_right), false)
                                 , false);
         ltex.deltas[1] = af::add(&delta1, &af::sum(&dd1_phase, 0), false);
-        
+
         // D2
         let dd2_left = h_pi(p3.clone()
                             , h_r(p2.clone()
@@ -385,17 +387,17 @@ impl Layer for Unitary
                                 , false);
         ltex.deltas[3] = af::add(&delta3, &af::sum(&dd3_phase, 0), false);
 
-        
+
         //------------------------------------------------------------------------------
         // dR
-        
+
         // R1
         let dr1_left = h_fft(h_d(p1.clone(), rec_t0.clone()));
-        let dr1_right = h_pi(p3.clone()
-                         , r_d(p4.clone()
-                         , r_ifft(h_r(p5.clone()
-                                      , r_d(p6.clone(), d_z.clone())))));
-        
+        let dr1_right = h_pi(p3_bis.clone()
+                             , r_d(p4.clone()
+                                   , r_ifft(h_r(p5.clone()
+                                                , r_d(p6.clone(), d_z.clone())))));
+
         let w = weight4.clone();
         let dh = dr1_right.clone();
         let dh2 = dh.clone();
@@ -405,12 +407,12 @@ impl Layer for Unitary
 
         let dh1 = af::transpose(&af::matmul(&w, &dh2, MatProp::NONE, MatProp::TRANS), false);
         let dr11 = af::mul(&af::conjg(&h0), &dh1, true);
-        
+
         let dr12 = af::conjg(&af::mul(&af::transpose(&af::conjg(&h1), false), &dh2, true));
 
         let dh3 = af::sum(&af::mul(&dh, &af::conjg(&h2), false), 1);
         let dr13 = af::matmul(&dh3 , &w, MatProp::NONE, MatProp::NONE);
-        
+
         let dr14 = af::conjg(&af::matmul(&dh3 , &af::conjg(&w), MatProp::NONE, MatProp::NONE));
 
         let dr1 = af::mul(&af::sub(&af::sub(&af::add(&dr11, &dr12, false), &dr13, false), &dr14, false), &-2, true);
@@ -435,12 +437,12 @@ impl Layer for Unitary
 
         let dh1 = af::transpose(&af::matmul(&w, &dh2, MatProp::NONE, MatProp::TRANS), false);
         let dr21 = af::mul(&af::conjg(&h0), &dh1, true);
-        
+
         let dr22 = af::conjg(&af::mul(&af::transpose(&af::conjg(&h1), false), &dh2, true));
 
         let dh3 = af::sum(&af::mul(&dh, &af::conjg(&h2), false), 1);
         let dr23 = af::matmul(&dh3 , &w, MatProp::NONE, MatProp::NONE);
-        
+
         let dr24 = af::conjg(&af::matmul(&dh3 , &af::conjg(&w), MatProp::NONE, MatProp::NONE));
 
         let dr2 = af::mul(&af::sub(&af::sub(&af::add(&dr21, &dr22, false), &dr23, false), &dr24, false), &-2, true);
@@ -449,36 +451,36 @@ impl Layer for Unitary
         ltex.deltas[5] = to_real(delta5.clone());
 
 
-       
-        
+
+
         // TO DO : fix the name of parameters to be coherent with the one of params.rs 
         //-----------------------------------------------------------------------------
         // dz => dU
         let d_u = af::matmul(&ltex.inputs[t-1]
-                         , &d_z
-                         , MatProp::CTRANS
-                         , MatProp::NONE);
+                             , &d_z
+                             , MatProp::CTRANS
+                             , MatProp::NONE);
         delta0 = af::add(&delta0, &d_u, false);
         ltex.deltas[0] = to_real(delta0.clone());
 
-        
+
         //-----------------------------------------------------------------------------
         // dz => db
-        let mut d_b = mod_relu_derivative_b(ltex.optional[t].clone()
-                                        , bias0.clone()
-                                        , d_rec.clone());
+        let mut d_b = mod_relu_derivative_b(ltex.optional[t+1].clone()
+                                            , bias0.clone()
+                                            , d_rec.clone());
         //d_b = af::add(&af::real(&d_b), &af::imag(&d_b), false);
         d_b = af::real(&d_b);
         delta8 = af::add(&delta8, &af::sum(&d_b, 0), false);
         ltex.deltas[8] = delta8.clone();
 
 
-        
+
         //-----------------------------------------------------------------------------
         // dz2 => db2
         ltex.deltas[9] = af::add(&delta9, &af::sum(&d_z2, 0), false);
 
-        
+
         //-----------------------------------------------------------------------------
         // dz2 => dV
         let concat_h = af::join(1,
@@ -489,8 +491,8 @@ impl Layer for Unitary
                              , MatProp::TRANS
                              , MatProp::NONE);
         ltex.deltas[6] = af::add(&delta6, &d_v, false);
-        
-        
+
+
         //-----------------------------------------------------------------------------
         // dz => dx
         let new_delta = af::real(&af::matmul(&d_z, &weight0, MatProp::NONE, MatProp::TRANS));

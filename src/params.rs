@@ -1,6 +1,8 @@
 use af::{Array, Dim4, HasAfEnum, DType};
 use std::default::Default;
 use num::Complex;
+use rand;
+use rand::Rng;
 
 //use itertools::Zip;
 use std::sync::{Arc, Mutex};
@@ -713,14 +715,29 @@ impl<'a> UnitaryGenerator for ParamManager {
         // activations
         let activations = vec![h_activation, o_activation];
         
-        // we won't minimize trough the permutation params so we store them in optional
-        let optionals = Some(vec![(permut_init, (hidden_size, 1))]);
-        
+       
         self.add::<T>(manager, device, "unitary"
                       , weights
                       , biases
                       , activations
                       , None
-                      , optionals);
-  }
+                      , None);
+
+        // permutation and permutation inverse
+        let dims = Dim4::new(&[hidden_size as u64, 1, 1, 1]);
+        let seq: Vec<usize> = (0..hidden_size).collect();
+        let mut permut: Vec<u32> = Vec::with_capacity(seq.len());
+        // elementwise cast
+        for e in &seq {
+            permut.push(*e as u32);
+        }
+        rand::thread_rng().shuffle(&mut permut);
+        let mut permut_inv: Vec<u32> = permut.clone();
+        for i in 0..permut.len(){
+            permut_inv[permut[i] as usize] = i as u32;
+        }
+        let layer = self.layer_storage.last().unwrap().clone();
+        layer.lock().unwrap().optional.push(utils::vec_to_array::<u32>(permut, dims));
+        layer.lock().unwrap().optional.push(utils::vec_to_array::<u32>(permut_inv, dims));
+    }
 }
