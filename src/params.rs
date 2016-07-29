@@ -571,13 +571,11 @@ fn add_unitary<T: HasAfEnum>(&mut self
           , input_size: usize
           , output_size: usize
           , hidden_size: usize
-          , h_activation: &str
           , o_activation: &str
           , h_init: &str 
           , v_init: &str
           , phase_init: &str
           , householder_init: &str
-          , permut_init: &str
           , u_init: &str
           , h_bias_init: &str
           , o_bias_init: &str);
@@ -677,13 +675,11 @@ impl<'a> UnitaryGenerator for ParamManager {
           , input_size: usize
           , output_size: usize
           , hidden_size: usize
-          , h_activation: &str
           , o_activation: &str
           , h_init: &str
           , v_init: &str
           , phase_init: &str
           , householder_init: &str
-          , permut_init: &str
           , u_init: &str
           , h_bias_init: &str
           , o_bias_init: &str
@@ -713,7 +709,7 @@ impl<'a> UnitaryGenerator for ParamManager {
                           , (o_bias_init, (1, output_size))];
 
         // activations
-        let activations = vec![h_activation, o_activation];
+        let activations = vec![o_activation];
         
        
         self.add::<T>(manager, device, "unitary"

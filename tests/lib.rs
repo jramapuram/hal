@@ -214,20 +214,17 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
 
     "unitary" => { 
         let hidden_size = 5;
-        let h_activation = "ones";
         let h_init = "glorot_uniform";
         let v_init = "glorot_uniform";
         let phase_init = "glorot_uniform";
         let householder_init = "glorot_uniform";
-        let permut_init = "permut";
         let u_init = "glorot_uniform";
         let h_bias_init = "zeros";
         let o_bias_init = "zeros";
         param_manager.add_unitary::<f64>(device_manager, device
                                                   , input_size, output_size, hidden_size
-                                                  , h_activation, activation
-                                                  , h_init, v_init, phase_init, householder_init
-                                                  , permut_init, u_init
+                                                  , activation, h_init, v_init, phase_init
+                                                  , householder_init, u_init
                                                   , h_bias_init, o_bias_init);
       //let hdims = Dim4::new(&[batch_size as u64, 2*hidden_size as u64, 1, 1]);
       //let h_t = utils::constant(hdims, DType::F64, 0.5f32);

@@ -115,7 +115,6 @@ impl Model for Sequential {
                                             , input_size, output_size, hidden_size 
 
                                             // activations for Ux + Wh + b1 and for Vh + b2
-                                            , params.get("h_activation").unwrap()
                                             , params.get("o_activation").unwrap()
 
                                             // init hidden state values
@@ -127,7 +126,6 @@ impl Model for Sequential {
                                             // init values for unitary matrices params
                                             , params.get("phase_init").unwrap()
                                             , params.get("householder_init").unwrap()
-                                            , params.get("permut_init").unwrap()
 
                                             // init values for hidden2output matrix params
                                             , params.get("u_init").unwrap()

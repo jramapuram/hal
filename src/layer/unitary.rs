@@ -100,48 +100,6 @@ fn to_real(ar: Array) -> Array {
     af::join(1, &af::real(&ar), &af::imag(&ar))
 }
 
-fn mod_relu(z: Array, b: Array) -> Array {
-    let module_z = af::root(&2f32, &af::real(&af::mul(&af::conjg(&z), &z, false)), true);
-    let new_module_z = activations::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
-    af::div(&af::mul(&z, &new_module_z, false), &module_z, false)
-}
-
-fn mod_relu_derivative_z(z: Array, b: Array, d_h: Array) -> Array {
-    let module_carre_z = af::real(&af::mul(&af::conjg(&z), &z, false));
-    let module_z = af::root(&2f32, &module_carre_z, true);
-    let new_module_z = activations::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
-
-    let d_activ = activations::get_derivative("relu", &new_module_z).unwrap();
-    let mut d_z1 = af::div(&af::mul(&d_h, &af::conjg(&z), false), &module_z, false);
-    d_z1 = af::mul(&d_z1, &d_activ, false);
-    d_z1 = af::div(&d_z1, &module_z, false);
-    d_z1 = af::div(&d_z1, &2f32, false);
-    d_z1 = af::add(&af::mul(&z, &d_z1, false), &af::conjg(&af::mul(&af::conjg(&z), &d_z1, false)), false);
-
-    let mut d_z2 = af::mul(&d_h, &new_module_z, false);
-    d_z2 = af::mul(&d_z2, &af::conjg(&z), false);
-    d_z2 = af::div(&d_z2, &module_carre_z, false);
-    d_z2 = af::div(&d_z2, &module_z, false);
-    d_z2 = af::div(&d_z2, &2f32, false);
-    d_z2 = af::add(&af::mul(&z, &d_z2, false), &af::conjg(&af::mul(&af::conjg(&z), &d_z2, false)), false);
-
-
-    let mut d_z3 = af::mul(&d_h, &new_module_z, false);
-    d_z3 = af::div(&d_z3, &module_z, false);
-
-    af::add(&af::sub(&d_z1, &d_z2, false), &d_z3, false)
-}
-
-fn mod_relu_derivative_b(z: Array, b: Array, d_h: Array) -> Array {
-    let module_z = af::root(&2f32, &af::real(&af::mul(&af::conjg(&z), &z, false)), true);
-    let new_module_z = activations::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
-    let d_activ = activations::get_derivative("relu", &new_module_z).unwrap();
-
-    let d_b = af::div(&af::mul(&d_h, &af::conjg(&z), false), &module_z, false);
-    af::mul(&d_b, &d_activ, false)
-}
-
-
 impl Layer for Unitary
 {
     fn forward(&self, params:  Arc<Mutex<Params>>, inputs: &Array, state: Option<Array>) -> (Array, Option<Array>)
@@ -213,7 +171,7 @@ impl Layer for Unitary
                             , MatProp::NONE);
 
         let vx_wh = af::add(&vx, &wh, false);
-        let new_h = mod_relu(vx_wh.clone(), bias0.clone());
+        let new_h = activations::mod_relu(vx_wh.clone(), bias0.clone());
 
         // we compute o_t = sigma2(U*h_t + b2)
         let r_h = af::real(&new_h);
@@ -227,7 +185,7 @@ impl Layer for Unitary
         let new_o = af::add(&uh, &bias1, true);
 
 
-        let out = activations::get_activation(&ltex.activations[1]
+        let out = activations::get_activation(&ltex.activations[0]
                                               , &new_o).unwrap(); 
 
 
@@ -307,7 +265,7 @@ impl Layer for Unitary
         }
 
         let d_z2 = af::mul(delta
-                           , &activations::get_derivative(&ltex.activations[1], &ltex.outputs[t-1]).unwrap()
+                           , &activations::get_derivative(&ltex.activations[0], &ltex.outputs[t-1]).unwrap()
                            , false);
 
         // dz2 => dh_{t}
@@ -321,9 +279,9 @@ impl Layer for Unitary
         let d_rec = af::add(&d_h1, &d_h2, false);
 
         // dh_{t} => dz
-        let d_z = mod_relu_derivative_z(ltex.optional[t+1].clone()
-                                        , bias0.clone()
-                                        , d_rec.clone());
+        let d_z = activations::mod_relu_derivative_z(ltex.optional[t+1].clone()
+                                                     , bias0.clone()
+                                                     , d_rec.clone());
 
         // dz => dh_{t-1} (used in the next step)
         let new_d_h2 = r_d(p1.clone()
@@ -466,9 +424,9 @@ impl Layer for Unitary
 
         //-----------------------------------------------------------------------------
         // dz => db
-        let mut d_b = mod_relu_derivative_b(ltex.optional[t+1].clone()
-                                            , bias0.clone()
-                                            , d_rec.clone());
+        let mut d_b = activations::mod_relu_derivative_b(ltex.optional[t+1].clone()
+                                                         , bias0.clone()
+                                                         , d_rec.clone());
         //d_b = af::add(&af::real(&d_b), &af::imag(&d_b), false);
         d_b = af::real(&d_b);
         delta8 = af::add(&delta8, &af::sum(&d_b, 0), false);
