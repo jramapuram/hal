@@ -335,24 +335,20 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                     println!("\nTesting gradient of array with {:?} dims", arr.dims());
 
                     // do the gradient check specific to the activation type
-                    match activations::is_smooth(activation) {
-                      false => utils::verify_gradient_kinks(|i| {
-                        // run forward pass using the modified array
-                        let p = params.clone();
-                        p.lock().unwrap().current_unroll = 0;
-                        param_manager.set_array_from_index(i.clone(), ind);
-                        let (fwd_pass, _) = layer.forward(params.clone(), &x.clone(), Some(h_t.clone()));
-                        loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
-                      }, &arr_bkp, eps, &grad).unwrap(),
-                      true  => utils::verify_gradient_smooth(|i| {
-                        // run forward pass using the modified array
-                        let p = params.clone();
-                        p.lock().unwrap().current_unroll = 0;
-                        param_manager.set_array_from_index(i.clone(), ind);
-                        let (fwd_pass, _) = layer.forward(params.clone(), &x.clone(), Some(h_t.clone()));
-                        loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
-                      }, &arr_bkp, eps, &grad).unwrap(),
+                    let grad_func = match activations::is_smooth(activation) {
+                      false => utils::verify_gradient_kinks,
+                      true  => utils::verify_gradient_smooth,
                     };
+
+                    // run the appropriate functor on the parameter
+                    grad_func(|i: &Array| {
+                      // run forward pass using the modified array
+                      let p = params.clone();
+                      p.lock().unwrap().current_unroll = 0;
+                      param_manager.set_array_from_index(i.clone(), ind);
+                      let (fwd_pass, _) = layer.forward(params.clone(), &x.clone(), Some(h_t.clone()));
+                      loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
+                    }, &arr_bkp, eps, &grad).unwrap();
                   }
                 });
 }

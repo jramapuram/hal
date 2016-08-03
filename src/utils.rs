@@ -362,12 +362,12 @@ fn _ungzip_to_file(dest: &str, entire_file: &Vec<u8>) -> bool{
   };
 
   let mut body = Vec::new();
-  d.read_to_end(&mut body);
+  d.read_to_end(&mut body).unwrap();
   let mut f = match File::create(dest){
-    Err(e) => panic!("cannot create file {}", dest),
+    Err(e) => panic!("cannot create file {}: {}", dest, e),
     Ok(f)  => f,
   };
-  f.write_all(&body[..]);
+  f.write_all(&body[..]).unwrap();
   true
 }
 
@@ -377,7 +377,7 @@ pub fn ungzip(src: &str) {
     Ok(f)  => f,
   };
   let mut entire_file = Vec::new();
-  file.read_to_end(&mut entire_file);
+  file.read_to_end(&mut entire_file).unwrap();
 
   // get the filename
   let name = _read_gzip_filename(&entire_file);
@@ -402,7 +402,7 @@ pub fn untar(src: &str, dest: &str){
 /// - `dest` is the destination file location
 pub fn download(url: &str, dest: &str) {
   print!("Downloading {} to {}...", url, dest);
-  let mut client = Client::new();
+  let client = Client::new();
   let mut res = client.get(url)
                       .header(Connection::close())
                       .send().unwrap();
@@ -410,10 +410,10 @@ pub fn download(url: &str, dest: &str) {
   res.read_to_end(&mut body).unwrap();
 
   let mut f = match File::create(dest){
-    Err(e) => panic!("cannot open file {}", dest),
+    Err(e) => panic!("cannot open file {}: {}", dest, e),
     Ok(f)  => f,
   };
-  f.write_all(&body[..]);
+  f.write_all(&body[..]).unwrap();
   println!("...complete: read {} Mb"
            , body.len() as f32/(1024.0*1024.0));
 }
