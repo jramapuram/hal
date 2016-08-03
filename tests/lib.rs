@@ -66,7 +66,7 @@ fn sigmoid_gradient() {
                     , "sigmoid");
 }
 
-// todo: why is this broken? do you need softmax + xentropy?
+// todo: need to implement softmax as jacobian
 // #[test]
 // fn softmax_gradient() {
 //   verify_derivative(activations::softmax
@@ -88,13 +88,17 @@ fn ones_gradient() {
 
 
 /// test unitary functions
-fn verify_func<F>(ufunc: F, name: &str, truth: &[f32])
+fn verify_func<F>(ufunc: F, name: &str, input: &[f32], truth: &[f32])
   where F : Fn(&Array) -> Array
 {
   env::set_var("rust_test_threads", "1");
   println!("\ntesting unitary function {}...", name);
-  let dims = Dim4::new(&[5, 1, 1, 1]);
-  let x = Array::new::<f32>(&[-1.0, 0.0, 1.0, 2.0, 3.0], dims);
+  let ilen = input.len();
+  let tlen = truth.len();
+  assert!(ilen == tlen, "input and output lengths must be the same");
+
+  let dims = Dim4::new(&[1, ilen as u64, 1, 1]);
+  let x = Array::new::<f32>(input, dims);
 
   // verify with l2 loss
   let x_t = Array::new::<f32>(truth, dims);
@@ -106,6 +110,7 @@ fn verify_func<F>(ufunc: F, name: &str, truth: &[f32])
 fn tanh(){
   verify_func(activations::tanh
               , "tanh"
+              , &[-1.0, 0.0, 1.0, 2.0, 3.0]
               , &[-0.7616, 0.0000, 0.7616, 0.9640, 0.9951]);
 }
 
@@ -113,6 +118,7 @@ fn tanh(){
 fn sigmoid(){
   verify_func(activations::sigmoid
               , "sigmoid"
+              , &[-1.0, 0.0, 1.0, 2.0, 3.0]
               , &[0.2689, 0.5000, 0.7311, 0.8808, 0.9526]);
 }
 
@@ -120,6 +126,7 @@ fn sigmoid(){
 fn relu(){
   verify_func(activations::relu
               , "relu"
+              , &[-1.0, 0.0, 1.0, 2.0, 3.0]
               , &[0.0, 0.0, 1.0, 2.0, 3.0]);
 }
 
@@ -127,6 +134,7 @@ fn relu(){
 fn lrelu(){
   verify_func(activations::lrelu
               , "lrelu"
+              , &[-1.0, 0.0, 1.0, 2.0, 3.0]
               , &[-0.01, 0.0, 1.0, 2.0, 3.0]);
 }
 
@@ -134,34 +142,60 @@ fn lrelu(){
 fn softmax(){
   verify_func(activations::softmax
               , "softmax"
-              , &[1.0, 1.0, 1.0, 1.0, 1.0]);
+              , &[-1.0, 0.0, 1.0, 2.0, 3.0]
+              , &[0.01165623, 0.03168492, 0.08612854, 0.23412165, 0.63640863]);
 }
 
 #[test]
 fn ones(){
   verify_func(activations::ones
               , "ones"
+              , &[-1.0, 0.0, 1.0, 2.0, 3.0]
               , &[-1.0, 0.0, 1.0, 2.0, 3.0]);
 }
 
 
+///
 /// test losses
+///
+
+/// Loss test helper function
+fn verify_loss_func(name: &str, input: &[f32], target: &[f32], l2: f32)
+{
+  env::set_var("rust_test_threads", "1");
+  println!("\ntesting loss function {}...", name);
+  let ilen = input.len();
+  let tlen = target.len();
+  assert!(ilen == tlen, "input and output lengths must be the same");
+
+  let dims = Dim4::new(&[1, ilen as u64, 1, 1]);
+  let x = Array::new::<f32>(input, dims);
+  let target = Array::new::<f32>(target, dims);
+  let pred_loss = loss::get_loss(name, &x, &target).unwrap();
+
+  // verify with l2 loss
+  let true_l2 = l2 * l2 - pred_loss * pred_loss;
+  assert!(true_l2 <= 1e-4
+          , "l2 loss of {} is higher than expected: {}[observed] vs {}[provided] : diff {}"
+          , name, pred_loss, l2, true_l2);
+}
+
 #[test]
 fn cross_entropy_softmax(){
-  println!("\ntesting cross-entropy soft max...");
-  let dims = Dim4::new(&[5, 1, 1, 1]);
-  let x = Array::new(&[-0.01, 0.00, 1.10, 2.20, 3.15], dims);
-  let target = Array::new(&[1.0, 0.00, 0.00, 0.00, 0.00], dims);
-  let x_t = 4.9980f32;
-
-  let x_pred = loss::get_loss("cross_entropy"
-                              , &activations::softmax(&x)
-                              , &target).unwrap();
-  let l2 = x_t * x_t - x_pred * x_pred;
-  assert!(l2 < 1e-7
-          , "cross-entropy-softmax loss is more than expected {} vs {} => {}"
-          , x_t, x_pred, l2);
+  verify_loss_func("cross_entropy_softmax"
+                   , &[-0.01, 0.00, 1.10, 2.20, 3.15]
+                   , &[1.0, 0.00, 0.00, 0.00, 0.00]
+                   , 3.6304748f32);
 }
+
+#[test]
+fn binary_cross_entropy(){
+  verify_loss_func("binary_cross_entropy"
+                   , &[-2.3]
+                   , &[1.0]
+                   , 2.3955455);
+}
+
 
 /// helper to build a layer
 pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
@@ -257,8 +291,9 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
   let temporal_size: usize = idims[2] as usize;
 
   let x = initializations::uniform::<f64>(idims, -0.5f32, 0.5f32);
-  let targets = match activation {
-    "softmax" => {
+  let targets = match (loss == "cross_entropy_softmax" || activation == "softmax")
+  {
+    true => {
       // randomly pick one of K indexes to set to 1
       let mut v: Vec<f64> = vec![0f64; output_size];
       let between = Range::new(0usize, output_size as usize);
@@ -269,8 +304,7 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
       // build an array
       utils::vec_to_array::<f64>(v, odims)
     },
-
-    _ => initializations::uniform::<f64>(odims, -0.5f32, 0.5f32),
+    _  => initializations::uniform::<f64>(odims, -0.5f32, 0.5f32),
   };
 
   layer_builder(layer_type, idims, odims, loss

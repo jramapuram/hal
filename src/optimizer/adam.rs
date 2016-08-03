@@ -1,5 +1,5 @@
 use af;
-use af::{Array, Dim4, DType};
+use af::{Array, Dim4};
 use itertools::Zip;
 use std::collections::HashMap;
 use std::default::Default;

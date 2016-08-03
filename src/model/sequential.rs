@@ -206,6 +206,22 @@ impl Model for Sequential {
             , "batch sizes for inputs and targets much be equal");
     assert!(idims[2] == tdims[2]
             , "sequence lengths for inputs and targets must be equal");
+    assert!(self.layers.len() > 0
+            , "Need at least one layer to fit!");
+
+    // verify that last layer is of logits type when using
+    // softmax_crossentropy or binary_crossentropy
+    if self.loss.to_lowercase() == "cross_entropy_softmax"
+      || self.loss.to_lowercase() == "binary_cross_entropy"
+    {
+      let last_layer_index = self.layers.len() - 1;
+      let last_layer_activations = self.param_manager.get_activations(last_layer_index);
+      let last_activation = last_layer_activations.last().unwrap();
+      assert!(last_activation == "ones" || last_activation == "linear",
+              "Erroneous results expected while using cross_entropy_* \
+               loss and non-logit units in the last layer");
+    }
+
 
     // loss vector current loss
     let mut lossvec = Vec::<f32>::new();
