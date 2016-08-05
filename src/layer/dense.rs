@@ -13,7 +13,7 @@ pub struct Dense {
 
 impl Layer for Dense
 {
-  fn forward(&self, params: Arc<Mutex<Params>>, inputs: &Array, state: Option<Array>) -> (Array, Option<Array>)
+  fn forward(&self, params: Arc<Mutex<Params>>, inputs: &Array, state: Option<&Vec<Array>>) -> (Array, Option<Vec<Array>>)
   {
     // get a handle to the underlying params
     let mut ltex = params.lock().unwrap();

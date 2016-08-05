@@ -267,11 +267,16 @@ pub fn layer_forward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &s
                   let params = param_manager.get_params(0);
 
                   // make it such that we are within an unrolling [for rnn types]
-                  let hdims = Dim4::new(&[idims[0] as u64, odims[1] as u64, 1, 1]);
-                  let h_t = utils::constant(hdims, DType::F64, 0.5f32);
+                  let h_t = match &layer_type.to_lowercase()[..] {
+                    "rnn" | "unitary"  | "dense" => {
+                      let hdims = Dim4::new(&[idims[0] as u64, odims[1] as u64, 1, 1]);
+                      vec![utils::constant(hdims, DType::F64, 0.5f32)]
+                    },
+                    _     => panic!("random state generation not implemented for {} type", layer_type),
+                  };
 
                   // run a forward pass
-                  let (activ, _) = layer.forward(params.clone(), &x.clone(), Some(h_t));
+                  let (activ, _) = layer.forward(params.clone(), &x.clone(), Some(&h_t));
 
                   let loss_activ = loss::get_loss(loss, &activ, &targets).unwrap();
                   assert!(loss_activ < 1e-9
@@ -314,11 +319,15 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                   let params = param_manager.get_params(0);
 
                   // make it such that we are within an unrolling [for rnn types]
-                  let hdims = Dim4::new(&[idims[0] as u64, odims[1] as u64, 1, 1]);
-                  let h_t = utils::constant(hdims, DType::F64, 0.5f32);
+                  let h_t = match &layer_type.to_lowercase()[..] {
+                    "rnn" | "unitary" | "dense" => {
+                      let hdims = Dim4::new(&[idims[0] as u64, odims[1] as u64, 1, 1]);
+                      vec![utils::constant(hdims, DType::F64, 0.5f32)]
+                    },
+                    _     => panic!("random state generation not implemented for {} type", layer_type),
+                  };
 
-                  // run a forward pass
-                  let (activ, _) = layer.forward(params.clone(), &x.clone(), Some(h_t.clone()));
+                  let (activ, _) = layer.forward(params.clone(), &x.clone(), Some(&h_t));
 
                   // get the derivative and save away all params
                   let delta = loss::get_loss_derivative(loss, &activ, &targets).unwrap();
@@ -346,7 +355,7 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                       let p = params.clone();
                       p.lock().unwrap().current_unroll = 0;
                       param_manager.set_array_from_index(i.clone(), ind);
-                      let (fwd_pass, _) = layer.forward(params.clone(), &x.clone(), Some(h_t.clone()));
+                      let (fwd_pass, _) = layer.forward(params.clone(), &x.clone(), Some(&h_t));
                       loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
                     }, &arr_bkp, eps, &grad).unwrap();
                   }

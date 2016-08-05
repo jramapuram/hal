@@ -21,7 +21,7 @@ impl RecurrentLayer for RNN {
 
 impl Layer for RNN
 {
-  fn forward(&self, params: Arc<Mutex<Params>>, inputs: &Array, state: Option<Array>) -> (Array, Option<Array>)
+  fn forward(&self, params: Arc<Mutex<Params>>, inputs: &Array, state: Option<&Vec<Array>>) -> (Array, Option<Vec<Array>>)
   {
     // get a handle to the underlying params
     let mut ltex = params.lock().unwrap();
@@ -36,7 +36,7 @@ impl Layer for RNN
     // set h_{t-1} to the given state (if provided)
     // also handle case where time = 0
     let htm1 = match state {
-      Some(init_state)  => init_state,
+      Some(init_state)  => init_state[0].clone(), // only one recurrence for vanilla RNN
       None              => match ltex.recurrences.len() {
         0 => {
           let output_size = ltex.weights[1].dims()[0]; // is [M x M]
@@ -76,7 +76,7 @@ impl Layer for RNN
     // update location in vector
     ltex.current_unroll += 1;
 
-    (a_t.clone(), Some(h_t.clone())) // clone just increases the ref count
+    (a_t.clone(), Some(vec![h_t.clone()])) // clone just increases the ref count
   }
 
   fn backward(&self, params: Arc<Mutex<Params>>, delta: &Array) -> Array

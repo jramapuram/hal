@@ -96,7 +96,6 @@ impl Model for Sequential {
       // "lstm"  => {
       //   self.param_manager.add_lstm::<T>(self.manager.clone(), self.device
       //                               , input_size, output_size
-      //                               , params.get("max_seq_size").unwrap()
       //                               , params.get("input_activation").unwrap()
       //                               , params.get("outer_activation").unwrap()
       //                               , params.get("w_init").unwrap()
@@ -104,9 +103,7 @@ impl Model for Sequential {
       //                               , params.get("forget_b_init").unwrap()
       //                               , params.get("b_init").unwrap());
       //   self.layers.push(Box::new(LSTM{input_size: input_size
-      //                                  , output_size: output_size
-      //                                  , max_seq_size: params.get("max_seq_size").unwrap()
-      //                                  , return_sequences: params.get("return_sequences").unwrap()}));
+      //                                  , output_size: output_size}));
       // },
       _  => panic!("Error unknown layer type"),
     }
@@ -319,16 +316,21 @@ impl Model for Sequential {
                   , "loss indices need to be of the same size as the predictions");
           match li[ind] {
             false => utils::constant(tar.dims(), tar.get_type(), 0.0f32),
-            true  => loss::get_loss_derivative(&self.loss, pred, &tar).unwrap(),
+            true  => {
+              loss_vec.push(loss::get_loss(&self.loss, pred, &tar).unwrap());
+              loss::get_loss_derivative(&self.loss, pred, &tar).unwrap()
+            },
           }
         },
-        None     => loss::get_loss_derivative(&self.loss, pred, &tar).unwrap(),
+        None     => {
+          loss_vec.push(loss::get_loss(&self.loss, pred, &tar).unwrap());
+          loss::get_loss_derivative(&self.loss, pred, &tar).unwrap()
+        },
       };
 
       for i in (0..last_index).rev() {
         delta = self.layers[i].backward(self.param_manager.get_params(i), &delta);
       }
-      loss_vec.push(loss::get_loss(&self.loss, pred, &tar).unwrap());
     }
 
     loss_vec
