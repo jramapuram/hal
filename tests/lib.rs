@@ -344,7 +344,8 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
                     println!("\nTesting gradient of array with {:?} dims", arr.dims());
 
                     // do the gradient check specific to the activation type
-                    let grad_func = match activations::is_smooth(activation) {
+                    let grad_func: fn(_, &Array, f64, &Array) -> Result<f64, HALError> = match activations::is_smooth(activation)
+                    {
                       false => utils::verify_gradient_kinks,
                       true  => utils::verify_gradient_smooth,
                     };
