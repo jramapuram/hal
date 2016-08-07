@@ -1,8 +1,8 @@
 use af;
 use af::{Backend, Array, HasAfEnum};
 use num::Zero;
-use std::cell::Cell;
-use std::sync::Arc;
+//use std::cell::Cell;
+use std::sync::{Arc, Mutex};
 
 pub type DeviceManager = Arc<DeviceManagerFactory>;
 
@@ -14,7 +14,7 @@ pub struct Device {
 
 pub struct DeviceManagerFactory {
   devices: Vec<Device>,
-  current: Cell<Device>,
+  current: Arc<Mutex<Device>>,
 }
 
 // toggle the backend and device
@@ -48,13 +48,13 @@ impl DeviceManagerFactory {
 
     Arc::new(DeviceManagerFactory {
       devices: devices,
-      current: Cell::new(current),
+      current: Arc::new(Mutex::new(current)),
     })
   }
 
   pub fn swap_device(&self, device: Device)
   {
-    let c = self.current.get();
+    let mut c = self.current.lock().unwrap();
     if c.backend != device.backend || c.id != device.id
     {
       assert!(self.devices.contains(&device)
@@ -63,8 +63,13 @@ impl DeviceManagerFactory {
       // println!("Swapping {}/{} to {}/{}", c.backend, c.id
       //          , device.backend, device.id);
       set_device(device);
-      self.current.set(device);
+      *c = device;
     }
+  }
+
+  pub fn current_device(&self) -> Device {
+    let c = self.current.lock().unwrap();
+    c.clone()
   }
 
   pub fn swap_array_backend<T>(&self, input: &Array
