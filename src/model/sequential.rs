@@ -84,13 +84,15 @@ impl Model for Sequential {
                                         , output_size: output_size}));
       },
       "rnn" => {
+        let hidden_size = params.get("hidden_size").unwrap().parse::<u64>().unwrap() as usize;
         self.param_manager.add_rnn::<T>(self.manager.clone(), self.device
-                                        , input_size, output_size
-                                        , params.get("activation").unwrap()
+                                        , input_size, hidden_size, output_size
+                                        , params.get("inner_activation").unwrap()
+                                        , params.get("outer_activation").unwrap()
                                         , params.get("w_init").unwrap()
-                                        , params.get("w_recurrent_init").unwrap()
                                         , params.get("b_init").unwrap());
         self.layers.push(Box::new(RNN{input_size: input_size
+                                      , hidden_size: hidden_size
                                       , output_size: output_size}));
       }
       // "lstm"  => {
@@ -216,7 +218,8 @@ impl Model for Sequential {
       let last_activation = last_layer_activations.last().unwrap();
       assert!(last_activation == "ones" || last_activation == "linear",
               "Erroneous results expected while using cross_entropy_* \
-               loss and non-logit units in the last layer");
+               loss and non-logit units in the last layer: {}"
+              , last_activation);
     }
 
 

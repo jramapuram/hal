@@ -198,7 +198,7 @@ fn binary_cross_entropy(){
 
 
 /// helper to build a layer
-pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
+pub fn layer_builder<F>(layer_type: &str, idims: Dim4, hdims:Option<Dim4>, odims: Dim4, loss: &str
                         , eps: f64, activation: &str, w_init: &str, b_init: &str, mut f: F)
   where F: FnMut(&ParamManager, Box<Layer>)
 {
@@ -221,6 +221,7 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
     }),
     "rnn"  => Box::new(layer::RNN {
       input_size: input_size,
+      hidden_size: hdims.unwrap()[1] as usize,
       output_size: output_size,
     }),
     //todo: lstm, etc
@@ -236,9 +237,11 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
                                               , b_init),
     "rnn"  => {
       param_manager.add_rnn::<f64>(device_manager, device
-                                   , input_size, output_size
-                                   , activation
-                                   , w_init, w_init // just dupe it
+                                   , input_size, hdims.unwrap()[1] as usize
+                                   , output_size
+                                   , activation // inner activation
+                                   , activation // outer activation
+                                   , w_init
                                    , b_init);
     }
     //todo: lstm, etc
@@ -250,9 +253,10 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
 }
 
 /// test forward pass for layers
-pub fn layer_forward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
-                            , eps: f64, activation: &str, w_init: &str, b_init: &str
-                            , inputs_vec: Vec<f64>, targets_vec: Vec<f64>)
+pub fn layer_forward_helper(layer_type: &str, idims: Dim4, hdims: Option<Dim4>
+                            , odims: Dim4, loss: &str, eps: f64, activation: &str
+                            , w_init: &str, b_init: &str, inputs_vec: Vec<f64>
+                            , targets_vec: Vec<f64>)
 {
   //env::set_var("af_disable_graphics", "1"); // glfw crashes otherwise
   println!("testing {} layer with {} acivation for forward pass..."
@@ -260,7 +264,7 @@ pub fn layer_forward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &s
   let x = Array::new::<f64>(&inputs_vec[..], idims);
   let targets = Array::new::<f64>(&targets_vec[..], odims);
 
-  layer_builder(layer_type, idims, odims, loss
+  layer_builder(layer_type, idims, hdims, odims, loss
                 , eps, activation, w_init, b_init, |param_manager, layer|
                 {
                   // run a forward pass and verify it is within tolerance
@@ -268,26 +272,27 @@ pub fn layer_forward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &s
 
                   // make it such that we are within an unrolling [for rnn types]
                   let h_t = match &layer_type.to_lowercase()[..] {
-                    "rnn" | "unitary"  | "dense" => {
-                      let hdims = Dim4::new(&[idims[0] as u64, odims[1] as u64, 1, 1]);
-                      vec![utils::constant(hdims, DType::F64, 0.5f32)]
+                    "rnn" | "unitary"  => {
+                      vec![utils::constant(hdims.unwrap(), DType::F64, 0.5f32)]
                     },
-                    _     => panic!("random state generation not implemented for {} type", layer_type),
+                    _     => vec![utils::constant(odims, DType::F64, 0.5f32)],
                   };
 
                   // run a forward pass
                   let (activ, _) = layer.forward(params.clone(), &x.clone(), Some(&h_t));
+                  let host_activ = utils::array_to_vec(&activ);
 
                   let loss_activ = loss::get_loss(loss, &activ, &targets).unwrap();
                   assert!(loss_activ < 1e-9
-                          , "forward pass verification failed, error = {}"
-                          , loss_activ);
+                          , "forward pass verification failed, \n --> tabluated = {:?} \n --> actual = {:?}\n ==> [error = {}]"
+                          , host_activ, targets_vec, loss_activ);
                 });
 }
 
 /// test layers gradients
-pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &str
-                             , eps: f64, activation: &str, w_init: &str, b_init: &str)
+pub fn layer_backward_helper(layer_type: &str, idims: Dim4, hdims: Option<Dim4>
+                             , odims: Dim4, loss: &str, eps: f64, activation: &str
+                             , w_init: &str, b_init: &str)
 {
   //env::set_var("af_disable_graphics", "1"); // glfw crashes otherwise
   // [batch_size, input_size, temporal_size, 1]
@@ -312,7 +317,7 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
     _  => initializations::uniform::<f64>(odims, -0.5f32, 0.5f32),
   };
 
-  layer_builder(layer_type, idims, odims, loss
+  layer_builder(layer_type, idims, hdims, odims, loss
                 , eps, activation, w_init, b_init, |param_manager, layer|
                 {
                   // run a forward and then bkwd pass to extract the gradients
@@ -320,11 +325,10 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, odims: Dim4, loss: &
 
                   // make it such that we are within an unrolling [for rnn types]
                   let h_t = match &layer_type.to_lowercase()[..] {
-                    "rnn" | "unitary" | "dense" => {
-                      let hdims = Dim4::new(&[idims[0] as u64, odims[1] as u64, 1, 1]);
-                      vec![utils::constant(hdims, DType::F64, 0.5f32)]
+                    "rnn" | "unitary" => {
+                      vec![utils::constant(hdims.unwrap(), DType::F64, 0.5f32)]
                     },
-                    _     => panic!("random state generation not implemented for {} type", layer_type),
+                    _  => vec![utils::constant(odims, DType::F64, 0.0f32)],
                   };
 
                   let (activ, _) = layer.forward(params.clone(), &x.clone(), Some(&h_t));
@@ -368,7 +372,7 @@ fn dense_forward(){
   timeit!({
     let idims = Dim4::new(&[1, 5, 1, 1]);
     let odims = Dim4::new(&[1, 5, 1, 1]);
-    layer_forward_helper("Dense", idims, odims, "l2", 1e-4
+    layer_forward_helper("Dense", idims, None, odims, "l2", 1e-4
                          , "linear"                                      // activation
                          , "ones"                                        // weight init
                          , "zeros"                                       // bias init
@@ -382,39 +386,56 @@ fn dense_backward() {
   timeit! ({
     let idims = Dim4::new(&[1, 5, 1, 1]);
     let odims = Dim4::new(&[1, 5, 1, 1]);
-    layer_backward_helper("Dense", idims, odims
-                          , "l2"              // loss
-                          , 1e-4              // eps for numerical grad
-                          , "tanh"            // activation
-                          , "glorot_uniform"  // weight init
-                          , "zeros");         // bias init
+    layer_backward_helper("Dense", idims, None, odims
+                          , "l2"                // loss
+                          , 1e-4                // eps for numerical grad
+                          , "tanh"              // activation
+                          , "glorot_uniform"    // weight init
+                          , "glorot_uniform");  // bias init
   });
 }
 
 #[test]
+/// This can be compared to the following tensorflow code:
+///
+/// import tensorflow as tf
+/// sess = tf.InteractiveSession()
+/// with tf.variable_scope("rnn", initializer=tf.ones):
+///     inputs = [tf.expand_dims(tf.constant([-0.01, 0.00, 1.10, 2.20, 3.15]), 0)]
+///     rnn_cell = tf.nn.rnn_cell.BasicRNNCell(5, activation=tf.identity)
+///     init_state = tf.constant(0.5, shape=[1, rnn_cell.state_size])
+///     outputs, state = tf.nn.rnn(rnn_cell, inputs, initial_state=init_state)
+///     outputs = tf.contrib.layers.fully_connected(outputs[0], 5,
+///                                                 activation_fn=tf.identity,
+///                                                 weights_initializer=tf.ones,
+///                                                 biases_initializer=tf.zeros)
+///     sess.run(tf.initialize_all_variables())
+///     print outputs.eval()
 fn rnn_forward(){
   timeit!({
     let idims = Dim4::new(&[1, 5, 1, 1]);
     let odims = Dim4::new(&[1, 5, 1, 1]);
-    layer_forward_helper("rnn", idims, odims, "l2", 1e-4
+    let hdims = Dim4::new(&[1, 5, 1, 1]);
+    layer_forward_helper("rnn", idims, Some(hdims), odims, "l2", 1e-4
                          , "linear"                                      // activation
                          , "ones"                                        // weight init
                          , "zeros"                                       // bias init
                          , vec![-0.01, 0.00, 1.10, 2.20, 3.15]           //input
-                         , vec![ 8.94000053, 8.94000053, 8.94000053, 8.94000053, 8.94000053]); //target
+                         , vec![ 44.70000458, 44.70000458, 44.70000458, 44.70000458, 44.70000458]); //target
   });
 }
 
 #[test]
 fn rnn_backward() {
   timeit! ({
-    let idims = Dim4::new(&[1, 5, 1, 1]); // single time slice
-    let odims = Dim4::new(&[1, 6, 1, 1]); // single time slice
-    layer_backward_helper("rnn", idims, odims
+    let idims = Dim4::new(&[1, 10, 1, 1]); // single time slice
+    let odims = Dim4::new(&[1, 10, 1, 1]); // single time slice
+    let hdims = Dim4::new(&[1, 10, 1, 1]); // single time slice
+    layer_backward_helper("rnn", idims, Some(hdims), odims
                           , "l2"              // loss
                           , 1e-4              // eps for numerical grad
                           , "tanh"            // activation
                           , "glorot_uniform"  // weight init
-                          , "zeros");         // bias init
+                          , "glorot_uniform");// bias init
   });
 }

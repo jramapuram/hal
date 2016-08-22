@@ -522,21 +522,27 @@ pub trait RNNGenerator {
                            , manager: DeviceManager
                            , device: Device
                            , input_size: usize
+                           , hidden_size: usize
                            , output_size: usize
-                           //, bptt_interval: usize
-                           , activation: &str
+                           , inner_activation: &str
+                           , outer_activation: &str
                            , w_init: &str
-                           , w_recurrent_init: &str
                            , b_init: &str);
 }
 
 pub enum LSTMIndex {
-  Input,      // i_t
+  Input=0,    // i_t
   Forget,     // f_t
   Output,     // o_t
   CellTilda,  // ct_t
   Cell,       // c_t
   CellOutput, // h_t
+}
+
+pub enum RNNIndex {
+  InputToHidden=0,
+  HiddenToOutput,
+  HiddenToHidden,
 }
 
 pub trait LSTMGenerator {
@@ -578,25 +584,30 @@ impl RNNGenerator for ParamManager {
                            , manager: DeviceManager
                            , device: Device
                            , input_size: usize
+                           , hidden_size: usize
                            , output_size: usize
-                           , activation: &str
+                           , inner_activation: &str
+                           , outer_activation: &str
                            , w_init: &str
-                           , w_recurrent_init: &str
                            , b_init: &str)
   {
-    let recurrent_weight_dims = (output_size, output_size);
-    let input_dims = (input_size, output_size);
-    let bias_dims = (output_size, 1);
+    let recurrent_dims = (hidden_size, hidden_size);
+    let input_dims = (input_size, hidden_size);
+    let output_dims = (hidden_size, output_size);
+    let input_bias_dims = (hidden_size, 1);
+    let output_bias_dims = (output_size, 1);
 
-    let mut weights = vec![(w_init, input_dims)];
-    let recurrent_weights = vec![(w_recurrent_init, recurrent_weight_dims)];
-    weights.extend(recurrent_weights); // all weights are passed as one to the add func
+    // all weights are passed as one to the add func
+    let weights = vec![(w_init, input_dims)         // input 2 hidden
+                       , (w_init, output_dims)      // hidden to output
+                       , (w_init, recurrent_dims)]; // hidden to hidden
+    let biases = vec![(b_init, input_bias_dims), (b_init, output_bias_dims)];
 
     self.add::<T>(manager, device, "rnn"
                   , weights                                            // weight dims
-                  , vec![(b_init, bias_dims)]                          // bias dims
-                  , vec![activation]                                   // activation vector
-                  , None//, Some(vec![("zeros", bias_dims); bptt_interval + 1]) // h_tm1 = sizeof(bias)
+                  , biases                                             // bias dims
+                  , vec![inner_activation, outer_activation]           // activation vector
+                  , None
                   , None);
   }
 }
