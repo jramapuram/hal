@@ -78,6 +78,7 @@ impl Layer for RNN
           ltex.recurrences.push(init_state[0].clone());
           init_state[0].clone() // only one recurrence for vanilla RNN
         },
+
         _ => {
           let rlen = ltex.recurrences.len();
           ltex.recurrences[rlen - 1] = init_state[0].clone();
@@ -92,7 +93,7 @@ impl Layer for RNN
           let zero_state = utils::constant(init_h_dims, inputs.get_type(), 0f32);
           ltex.recurrences.push(zero_state.clone());
           zero_state
-        }
+        },
         _ => ltex.recurrences.last().unwrap().clone()
       }
     };

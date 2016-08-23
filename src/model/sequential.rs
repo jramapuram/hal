@@ -68,7 +68,7 @@ impl Model for Sequential {
   /// - `layer` is the type of layer to add
   /// - `params` is a hashmap of params for the provided layer
   fn add<T: HasAfEnum>(&mut self, layer: &str
-         , params: HashMap<&str, String>)
+                       , params: HashMap<&str, String>)
   {
     //TODO: Error handling for hashmap
     let input_size = params.get("input_size").unwrap().parse::<u64>().unwrap() as usize;

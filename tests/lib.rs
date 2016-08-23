@@ -326,8 +326,9 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, hdims: Option<Dim4>
                   // make it such that we are within an unrolling [for rnn types]
                   let h_t = match &layer_type.to_lowercase()[..] {
                     "rnn" | "unitary" => {
-                      vec![utils::constant(hdims.unwrap(), DType::F64, 0.5f32)]
+                      vec![initializations::uniform::<f64>(hdims.unwrap(), -0.5, 0.5)]
                     },
+                    // XXX: refactor later
                     _  => vec![utils::constant(odims, DType::F64, 0.0f32)],
                   };
 
@@ -433,8 +434,8 @@ fn rnn_backward() {
     let hdims = Dim4::new(&[1, 10, 1, 1]); // single time slice
     layer_backward_helper("rnn", idims, Some(hdims), odims
                           , "l2"              // loss
-                          , 1e-4              // eps for numerical grad
-                          , "tanh"            // activation
+                          , 1e-3              // eps for numerical grad
+                          , "tanh"            // activation [used for inner and outer]
                           , "glorot_uniform"  // weight init
                           , "glorot_uniform");// bias init
   });
