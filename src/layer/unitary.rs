@@ -102,7 +102,7 @@ fn to_real(ar: Array) -> Array {
 
 impl Layer for Unitary
 {
-    fn forward(&self, params:  Arc<Mutex<Params>>, inputs: &Array, state: Option<Array>) -> (Array, Option<Array>)
+    fn forward(&self, params:  Arc<Mutex<Params>>, inputs: &Array, state: Option<&Vec<Array>>) -> (Array, Option<Vec<Array>>)
     {
         let mut ltex = params.lock().unwrap();
         let t = ltex.current_unroll;
@@ -148,7 +148,7 @@ impl Layer for Unitary
         let mut rec_t = to_complex(ltex.recurrences[t].clone());
 
         rec_t = match state {
-            Some(init_state)    => init_state,
+            Some(init_state)    => init_state[0].clone(),
             None                => rec_t
         };
 

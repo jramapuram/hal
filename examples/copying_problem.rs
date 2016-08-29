@@ -5,6 +5,7 @@ use rand::distributions::{Range, IndependentSample};
 
 use hal::utils;
 use hal::Model;
+use hal::loss;
 use hal::initializations::uniform;
 use hal::optimizer::{Optimizer, get_optimizer_with_defaults};
 use hal::data::{DataSource, AddingProblemSource, CopyingProblemSource};
@@ -12,8 +13,11 @@ use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::plot::{plot_vec, plot_array};
 use hal::device::{DeviceManagerFactory, Device};
-use af::{Backend, HasAfEnum, MatProp, DType};
+use af::{Backend, HasAfEnum, MatProp, DType, Dim4};
 
+use std::fs::{File, OpenOptions};
+use std::path::Path;
+use std::io::prelude::*;
 
 fn main() {
     // First we need to parameterize our network
@@ -21,11 +25,14 @@ fn main() {
     let seq_size = 10;
     let hidden_dims = 30;
     let output_dims = 10;
-    let num_train_samples = 32000;
-    let batch_size = 10;
+    let num_train_samples = 2000;
+    let batch_size = 50;
     let optimizer_type = "Adam";
-    let epochs = 5;
+    let epochs = 1;
     let bptt_unroll = 120;
+    let data_type = DType::F32;
+
+    let num_test_samples = 1000;
 
     // Now, let's build a model with an device manager on a specific device
     // an optimizer and a loss function. For this example we demonstrate a simple autoencoder
@@ -34,12 +41,13 @@ fn main() {
     let gpu_device = Device{backend: Backend::DEFAULT, id: 0};
     let cpu_device = Device{backend: Backend::CPU, id: 0};
     let optimizer = get_optimizer_with_defaults(optimizer_type).unwrap();
+    let loss_fct = "cross_entropy_softmax";
     let mut model = Box::new(Sequential::new(manager.clone()
                                              , optimizer         // optimizer
-                                             , "mse"             // loss
+                                             , loss_fct          // loss
                                              , gpu_device));     // device for model
 
-    // Let's add a few layers why don't we?
+    // Add the unitary layer
     model.add::<f32>("unitary", hashmap!["input_size"   => input_dims.to_string()
                      , "output_size"  => output_dims.to_string()
                      , "hidden_size"  => hidden_dims.to_string()
@@ -56,19 +64,77 @@ fn main() {
     model.info();
     manager.swap_device(cpu_device);
 
-    let uniform_generator = CopyingProblemSource::new(input_dims
+    // Initializes the generator of copying problem data
+    let train_generator = CopyingProblemSource::new(input_dims
                                                       , batch_size
                                                       , seq_size
                                                       , bptt_unroll
-                                                      , DType::F32
+                                                      , data_type
                                                       , num_train_samples);
 
-
-    let loss = model.fit::<CopyingProblemSource, f32>(&uniform_generator
+    // Training process
+    let loss = model.fit::<CopyingProblemSource, f32>(&train_generator
                                                       , cpu_device
                                                       , epochs
                                                       , batch_size
                                                       , Some(bptt_unroll)
                                                       , None
                                                       , true);
+
+    println!(" ");
+
+    // Testing process
+    manager.swap_device(cpu_device);
+
+    let test_generator = CopyingProblemSource::new(input_dims
+                                                      , num_test_samples
+                                                      , seq_size
+                                                      , bptt_unroll
+                                                      , data_type
+                                                      , num_test_samples);
+
+    let minibatch = test_generator.get_test_iter(num_test_samples);
+    let batch_input = manager.swap_array_backend::<f32>(&minibatch.input.into_inner()
+                                                        , cpu_device
+                                                        , gpu_device);
+    let batch_target = manager.swap_array_backend::<f32>(&minibatch.target.into_inner()
+                                                         , cpu_device
+                                                         , gpu_device);
+    let batch_pred = model.forward::<f32>(&batch_input, gpu_device, gpu_device);
+    let mut loss_vec = Vec::with_capacity(bptt_unroll as usize);
+
+    let dims = Dim4::new(&[num_test_samples,1,1,1]);
+    let mut wins_vec = af::constant(1f32, dims);
+
+    let dims = Dim4::new(&[num_test_samples, input_dims,1,1]);
+    let zeros = af::constant(0f32, dims);
+    let ones = af::constant(1f32, dims);
+
+    for ind in 0..bptt_unroll {
+        let pred = batch_pred[ind as usize].clone();
+        let tar = af::slice(&batch_target, ind as u64);
+
+        // Computes loss
+        loss_vec.push(loss::get_loss(loss_fct, &pred, &tar).unwrap());
+
+        // Compute accuracy
+        let max = af::max(&pred, 1);
+        let isMax = af::eq(&pred, &max, true);
+        let oneMax = af::select(&ones, &isMax, &zeros);
+        let total = af::sum(&af::mul(&oneMax, &tar, false), 1);
+        wins_vec = af::mul(&wins_vec, &total, false);
+    }
+
+    let loss_sum = loss_vec.iter().fold(0f32, |sum, val| sum + val);
+    let avg_loss = loss_sum / bptt_unroll as f32;
+
+    let (wins, _) = af::sum_all(&wins_vec);
+    let accuracy = wins / num_test_samples as f64;
+    
+    println!("{}", avg_loss);
+    println!("{}\n", accuracy);
+
+
+
+
 }

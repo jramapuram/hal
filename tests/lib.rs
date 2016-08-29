@@ -250,7 +250,7 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, hdims:Option<Dim4>, odims
     }
 
     "unitary" => { 
-        let hidden_size = 5;
+        let hidden_size = 4;
         let h_init = "glorot_uniform";
         let v_init = "glorot_uniform";
         let phase_init = "glorot_uniform";
@@ -468,7 +468,7 @@ fn rnn_backward() {
 fn unitary_forward() {
     let idims = Dim4::new(&[1, 8, 1, 1]);
     let odims = Dim4::new(&[1, 8, 1, 1]);
-    layer_forward_helper("unitary", idims, odims, "l2", 1e-4
+    layer_forward_helper("unitary", idims, None, odims, "l2", 1e-4
                          , "tanh"
                          , " "
                          , " "
@@ -481,7 +481,8 @@ fn unitary_forward() {
 fn unitary_backward() {
     let idims = Dim4::new(&[1, 8, 1, 1]);
     let odims = Dim4::new(&[1, 8, 1, 1]);
-    layer_backward_helper("unitary", idims, odims, "l2", 1e-4
+    let hdims = Dim4::new(&[1, 8, 1, 1]);
+    layer_backward_helper("unitary", idims, None, odims, "l2", 1e-4
                           , "tanh"
                           , " "
                           , " ");
