@@ -13,11 +13,11 @@ use af::{Backend, DType};
 
 fn main() {
   // First we need to parameterize our network
-  let input_dims = 1;
-  let batch_size = 8;
+  let input_dims = 2;
+  let batch_size = 1;
   let seq_len = 10;
-  let hidden_dims = 64;
-  let output_dims = 1;
+  let hidden_dims = 2048;
+  let output_dims = input_dims;
   let num_train_samples = 65536;
   let optimizer_type = "Adam";
   let epochs = 1000;
@@ -35,11 +35,12 @@ fn main() {
                                            , gpu_device));             // device for model
 
   // Let's add a few layers why don't we?
-  model.add::<f32>("rnn", hashmap!["activation"          => "tanh".to_string()
+  model.add::<f32>("rnn", hashmap!["inner_activation"    => "tanh".to_string()
+                                   , "outer_activation"  => "relu".to_string()
                                    , "input_size"        => input_dims.to_string()
+                                   , "hidden_size"       => hidden_dims.to_string()
                                    , "output_size"       => hidden_dims.to_string()
                                    , "w_init"            => "glorot_uniform".to_string()
-                                   , "w_recurrent_init"  => "glorot_uniform".to_string()
                                    , "b_init"            => "zeros".to_string()]);
   model.add::<f32>("dense", hashmap!["activation"        => "linear".to_string()  // softmax is in loss
                                      , "input_size"      => hidden_dims.to_string()

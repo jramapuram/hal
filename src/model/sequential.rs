@@ -68,7 +68,7 @@ impl Model for Sequential {
   /// - `layer` is the type of layer to add
   /// - `params` is a hashmap of params for the provided layer
   fn add<T: HasAfEnum>(&mut self, layer: &str
-         , params: HashMap<&str, String>)
+                       , params: HashMap<&str, String>)
   {
     //TODO: Error handling for hashmap
     let input_size = params.get("input_size").unwrap().parse::<u64>().unwrap() as usize;
@@ -84,19 +84,20 @@ impl Model for Sequential {
                                         , output_size: output_size}));
       },
       "rnn" => {
+        let hidden_size = params.get("hidden_size").unwrap().parse::<u64>().unwrap() as usize;
         self.param_manager.add_rnn::<T>(self.manager.clone(), self.device
-                                        , input_size, output_size
-                                        , params.get("activation").unwrap()
+                                        , input_size, hidden_size, output_size
+                                        , params.get("inner_activation").unwrap()
+                                        , params.get("outer_activation").unwrap()
                                         , params.get("w_init").unwrap()
-                                        , params.get("w_recurrent_init").unwrap()
                                         , params.get("b_init").unwrap());
         self.layers.push(Box::new(RNN{input_size: input_size
+                                      , hidden_size: hidden_size
                                       , output_size: output_size}));
       }
       // "lstm"  => {
       //   self.param_manager.add_lstm::<T>(self.manager.clone(), self.device
       //                               , input_size, output_size
-      //                               , params.get("max_seq_size").unwrap()
       //                               , params.get("input_activation").unwrap()
       //                               , params.get("outer_activation").unwrap()
       //                               , params.get("w_init").unwrap()
@@ -104,9 +105,7 @@ impl Model for Sequential {
       //                               , params.get("forget_b_init").unwrap()
       //                               , params.get("b_init").unwrap());
       //   self.layers.push(Box::new(LSTM{input_size: input_size
-      //                                  , output_size: output_size
-      //                                  , max_seq_size: params.get("max_seq_size").unwrap()
-      //                                  , return_sequences: params.get("return_sequences").unwrap()}));
+      //                                  , output_size: output_size}));
       // },
       _  => panic!("Error unknown layer type"),
     }
@@ -206,6 +205,23 @@ impl Model for Sequential {
             , "batch sizes for inputs and targets much be equal");
     assert!(idims[2] == tdims[2]
             , "sequence lengths for inputs and targets must be equal");
+    assert!(self.layers.len() > 0
+            , "Need at least one layer to fit!");
+
+    // verify that last layer is of logits type when using
+    // softmax_crossentropy or binary_crossentropy
+    if self.loss.to_lowercase() == "cross_entropy_softmax"
+      || self.loss.to_lowercase() == "binary_cross_entropy"
+    {
+      let last_layer_index = self.layers.len() - 1;
+      let last_layer_activations = self.param_manager.get_activations(last_layer_index);
+      let last_activation = last_layer_activations.last().unwrap();
+      assert!(last_activation == "ones" || last_activation == "linear",
+              "Erroneous results expected while using cross_entropy_* \
+               loss and non-logit units in the last layer: {}"
+              , last_activation);
+    }
+
 
     // loss vector current loss
     let mut lossvec = Vec::<f32>::new();
@@ -303,16 +319,21 @@ impl Model for Sequential {
                   , "loss indices need to be of the same size as the predictions");
           match li[ind] {
             false => utils::constant(tar.dims(), tar.get_type(), 0.0f32),
-            true  => loss::get_loss_derivative(&self.loss, pred, &tar).unwrap(),
+            true  => {
+              loss_vec.push(loss::get_loss(&self.loss, pred, &tar).unwrap());
+              loss::get_loss_derivative(&self.loss, pred, &tar).unwrap()
+            },
           }
         },
-        None     => loss::get_loss_derivative(&self.loss, pred, &tar).unwrap(),
+        None     => {
+          loss_vec.push(loss::get_loss(&self.loss, pred, &tar).unwrap());
+          loss::get_loss_derivative(&self.loss, pred, &tar).unwrap()
+        },
       };
 
       for i in (0..last_index).rev() {
         delta = self.layers[i].backward(self.param_manager.get_params(i), &delta);
       }
-      loss_vec.push(loss::get_loss(&self.loss, pred, &tar).unwrap());
     }
 
     loss_vec

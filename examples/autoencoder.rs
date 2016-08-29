@@ -3,13 +3,13 @@ extern crate arrayfire as af;
 
 use hal::Model;
 use hal::optimizer::{Optimizer, get_optimizer_with_defaults};
-use hal::data::{DataSource, SinSource};
+use hal::data::{DataSource, DataLoader, SinSource};
 use hal::error::HALError;
 use hal::model::{Sequential};
 use hal::plot::{plot_vec, plot_array};
 use hal::device::{DeviceManagerFactory, Device};
 use af::{Backend, DType};
-
+use std::sync::{Arc, Mutex};
 
 fn main() {
   // First we need to parameterize our network
@@ -52,17 +52,35 @@ fn main() {
   // The model will automatically toggle to the desired backend during training
   manager.swap_device(cpu_device);
 
-  // Build our sin wave source
-  let sin_generator = SinSource::new(input_dims, batch_size
-                                     , DType::F32        // specify the type of data
-                                     , num_train_samples // generator can do inf, so decide
-                                     , false             // normalized ?
-                                     , false);           // shuffled ?
+  // Bind a simple sin wave generating source
+  let source = SinSource::new(input_dims, batch_size
+                              , DType::F32         // specify the type of data
+                              , num_train_samples  // generator can do inf, so decide
+                              , false              // normalized ?
+                              , false);
+
+  // Note: Currently the DataLoader only works with the same source and target device
+  // Build our sin wave source & wrap in a dataloader (thread based async queuing)
+  // The dataloader only makes sense for data that is not sequence dependent
+  // let source = Arc::new(Mutex::new(SinSource::new(input_dims, batch_size
+  //                                                 , DType::F32         // specify the type of data
+  //                                                 , num_train_samples  // generator can do inf, so decide
+  //                                                 , false              // normalized ?
+  //                                                 , false)));          // shuffled ?
+  // let source = DataLoader::new(4                   // number of worker threads
+  //                              , manager           // the device manager
+  //                              , cpu_device        // data source device
+  //                              , batch_size * 10   // training buffer size
+  //                              , batch_size * 2    // test buffer size
+  //                              , batch_size * 2    // validation buffer size
+  //                              , batch_size        // self explanatory
+  //                              , source.clone());  // the source to wrap
+
 
   // iterate our model in Verbose mode (printing loss)
   // Note: more manual control can be enacted by directly calling
-  //       forward/backward & optimizer update
-  let loss = model.fit::<SinSource, f32>(&sin_generator        // what data source to pull from
+  //       forward/backward & optimizer update [see sequential.rs]
+  let loss = model.fit::<SinSource, f32>(&source              // what data source to pull from
                                          , cpu_device          // source device
                                          , epochs, batch_size  // self explanatory :)
                                          , None                // BPTT interval [rnn only]
@@ -73,7 +91,7 @@ fn main() {
   plot_vec(loss, "Loss vs. Iterations", 512, 512);
 
   // infer on one test and plot the first sample (row) of the predictions
-  let test_sample = sin_generator.get_test_iter(1).input.into_inner();
+  let test_sample = source.get_test_iter(1).input.into_inner();
   println!("test sample shape: {:?}", test_sample.dims());
   let prediction = model.forward::<f32>(&test_sample
                                         , cpu_device   // source device
