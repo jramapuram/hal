@@ -19,27 +19,36 @@ pub fn mse_vec(pred: &Array, target: &Array) -> Array {
 }
 
 /// Return a vector form of cross entropy
-/// -ylnx - [1-y]ln[1-x]
+/// -ylnx
 pub fn cross_entropy_vec(pred: &Array, target: &Array) -> Array {
   // -yln x
+  let eps = 1e-10;
+  af::mul(&af::mul(&-1.0f32, target, false)
+          , &af::log(&utils::clip_by_value(pred, eps, 1.0 - eps)), false)
+}
+
+/// Return the vector form of binary cross entropy
+/// -ylnx - [1-y]ln[1-x]
+pub fn binary_cross_entropy_vec(pred: &Array, target: &Array) -> Array {
+  let pred = activations::sigmoid(pred);
+  let eps = 1e-10;
   let pos = af::mul(&af::mul(&-1.0f32, target, false)
-                    , &af::log(&utils::clip_by_value(pred, 1e-10, 1.0)), false);
-  
-  //[1-y]ln[1-x]
+                    , &af::log(&utils::clip_by_value(&pred, eps, 1.0 - eps)), false);
+   //[1-y]ln[1-x]
   let neg = af::mul(&af::sub(&1.0f32, target, false)
                     , &af::log(&utils::clip_by_value(&af::sub(&1.0f32
-                                                              , pred
+                                                              , &pred
                                                               , false)
-                                                     , 1e-10, 1.0)), false);
+                                                     , eps, 1.0 - eps)), false);
   af::sub(&pos, &neg, false)
 }
 
+/// Returns a vector form of the cross entropy softmax
+// E = sum(-ylnx])
 pub fn cross_entropy_softmax_vec(pred: &Array, target: &Array) -> Array {
-  // y: true target, x: prediction
-  // E = sum(-ylnx - [1-y]ln[1-x])
+  // y: true target [non activated], x: prediction
   cross_entropy_vec(&activations::softmax(pred), target)
 }
-
 
 /// Provide a reduced form the L2 loss (single scalar)
 pub fn l2(pred: &Array, target: &Array) -> f32 {
@@ -54,14 +63,21 @@ pub fn mse(pred: &Array, target: &Array) -> f32 {
 /// Provide a reduced form the cross-entropy loss (single scalar)
 pub fn cross_entropy(pred: &Array, target: &Array) -> f32 {
   // y: true target, x: prediction
-  // E = sum(-ylnx - [1-y]ln[1-x])
+  // E = sum(-ylnx)
   af::sum_all(&cross_entropy_vec(pred, target)).0 as f32
+}
+
+/// Provide a reduced form the binary-cross-entropy loss (single scalar)
+pub fn binary_cross_entropy(pred: &Array, target: &Array) -> f32 {
+  // y: true target, x: prediction
+  // E = sum(-ylnx - [1-y]ln[1-x])
+  af::sum_all(&binary_cross_entropy_vec(pred, target)).0 as f32
 }
 
 /// Provide a reduced form the cross-entropy+softmax loss (single scalar)
 pub fn cross_entropy_softmax(pred: &Array, target: &Array) -> f32 {
   // y: true target, x: prediction
-  // E = sum(-ylnx - [1-y]ln[1-x])
+  // E = sum(-ylnx)
   af::sum_all(&cross_entropy_softmax_vec(pred, target)).0 as f32
 }
 
@@ -85,8 +101,15 @@ pub fn cross_entropy_derivative(pred: &Array, target: &Array) -> Array {
 
 /// Provides the vector derivative of the cross-entropy+softmax error
 pub fn cross_entropy_softmax_derivative(pred: &Array, target: &Array) -> Array {
-  mse_derivative(pred, target)
+  mse_derivative(&activations::softmax(pred), target)
 }
+
+/// Provides the vector derivative of the binary-cross-entropy error
+/// Note: Assumes sigmoidal output units
+pub fn binary_cross_entropy_derivative(pred: &Array, target: &Array) -> Array {
+  mse_derivative(&activations::sigmoid(pred), target)
+}
+
 
 /// Helper to provide a loss from a string
 pub fn get_loss(name: &str, pred: &Array, target: &Array) -> Result<f32, HALError> {
@@ -94,6 +117,7 @@ pub fn get_loss(name: &str, pred: &Array, target: &Array) -> Result<f32, HALErro
     "l2"                    => Ok(l2(pred, target)),
     "mse"                   => Ok(mse(pred, target)),
     "cross_entropy"         => Ok(cross_entropy(pred, target)),
+    "binary_cross_entropy"  => Ok(binary_cross_entropy(pred, target)),
     "cross_entropy_softmax" => Ok(cross_entropy_softmax(pred, target)),
     _                       => Err(HALError::UNKNOWN_LOSS),
   }
@@ -105,6 +129,7 @@ pub fn get_loss_vec(name: &str, pred: &Array, target: &Array) -> Result<Array, H
     "l2"                    => Ok(l2_vec(pred, target)),
     "mse"                   => Ok(mse_vec(pred, target)),
     "cross_entropy"         => Ok(cross_entropy_vec(pred, target)),
+    "binary_cross_entropy"  => Ok(binary_cross_entropy_vec(pred, target)),
     "cross_entropy_softmax" => Ok(cross_entropy_softmax_vec(pred, target)),
     _                       => Err(HALError::UNKNOWN_LOSS),
   }
@@ -116,6 +141,7 @@ pub fn get_loss_derivative(name: &str, pred: &Array, target: &Array) -> Result<A
     "l2"                    => Ok(l2_derivative(pred, target)),
     "mse"                   => Ok(mse_derivative(pred, target)),
     "cross_entropy"         => Ok(cross_entropy_derivative(pred, target)),
+    "binary_cross_entropy"  => Ok(binary_cross_entropy_derivative(pred, target)),
     "cross_entropy_softmax" => Ok(cross_entropy_softmax_derivative(pred, target)),
     _                       => Err(HALError::UNKNOWN_LOSS),
   }

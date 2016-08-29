@@ -7,6 +7,7 @@ extern crate conv;
 extern crate tar;
 extern crate flate2;
 extern crate hyper;
+extern crate spmc;
 extern crate statistical;
 extern crate rustc_serialize;
 
