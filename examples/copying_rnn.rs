@@ -23,7 +23,7 @@ fn main() {
     // First we need to parameterize our network
     let input_dims = 10;
     let seq_size = 10;
-    let hidden_dims = 30;
+    let hidden_dims = 100;
     let output_dims = 10;
     let num_train_samples = 100;
     let batch_size = 5;
@@ -48,16 +48,13 @@ fn main() {
                                              , gpu_device));     // device for model
 
     // Add the unitary layer
-    model.add::<f32>("unitary", hashmap!["input_size"   => input_dims.to_string()
+    model.add::<f32>("rnn", hashmap!["input_size"   => input_dims.to_string()
+                     , "hidden_size" => hidden_dims.to_string()
                      , "output_size"  => output_dims.to_string()
-                     , "hidden_size"  => hidden_dims.to_string()
-                     , "o_activation" => "ones".to_string()
-                     , "h_init"       => "glorot_uniform".to_string()
-                     , "v_init"       => "glorot_uniform".to_string()
-                     , "phase_init"      => "glorot_uniform".to_string()
-                     , "householder_init"      => "glorot_uniform".to_string()
-                     , "u_init"       => "glorot_uniform".to_string()
-                     , "h_bias_init"      => "zeros".to_string()
+                     , "inner_activation"  => "tanh".to_string()
+                     , "outer_activation" => "ones".to_string()
+                     , "w_init"         => "glorot_uniform".to_string()
+                     , "b_init"         => "glorot_uniform".to_string()
                      , "o_bias_init"      => "zeros".to_string()]);
 
 

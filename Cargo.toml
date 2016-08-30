@@ -46,3 +46,6 @@ path = "examples/copying_problem.rs"
 name = "adding_problem"
 path = "examples/adding_problem.rs"
 
+[[example]]
+name = "copying_rnn"
+path = "examples/copying_rnn.rs"
