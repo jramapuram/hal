@@ -584,7 +584,8 @@ fn add_unitary<T: HasAfEnum>(&mut self
           , householder_init: &str
           , u_init: &str
           , h_bias_init: &str
-          , o_bias_init: &str);
+          , o_bias_init: &str
+          , is_permut_const: bool);
 }
 
 /** Custom Layer Impls **/
@@ -694,6 +695,7 @@ impl<'a> UnitaryGenerator for ParamManager {
           , u_init: &str
           , h_bias_init: &str
           , o_bias_init: &str
+          , is_permut_const: bool
           )
     {
         // We store all unitary matrices params in the attribute vector "weights".
@@ -738,10 +740,12 @@ impl<'a> UnitaryGenerator for ParamManager {
         for e in &seq {
             permut.push(*e as u32);
         }
-        rand::thread_rng().shuffle(&mut permut);
         let mut permut_inv: Vec<u32> = permut.clone();
-        for i in 0..permut.len(){
-            permut_inv[permut[i] as usize] = i as u32;
+        if is_permut_const == false {
+            rand::thread_rng().shuffle(&mut permut);
+            for i in 0..permut.len(){
+                permut_inv[permut[i] as usize] = i as u32;
+            }
         }
         let layer = self.layer_storage.last().unwrap().clone();
         layer.lock().unwrap().optional.push(utils::vec_to_array::<u32>(permut, dims));

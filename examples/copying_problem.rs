@@ -58,7 +58,8 @@ fn main() {
                      , "householder_init"      => "glorot_uniform".to_string()
                      , "u_init"       => "glorot_uniform".to_string()
                      , "h_bias_init"      => "zeros".to_string()
-                     , "o_bias_init"      => "zeros".to_string()]);
+                     , "o_bias_init"      => "zeros".to_string()
+                     , "is_permut_const"    => "false".to_string()]);
 
 
     model.info();

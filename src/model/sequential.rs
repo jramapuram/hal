@@ -132,6 +132,7 @@ impl Model for Sequential {
                                             // init biases values
                                             , params.get("h_bias_init").unwrap()
                                             , params.get("o_bias_init").unwrap()
+                                            , params.get("is_permut_const").unwrap().parse::<bool>().unwrap()
                                             ); 
             self.layers.push(Box::new(Unitary{input_size: input_size
                                         , output_size: output_size}));

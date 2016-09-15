@@ -20,15 +20,14 @@ fn main() {
     // First we need to parameterize our network
     let hidden_dims = 100;
     let num_train_samples = 1000000;
-    let batch_size = 5;
+    let batch_size = 100;
     let optimizer_type = "Adam";
     let epochs = 1;
-    let bptt_unroll: u64 = 6;
+    let bptt_unroll: u64 = 12;
 
     let mut loss_indices = vec!(false; (bptt_unroll-1) as usize);
     loss_indices.push(true);
 
-    let num_test_samples = 1000;
 
 
     // Now, let's build a model with an device manager on a specific device
@@ -45,7 +44,7 @@ fn main() {
                                              , gpu_device));    // device for model
 
     // Add the unitary layer
-    model.add::<f32>("unitary", hashmap!["input_size"   => 2.to_string()
+    model.add::<f32>("unitary", hashmap!["input_size"   => 1.to_string()
                      , "output_size"  => 1.to_string()
                      , "hidden_size"  => hidden_dims.to_string()
                      , "o_activation" => "ones".to_string()
@@ -55,7 +54,8 @@ fn main() {
                      , "householder_init"      => "glorot_uniform".to_string()
                      , "u_init"       => "glorot_uniform".to_string()
                      , "h_bias_init"      => "zeros".to_string()
-                     , "o_bias_init"      => "zeros".to_string()]);
+                     , "o_bias_init"      => "zeros".to_string()
+                     , "is_permut_const"    => "false".to_string()]);
 
 
     model.info();
@@ -74,42 +74,5 @@ fn main() {
                                                      , Some(bptt_unroll)
                                                      , Some(&loss_indices)
                                                      , true);
-    println!(" ");
-
-    // Testing process
-    manager.swap_device(cpu_device);
-
-    let test_generator = AddingProblemSource::new(num_test_samples
-                                                  , bptt_unroll
-                                                  , DType::F32
-                                                  , num_test_samples);
-
-
-
-
-
-
-
-
-
-    let minibatch = test_generator.get_test_iter(num_test_samples);
-    let batch_input = manager.swap_array_backend::<f32>(&minibatch.input.into_inner()
-                                                        , cpu_device
-                                                        , gpu_device);
-    let batch_target = manager.swap_array_backend::<f32>(&minibatch.target.into_inner()
-                                                         , cpu_device
-                                                         , gpu_device);
-    let batch_pred = model.forward::<f32>(&batch_input, gpu_device, gpu_device);
-
-    let dims = Dim4::new(&[num_test_samples,1,1,1]);
-    let mut wins_vec = af::constant(1f32, dims);
-
-    let pred = batch_pred[(bptt_unroll - 1) as usize].clone();
-    let tar = af::slice(&batch_target, bptt_unroll - 1);
-    af::print(&pred);
-    af::print(&tar);
-    
-    // Computes loss
-    let avg_loss = loss::get_loss(loss_fct, &pred, &tar).unwrap();
 }
 

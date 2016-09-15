@@ -21,7 +21,7 @@ impl AddingProblemSource {
     {
         assert!(bptt_unroll % 4 == 0, "The number of time steps has to be divisible by 4 for the adding problem");
         let input_dims = Dim4::new(&[batch_size, 1, bptt_unroll, 1]);
-        let target_dims = Dim4::new(&[batch_size, 1, 1, 1]);
+        let target_dims = Dim4::new(&[batch_size, 1, bptt_unroll, 1]);
         let train_samples = 0.7 * max_samples as f32;
         let test_samples = 0.2 * max_samples as f32;
         let validation_samples = 0.1 * max_samples as f32;
@@ -59,7 +59,6 @@ impl AddingProblemSource {
         for _ in 0..batch_size {
             let index1 = between1.ind_sample(&mut rng1) as usize;
             let index2 = between2.ind_sample(&mut rng2) as usize;
-            println!("{} {}", &index1, &index2);
             let mut vec_temp = vec_zeros.clone();
             vec_temp[index1] = 1f32;
             vec_temp[index2] = 1f32;
@@ -75,14 +74,10 @@ impl AddingProblemSource {
     fn generate_target(&self, input: &Array, batch_size: u64, bptt_unroll: u64) -> Array {
         let first = af::slices(&input, 0, bptt_unroll/2-1);
         let second = af::slices(&input, bptt_unroll/2, bptt_unroll-1);
-        let zeros = af::constant(0. as f32, first.dims());
-        let ones = af::constant(1. as f32, first.dims());
         let ar = af::mul(&first, &second, false);
 
-        af::sum(&ar, 2)
-
-
-
+        let zeros = af::constant(0f32, Dim4::new(&[batch_size, 1, bptt_unroll, 1]));
+        af::add(&af::sum(&ar, 2), &zeros, true)
     }
 }
 
