@@ -17,6 +17,11 @@ pub struct Unitary {
     pub output_size: usize,
 }
 
+/// Compute the multiplication with the diagonal matrix of phases D
+///
+/// # Parameters
+/// - 'param' is the vector of phases
+/// - 'ar' is the current hidden state
 fn h_d(param: Array, ar: Array) -> Array {
     let D = af::cplx2(&af::cos(&param)
                       , &af::sin(&param)
@@ -24,41 +29,72 @@ fn h_d(param: Array, ar: Array) -> Array {
     af::mul(&D, &ar, true)
 }
 
+/// Compute the multiplication with the diagonal matrix of phases D for the backpropagation
+/// (complex conjugate)
+///
+/// # Parameters
+/// - 'param' is the vector of phases
+/// - 'ar' is the current hidden state
 fn r_d(param: Array, ar: Array) -> Array {
     let D = af::cplx2(&af::cos(&param)
                       , &af::mul(&af::sin(&param), &-1, true)
                       ,false);
     af::mul(&D, &ar, true)
 }
-
+/// Wrapper to apply the fft to the current hidden state
+///
+/// # Parameters
+/// - 'ar' is the current hidden state
 fn h_fft(ar: Array) -> Array {
     let ar_size = ar.dims()[1];
     af::transpose(&af::fft(&af::transpose(&ar, false), 1.0, ar_size as i64)
                   , false)
 }
 
+/// Wrapper to apply the fft inverse to the current hidden state for the backpropagation
+///
+/// # Parameters
+/// - 'ar' is the current hidden state
 fn r_fft(ar: Array) -> Array {
     let ar_size = ar.dims()[1];
     af::transpose(&af::ifft(&af::transpose(&ar, false), 1.0, ar_size as i64)
                   , false)
 }
 
+/// Wrapper to apply the fft inverse to the current hidden state
+///
+/// # Parameters
+/// - 'ar' is the current hidden state
 fn h_ifft(ar: Array) -> Array {
     let ar_size = ar.dims()[1];
     af::transpose(&af::ifft(&af::transpose(&ar, false), 1.0/(ar_size as f64), ar_size as i64)
                   , false)
 }
 
+/// Wrapper to apply the fft to the current hidden state for the backpropagation
+///
+/// # Parameters
+/// - 'ar' is the current hidden state
 fn r_ifft(ar: Array) -> Array {
     let ar_size = ar.dims()[1];
     af::transpose(&af::fft(&af::transpose(&ar, false), 1.0/(ar_size as f64), ar_size as i64)
                   , false)
 }
 
+/// Apply the permutation pi
+///
+/// # Parameters
+/// - 'param' is the vector defining the permutation
+/// - 'ar' is the current hidden state
 fn h_pi(param: Array, ar: Array) -> Array {
     af::lookup(&ar, &param, 1)
 }
 
+/// Compute the multiplication with the Householder reflexion matrix R
+///
+/// # Parameters
+/// - 'param' is the vector defining the direction of the reflexion
+/// - 'ar' is the current hidden state
 fn h_r(param: Array, mut ar: Array) -> Array {
     let ar_temp = ar.clone();
     ar = af::matmul(&param
@@ -76,6 +112,10 @@ fn h_r(param: Array, mut ar: Array) -> Array {
 }
 
 // Wh = (D3 R2 F-1 D2 Pi R1 F D1) h
+/// Wrapper to compute the multiplication with the whole hidden2hidden matrix
+///
+/// # Parameters
+/// - 'p' parameters of the hidden2hidden matrix
 fn wh(p1: Array, p2: Array, p3: Array, p4: Array, p5: Array, p6: Array, ar: Array) -> Array { 
     let mut current = ar;
     current = h_d(p1, current);
@@ -90,12 +130,19 @@ fn wh(p1: Array, p2: Array, p3: Array, p4: Array, p5: Array, p6: Array, ar: Arra
 
 }
 
+/// Convert real vectors to a complex ones using the first and second half as real part and imaginary part respectively
+/// # Parameters
+/// - 'ar' is the matrix of real vectors to convert
 fn to_complex(ar:Array) -> Array {  
     let dim = ar.dims()[1];
     assert!(dim % 2 == 0, "The dimension of the complex split has to be even");
     af::cplx2(&af::cols(&ar, 0, dim/2-1), &af::cols(&ar, dim/2, dim-1), false)
 }
 
+/// Convert complex vectors to real ones concatenating real and imaginary parts
+///
+/// # Parameters
+/// - 'ar' is the matrix of complex vectors to convert
 fn to_real(ar: Array) -> Array {
     af::join(1, &af::real(&ar), &af::imag(&ar))
 }

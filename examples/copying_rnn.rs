@@ -63,11 +63,11 @@ fn main() {
 
     // Initializes the generator of copying problem data
     let train_generator = CopyingProblemSource::new(input_dims
-                                                      , batch_size
-                                                      , seq_size
-                                                      , bptt_unroll
-                                                      , data_type
-                                                      , num_train_samples);
+                                                    , batch_size
+                                                    , seq_size
+                                                    , bptt_unroll
+                                                    , data_type
+                                                    , num_train_samples);
 
     // Training process
     let loss = model.fit::<CopyingProblemSource, f32>(&train_generator

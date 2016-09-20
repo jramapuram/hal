@@ -239,16 +239,16 @@ where F: FnMut(&ParamManager, Box<Layer>)
                                                   , input_size, output_size
                                                   , activation
                                                   , w_init
-                                                  , b_init),
-                                                  "rnn"  => {
-                                                      param_manager.add_rnn::<f64>(device_manager, device
-                                                                                   , input_size, hdims.unwrap()[1] as usize
-                                                                                   , output_size
-                                                                                   , activation // inner activation
-                                                                                   , activation // outer activation
-                                                                                   , w_init
-                                                                                   , b_init);
-                                                  }
+                                                  , b_init);
+        "rnn"  => {
+            param_manager.add_rnn::<f64>(device_manager, device
+                                         , input_size, hdims.unwrap()[1] as usize
+                                         , output_size
+                                         , activation // inner activation
+                                         , activation // outer activation
+                                         , w_init
+                                         , b_init);
+        }
 
         "unitary" => { 
             let hidden_size = hdims.unwrap()[1] as usize;
