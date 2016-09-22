@@ -251,7 +251,6 @@ where F: FnMut(&ParamManager, Box<Layer>)
                                          , w_init
                                          , b_init);
         }
-
         "unitary" => { 
             let hidden_size = hdims.unwrap()[1] as usize;
             let h_init = "ones";
