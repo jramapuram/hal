@@ -8,12 +8,12 @@ use std::collections::HashMap;
 
 use loss;
 use utils;
-use layer::{Layer, Dense, RNN};//, LSTM};
+use layer::{Layer, Dense, RNN, Unitary};//, LSTM};
 use data::{DataSource};
 use device::{Device, DeviceManager, DeviceManagerFactory};
 use model::Model;
 use optimizer::{Optimizer, SGD};
-use params::{ParamManager, DenseGenerator, LSTMGenerator, RNNGenerator};
+use params::{ParamManager, DenseGenerator, LSTMGenerator, RNNGenerator, UnitaryGenerator};
 
 pub struct Sequential {
   layers: Vec<Box<Layer>>,
@@ -107,6 +107,37 @@ impl Model for Sequential {
       //   self.layers.push(Box::new(LSTM{input_size: input_size
       //                                  , output_size: output_size}));
       // },
+      
+      "unitary" => { 
+          let hidden_size = params.get("hidden_size").unwrap().parse::<u64>().unwrap() as usize;
+          self.param_manager.add_unitary::<T>(self.manager.clone(), self.device
+                                            , input_size, output_size, hidden_size 
+
+                                            // activations for Ux + Wh + b1 and for Vh + b2
+                                            , params.get("o_activation").unwrap()
+
+                                            // init hidden state values
+                                            , params.get("h_init").unwrap()
+
+                                            // init values for input2hidden matrix params
+                                            , params.get("v_init").unwrap()
+                                            
+                                            // init values for unitary matrices params
+                                            , params.get("phase_init").unwrap()
+                                            , params.get("householder_init").unwrap()
+
+                                            // init values for hidden2output matrix params
+                                            , params.get("u_init").unwrap()
+                                            
+                                            // init biases values
+                                            , params.get("h_bias_init").unwrap()
+                                            , params.get("o_bias_init").unwrap()
+                                            , params.get("is_permut_const").unwrap().parse::<bool>().unwrap()
+                                            ); 
+            self.layers.push(Box::new(Unitary{input_size: input_size
+                                        , output_size: output_size}));
+     }
+
       _  => panic!("Error unknown layer type"),
     }
   }
@@ -251,6 +282,14 @@ impl Model for Sequential {
                                                            , src_device
                                                            , compute_device);
 
+        /*
+        {
+            let param = self.param_manager.get_params(0);
+            let ltex = param.lock().unwrap();
+            af::print(&ltex.weights[0]);
+            af::print(&ltex.deltas[0]);
+        }
+        */
         // if bptt_interval is specified we slice our minibatch
         // into bptt_interval number of slices and then forward pass on it
         let mut current_loss_vec = Vec::new();
@@ -272,10 +311,11 @@ impl Model for Sequential {
 
         self.optimizer.update(&mut self.param_manager, batch_size as u64);
 
+
         // cache and print loss (if verbose)
         if verbose {
           let loss_sum = current_loss_vec.iter().fold(0f32, |sum, val| sum + val);
-          let avg_loss = current_loss_vec.len() as f32 * loss_sum;
+          let avg_loss = loss_sum / current_loss_vec.len() as f32 ;
           print!("{} ", avg_loss);
         }
         lossvec.extend(current_loss_vec);

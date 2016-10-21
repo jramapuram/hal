@@ -37,3 +37,15 @@ path = "examples/autoencoder.rs"
 [[example]]
 name = "xor_rnn"
 path = "examples/xor_rnn.rs"
+
+[[example]]
+name = "copying_problem"
+path = "examples/copying_problem.rs"
+
+[[example]]
+name = "adding_problem"
+path = "examples/adding_problem.rs"
+
+[[example]]
+name = "copying_rnn"
+path = "examples/copying_rnn.rs"

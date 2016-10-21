@@ -12,7 +12,7 @@ use rand::distributions::{IndependentSample, Range};
 use hal::{utils, activations, initializations, loss};
 use hal::layer;
 use hal::layer::{Layer};
-use hal::params::{DenseGenerator, RNNGenerator, ParamManager};
+use hal::params::{DenseGenerator, RNNGenerator, UnitaryGenerator, ParamManager};
 use hal::device::{DeviceManagerFactory, Device};
 use hal::error::HALError;
 
@@ -105,6 +105,7 @@ fn verify_func<F>(ufunc: F, name: &str, input: &[f32], truth: &[f32])
   let l2 = loss::get_loss("l2", &ufunc(&x), &x_t).unwrap();
   assert!(l2 <= 1e-4, "l2 loss of {} is higher than expected: {}", name, l2);
 }
+
 
 #[test]
 fn tanh(){
@@ -200,7 +201,7 @@ fn binary_cross_entropy(){
 /// helper to build a layer
 pub fn layer_builder<F>(layer_type: &str, idims: Dim4, hdims:Option<Dim4>, odims: Dim4, loss: &str
                         , eps: f64, activation: &str, w_init: &str, b_init: &str, mut f: F)
-  where F: FnMut(&ParamManager, Box<Layer>)
+where F: FnMut(&ParamManager, Box<Layer>)
 {
   // [batch_size, input_size, temporal_size, 1]
   let batch_size: usize = idims[0] as usize;
@@ -224,17 +225,23 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, hdims:Option<Dim4>, odims
       hidden_size: hdims.unwrap()[1] as usize,
       output_size: output_size,
     }),
+    "unitary" => Box::new(layer::Unitary {
+      input_size: input_size,
+      output_size: output_size,
+    }),
     //todo: lstm, etc
     _      => panic!("unknown layer type specified"),
   };
 
   // push it into the param manager
   match layer_type {
-    "Dense" => param_manager.add_dense::<f64>(device_manager, device
-                                              , input_size, output_size
-                                              , activation
-                                              , w_init
-                                              , b_init),
+    "Dense" => {
+      param_manager.add_dense::<f64>(device_manager, device
+                                     , input_size, output_size
+                                     , activation
+                                     , w_init
+                                     , b_init);
+    }
     "rnn"  => {
       param_manager.add_rnn::<f64>(device_manager, device
                                    , input_size, hdims.unwrap()[1] as usize
@@ -243,6 +250,24 @@ pub fn layer_builder<F>(layer_type: &str, idims: Dim4, hdims:Option<Dim4>, odims
                                    , activation // outer activation
                                    , w_init
                                    , b_init);
+    }
+    "unitary" => { 
+      let hidden_size = hdims.unwrap()[1] as usize;
+      let h_init = "ones";
+      let v_init = "ones";
+      let phase_init = "ones";
+      let householder_init = "ones";
+      let u_init = "ones";
+      let h_bias_init = "ones";
+      let o_bias_init = "ones";
+      param_manager.add_unitary::<f64>(device_manager, device
+                                       , input_size, output_size, hidden_size
+                                       , activation, h_init, v_init, phase_init
+                                       , householder_init, u_init
+                                       , h_bias_init, o_bias_init, true);
+      //let hdims = Dim4::new(&[batch_size as u64, 2*hidden_size as u64, 1, 1]);
+      //let h_t = utils::constant(hdims, DType::F64, 0.5f32);
+      //param_manager.set_recurrences(0, vec![h_t]);
     }
     //todo: lstm, etc
     _      => panic!("unknown layer type specified"),
@@ -325,14 +350,18 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, hdims: Option<Dim4>
 
                   // make it such that we are within an unrolling [for rnn types]
                   let h_t = match &layer_type.to_lowercase()[..] {
-                    "rnn" | "unitary" => {
+                    "rnn" => {
                       vec![initializations::uniform::<f64>(hdims.unwrap(), -0.5, 0.5)]
                     },
                     // XXX: refactor later
                     _  => vec![utils::constant(odims, DType::F64, 0.0f32)],
                   };
 
-                  let (activ, _) = layer.forward(params.clone(), &x.clone(), Some(&h_t));
+                  let (activ, _) = match layer_type
+                  {
+                    "unitary"     => layer.forward(params.clone(), &x.clone(), None),
+                    _             => layer.forward(params.clone(), &x.clone(), Some(&h_t)),
+                  };
 
                   // get the derivative and save away all params
                   let delta = loss::get_loss_derivative(loss, &activ, &targets).unwrap();
@@ -349,10 +378,14 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, hdims: Option<Dim4>
                     println!("\nTesting gradient of array with {:?} dims", arr.dims());
 
                     // do the gradient check specific to the activation type
-                    let grad_func: fn(_, &Array, f64, &Array) -> Result<f64, HALError> = match activations::is_smooth(activation)
+                    let grad_func: fn(_, &Array, f64, &Array) -> Result<f64, HALError> = match layer_type
                     {
-                      false => utils::verify_gradient_kinks,
-                      true  => utils::verify_gradient_smooth,
+                      "unitary"   => utils::verify_gradient_kinks,
+                      _           => match activations::is_smooth(activation)
+                      {
+                        false => utils::verify_gradient_kinks,
+                        true  => utils::verify_gradient_smooth,
+                      },
                     };
 
                     // run the appropriate functor on the parameter
@@ -361,10 +394,16 @@ pub fn layer_backward_helper(layer_type: &str, idims: Dim4, hdims: Option<Dim4>
                       let p = params.clone();
                       p.lock().unwrap().current_unroll = 0;
                       param_manager.set_array_from_index(i.clone(), ind);
-                      let (fwd_pass, _) = layer.forward(params.clone(), &x.clone(), Some(&h_t));
+
+                      let (fwd_pass, _) = match layer_type
+                      {
+                        "unitary"     => layer.forward(params.clone(), &x.clone(), None),
+                        _             => layer.forward(params.clone(), &x.clone(), Some(&h_t)),
+                      };
+
                       loss::get_loss(loss, &fwd_pass, &targets).unwrap() as f64
                     }, &arr_bkp, eps, &grad).unwrap();
-                  }
+                  };
                 });
 }
 
@@ -429,9 +468,9 @@ fn rnn_forward(){
 #[test]
 fn rnn_backward() {
   timeit! ({
-    let idims = Dim4::new(&[1, 10, 1, 1]); // single time slice
-    let odims = Dim4::new(&[1, 10, 1, 1]); // single time slice
-    let hdims = Dim4::new(&[1, 10, 1, 1]); // single time slice
+    let idims = Dim4::new(&[1, 4, 1, 1]); // single time slice
+    let odims = Dim4::new(&[1, 4, 1, 1]); // single time slice
+    let hdims = Dim4::new(&[1, 4, 1, 1]); // single time slice
     layer_backward_helper("rnn", idims, Some(hdims), odims
                           , "l2"              // loss
                           , 1e-3              // eps for numerical grad
@@ -440,3 +479,29 @@ fn rnn_backward() {
                           , "glorot_uniform");// bias init
   });
 }
+
+#[test]
+fn unitary_forward() {
+  let idims = Dim4::new(&[1, 10, 1, 1]);
+  let odims = Dim4::new(&[1, 10, 1, 1]);
+  let hdims = Dim4::new(&[1, 10, 1, 1]);
+  layer_forward_helper("unitary", idims, Some(hdims), odims, "l2", 1e-4
+                       , "ones"
+                       , " "
+                       , " "
+                       , vec![0.4f64, -1.2, -0.55, 0.15, -0.55, 3.2, -2.5, 3.2, -12., 30.]
+                       , vec![421.536289, 421.536289, 421.536289, 421.536289, 421.536289, 421.536289, 421.536289, 421.536289, 421.536289, 421.536289]);
+
+}
+
+#[test]
+fn unitary_backward() {
+  let idims = Dim4::new(&[1, 8, 1, 1]);
+  let odims = Dim4::new(&[1, 8, 1, 1]);
+  let hdims = Dim4::new(&[1, 8, 1, 1]);
+  layer_backward_helper("unitary", idims, Some(hdims), odims, "cross_entropy_softmax", 1e-4
+                        , "relu"
+                        , " "
+                        , " ");
+}
+

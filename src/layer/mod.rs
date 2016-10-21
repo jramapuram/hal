@@ -1,5 +1,7 @@
 pub use self::dense::Dense;
 mod dense;
+pub use self::unitary::Unitary;
+mod unitary;
 
 pub use self::rnn::RNN;
 mod rnn;

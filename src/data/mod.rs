@@ -1,6 +1,12 @@
 pub use self::sin::SinSource;
 mod sin;
 
+pub use self::copying_prob_src::CopyingProblemSource;
+mod copying_prob_src;
+
+pub use self::adding_prob_src::AddingProblemSource;
+mod adding_prob_src;
+
 pub use self::xor::XORSource;
 mod xor;
 
