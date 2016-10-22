@@ -126,46 +126,45 @@ pub fn ones_derivative(x: &Array) -> Array {
 
 /// Apply relu on the module of the complex array
 pub fn mod_relu(z: Array, b: Array) -> Array {
-    let module_z = af::root(&2f32, &af::real(&af::mul(&af::conjg(&z), &z, false)), true);
-    let new_module_z = self::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
-    af::div(&af::mul(&z, &new_module_z, false), &module_z, false)
+  let module_z = af::root(&2f32, &af::real(&af::mul(&af::conjg(&z), &z, false)), true);
+  let new_module_z = self::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
+  af::div(&af::mul(&z, &new_module_z, false), &module_z, false)
 }
 
 /// Compute mod_relu derivative with respect to z
 pub fn mod_relu_derivative_z(z: Array, b: Array, d_h: Array) -> Array {
-    let module_carre_z = af::real(&af::mul(&af::conjg(&z), &z, false));
-    let module_z = af::root(&2f32, &module_carre_z, true);
-    let new_module_z = self::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
+  let module_carre_z = af::real(&af::mul(&af::conjg(&z), &z, false));
+  let module_z = af::root(&2f32, &module_carre_z, true);
+  let new_module_z = self::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
 
-    let d_activ = self::get_derivative("relu", &new_module_z).unwrap();
-    let mut d_z1 = af::div(&af::mul(&d_h, &af::conjg(&z), false), &module_z, false);
-    d_z1 = af::mul(&d_z1, &d_activ, false);
-    d_z1 = af::div(&d_z1, &module_z, false);
-    d_z1 = af::div(&d_z1, &2f32, false);
-    d_z1 = af::add(&af::mul(&z, &d_z1, false), &af::conjg(&af::mul(&af::conjg(&z), &d_z1, false)), false);
+  let d_activ = self::get_derivative("relu", &new_module_z).unwrap();
+  let mut d_z1 = af::div(&af::mul(&d_h, &af::conjg(&z), false), &module_z, false);
+  d_z1 = af::mul(&d_z1, &d_activ, false);
+  d_z1 = af::div(&d_z1, &module_z, false);
+  d_z1 = af::div(&d_z1, &2f32, false);
+  d_z1 = af::add(&af::mul(&z, &d_z1, false), &af::conjg(&af::mul(&af::conjg(&z), &d_z1, false)), false);
 
-    let mut d_z2 = af::mul(&d_h, &new_module_z, false);
-    d_z2 = af::mul(&d_z2, &af::conjg(&z), false);
-    d_z2 = af::div(&d_z2, &module_carre_z, false);
-    d_z2 = af::div(&d_z2, &module_z, false);
-    d_z2 = af::div(&d_z2, &2f32, false);
-    d_z2 = af::add(&af::mul(&z, &d_z2, false), &af::conjg(&af::mul(&af::conjg(&z), &d_z2, false)), false);
+  let mut d_z2 = af::mul(&d_h, &new_module_z, false);
+  d_z2 = af::mul(&d_z2, &af::conjg(&z), false);
+  d_z2 = af::div(&d_z2, &module_carre_z, false);
+  d_z2 = af::div(&d_z2, &module_z, false);
+  d_z2 = af::div(&d_z2, &2f32, false);
+  d_z2 = af::add(&af::mul(&z, &d_z2, false), &af::conjg(&af::mul(&af::conjg(&z), &d_z2, false)), false);
 
+  let mut d_z3 = af::mul(&d_h, &new_module_z, false);
+  d_z3 = af::div(&d_z3, &module_z, false);
 
-    let mut d_z3 = af::mul(&d_h, &new_module_z, false);
-    d_z3 = af::div(&d_z3, &module_z, false);
-
-    af::add(&af::sub(&d_z1, &d_z2, false), &d_z3, false)
+  af::add(&af::sub(&d_z1, &d_z2, false), &d_z3, false)
 }
 
 /// Compute mod_relu derivative with respect to b
 pub fn mod_relu_derivative_b(z: Array, b: Array, d_h: Array) -> Array {
-    let module_z = af::root(&2f32, &af::real(&af::mul(&af::conjg(&z), &z, false)), true);
-    let new_module_z = self::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
-    let d_activ = self::get_derivative("relu", &new_module_z).unwrap();
+  let module_z = af::root(&2f32, &af::real(&af::mul(&af::conjg(&z), &z, false)), true);
+  let new_module_z = self::get_activation("relu", &af::add(&module_z, &b, true)).unwrap();
+  let d_activ = self::get_derivative("relu", &new_module_z).unwrap();
 
-    let d_b = af::div(&af::mul(&d_h, &af::conjg(&z), false), &module_z, false);
-    af::mul(&d_b, &d_activ, false)
+  let d_b = af::div(&af::mul(&d_h, &af::conjg(&z), false), &module_z, false);
+  af::mul(&d_b, &d_activ, false)
 }
 
 

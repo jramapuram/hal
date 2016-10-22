@@ -45,16 +45,16 @@ fn main() {
 
   // Add the unitary layer
   model.add::<f32>("unitary", hashmap!["input_size"   => 1.to_string()
-                   , "output_size"  => 1.to_string()
-                   , "hidden_size"  => hidden_dims.to_string()
-                   , "o_activation" => "ones".to_string()
-                   , "h_init"       => "glorot_uniform".to_string()
-                   , "v_init"       => "glorot_uniform".to_string()
-                   , "phase_init"      => "glorot_uniform".to_string()
-                   , "householder_init"      => "glorot_uniform".to_string()
-                   , "u_init"       => "glorot_uniform".to_string()
-                   , "h_bias_init"      => "zeros".to_string()
-                   , "o_bias_init"      => "zeros".to_string()
+                   , "output_size"        => 1.to_string()
+                   , "hidden_size"        => hidden_dims.to_string()
+                   , "o_activation"       => "ones".to_string()
+                   , "h_init"             => "glorot_uniform".to_string()
+                   , "v_init"             => "glorot_uniform".to_string()
+                   , "phase_init"         => "glorot_uniform".to_string()
+                   , "householder_init"   => "glorot_uniform".to_string()
+                   , "u_init"             => "glorot_uniform".to_string()
+                   , "h_bias_init"        => "zeros".to_string()
+                   , "o_bias_init"        => "zeros".to_string()
                    , "is_permut_const"    => "false".to_string()]);
 
 
@@ -75,4 +75,3 @@ fn main() {
                                                    , Some(&loss_indices)
                                                    , true);
 }
-

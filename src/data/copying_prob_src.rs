@@ -4,16 +4,14 @@ use af;
 use af::{Array, Dim4, DType};
 use std::cell::{RefCell, Cell};
 
-use initializations;
 use utils;
-
 use data::{Data, DataSource, DataParams, Normalize, Shuffle};
 
 pub struct CopyingProblemSource {
   pub params: DataParams,
   pub iter: Cell<u64>,
   pub offset: Cell<f32>,
-  pub bptt_unroll : u64, 
+  pub bptt_unroll : u64,
   pub seq_size : u64,
 }
 
@@ -21,7 +19,8 @@ impl CopyingProblemSource {
   pub fn new(input_size: u64, batch_size: u64, seq_size: u64
              , bptt_unroll: u64, dtype: DType, max_samples: u64) -> CopyingProblemSource
   {
-    assert!(bptt_unroll > 2*seq_size, "The number of time steps has to be bigger than the sequence size x2 for the copying problem");
+    assert!(bptt_unroll > 2 * seq_size
+            , "The number of time steps has to be bigger than the sequence size x2 for the copying problem");
     let input_dims = Dim4::new(&[batch_size, input_size, bptt_unroll, 1]);
     //let output_dims = Dim4::new(&[batch_size, output_size, bptt_unroll, 1]);
     let train_samples = 0.7 * max_samples as f32;
@@ -91,7 +90,6 @@ impl CopyingProblemSource {
   }
 
   fn generate_target(&self, input: &Array, batch_size: u64, input_size: u64, bptt_unroll: u64, seq_size: u64) -> Array {
-
     let mut vec_total = Vec::with_capacity((batch_size*input_size*(bptt_unroll-seq_size)) as usize);
     let vec_zeros = vec!(0f32; input_size as usize);
 
@@ -122,7 +120,7 @@ impl DataSource for CopyingProblemSource {
                                    , self.params.target_dims[1]
                                    , self.params.target_dims[2]
                                    , self.seq_size);
-    let mut batch = Data {
+    let batch = Data {
       input: RefCell::new(Box::new(inp.clone())),
       target: RefCell::new(Box::new(tar.clone())),
     };
@@ -148,17 +146,3 @@ impl DataSource for CopyingProblemSource {
     Some( self.get_train_iter(num_batch))
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

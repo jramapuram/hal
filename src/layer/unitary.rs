@@ -116,7 +116,7 @@ fn h_r(param: Array, mut ar: Array) -> Array {
 ///
 /// # Parameters
 /// - 'p' parameters of the hidden2hidden matrix
-fn wh(p1: Array, p2: Array, p3: Array, p4: Array, p5: Array, p6: Array, ar: Array) -> Array { 
+fn wh(p1: Array, p2: Array, p3: Array, p4: Array, p5: Array, p6: Array, ar: Array) -> Array {
   let mut current = ar;
   current = h_d(p1, current);
   current = h_fft(current);
@@ -133,7 +133,7 @@ fn wh(p1: Array, p2: Array, p3: Array, p4: Array, p5: Array, p6: Array, ar: Arra
 /// Convert real vectors to a complex ones using the first and second half as real part and imaginary part respectively
 /// # Parameters
 /// - 'ar' is the matrix of real vectors to convert
-fn to_complex(ar:Array) -> Array {  
+fn to_complex(ar:Array) -> Array {
   let dim = ar.dims()[1];
   assert!(dim % 2 == 0, "The dimension of the complex split has to be even");
   af::cplx2(&af::cols(&ar, 0, dim/2-1), &af::cols(&ar, dim/2, dim-1), false)
@@ -156,17 +156,17 @@ impl Layer for Unitary
 
 
     // Transformation of complex parameters
-    let mut weight0 = to_complex(ltex.weights[0].clone());
+    let weight0 = to_complex(ltex.weights[0].clone());
     let mut weight4 = to_complex(ltex.weights[4].clone());
     let mut weight5 = to_complex(ltex.weights[5].clone());
 
     // Not complex
-    let mut weight1 = ltex.weights[1].clone();
-    let mut weight2 = ltex.weights[2].clone();
-    let mut weight3 = ltex.weights[3].clone();
-    let mut weight6 = ltex.weights[6].clone();
-    let mut bias0 = ltex.biases[0].clone();
-    let mut bias1 = ltex.biases[1].clone();
+    let weight1 = ltex.weights[1].clone();
+    let weight2 = ltex.weights[2].clone();
+    let weight3 = ltex.weights[3].clone();
+    let weight6 = ltex.weights[6].clone();
+    let bias0 = ltex.biases[0].clone();
+    let bias1 = ltex.biases[1].clone();
 
     if t == 0 {
       // Initialize hidden state in the first iteration
@@ -185,11 +185,11 @@ impl Layer for Unitary
       ltex.recurrences[0] = af::add(&zero, &ltex.recurrences[0], true);
 
       // We normalize Householder parameters;
-      let sqrNorm = af::norm(&weight4, af::NormType::VECTOR_2, 1., 1.)as f32;
-      weight4 = af::div(&weight4, &sqrNorm, true);
+      let mut sqr_norm = af::norm(&weight4, af::NormType::VECTOR_2, 1., 1.)as f32;
+      weight4 = af::div(&weight4, &sqr_norm, true);
       ltex.weights[4] = to_real(weight4.clone());
-      let sqrNorm = af::norm(&weight5, af::NormType::VECTOR_2, 1., 1.)as f32;
-      weight5 = af::div(&weight5, &sqrNorm, true);
+      sqr_norm = af::norm(&weight5, af::NormType::VECTOR_2, 1., 1.)as f32;
+      weight5 = af::div(&weight5, &sqr_norm, true);
       ltex.weights[5] = to_real(weight5.clone());
     }
     let mut rec_t = to_complex(ltex.recurrences[t].clone());
@@ -199,7 +199,7 @@ impl Layer for Unitary
       None                => rec_t
     };
 
-    // we compute h_t+1 = sigma1(W*h_t + V*x_t + b1) 
+    // we compute h_t+1 = sigma1(W*h_t + V*x_t + b1)
     let wh = wh(weight1.clone()
                 , weight4.clone()
                 , ltex.optional[0].clone()
@@ -209,7 +209,7 @@ impl Layer for Unitary
                 , rec_t.clone());
 
     // In order to convert inputs.data into a complex array
-    let c_zeros = initializations::zeros::<Complex<f32>>(inputs.dims()); 
+    let c_zeros = initializations::zeros::<Complex<f32>>(inputs.dims());
 
     let c_inputs = af::add(inputs, &c_zeros, false);
     let vx = af::matmul(&c_inputs
@@ -233,7 +233,7 @@ impl Layer for Unitary
 
 
     let out = activations::get_activation(&ltex.activations[0]
-                                          , &new_o).unwrap(); 
+                                          , &new_o).unwrap();
 
 
     if ltex.inputs.len() > t {
@@ -242,8 +242,7 @@ impl Layer for Unitary
       ltex.outputs[t] = out.clone();
       ltex.optional[t+2] = vx_wh.clone();
 
-    }
-    else{
+    } else{
       ltex.inputs.push(c_inputs.clone());
       ltex.recurrences.push(to_real(new_h.clone()));
       ltex.outputs.push(out.clone());
@@ -262,11 +261,11 @@ impl Layer for Unitary
     let t = ltex.current_unroll;
 
     // Transformation of complex parameters
-    let mut weight0 = to_complex(ltex.weights[0].clone());
-    let mut weight4 = to_complex(ltex.weights[4].clone());
-    let mut weight5 = to_complex(ltex.weights[5].clone());
-    let mut rec_t0 = to_complex(ltex.recurrences[t-1].clone());
-    let mut rec_t1 = to_complex(ltex.recurrences[t].clone());
+    let weight0 = to_complex(ltex.weights[0].clone());
+    let weight4 = to_complex(ltex.weights[4].clone());
+    let weight5 = to_complex(ltex.weights[5].clone());
+    let rec_t0 = to_complex(ltex.recurrences[t-1].clone());
+    let rec_t1 = to_complex(ltex.recurrences[t].clone());
 
     let mut delta0 = to_complex(ltex.deltas[0].clone());
     let mut delta4 = to_complex(ltex.deltas[4].clone());
@@ -274,19 +273,19 @@ impl Layer for Unitary
     let mut delta7 = to_complex(ltex.deltas[7].clone());
 
     // Not complex
-    let mut weight1 = ltex.weights[1].clone();
-    let mut weight2 = ltex.weights[2].clone();
-    let mut weight3 = ltex.weights[3].clone();
-    let mut weight6 = ltex.weights[6].clone();
-    let mut bias0 = ltex.biases[0].clone();
-    let mut bias1 = ltex.biases[1].clone();
+    let weight1 = ltex.weights[1].clone();
+    let weight2 = ltex.weights[2].clone();
+    let weight3 = ltex.weights[3].clone();
+    let weight6 = ltex.weights[6].clone();
+    let bias0 = ltex.biases[0].clone();
+    //let bias1 = ltex.biases[1].clone();
 
-    let mut delta1 = ltex.deltas[1].clone();
-    let mut delta2 = ltex.deltas[2].clone();
-    let mut delta3 = ltex.deltas[3].clone();
-    let mut delta6 = ltex.deltas[6].clone();
+    let delta1 = ltex.deltas[1].clone();
+    let delta2 = ltex.deltas[2].clone();
+    let delta3 = ltex.deltas[3].clone();
+    let delta6 = ltex.deltas[6].clone();
     let mut delta8 = ltex.deltas[8].clone();
-    let mut delta9 = ltex.deltas[9].clone();
+    let delta9 = ltex.deltas[9].clone();
 
     let p1 = weight1.clone();
     let p2 = weight4.clone();
@@ -297,7 +296,7 @@ impl Layer for Unitary
     let p6 = weight3.clone();
 
     let dim_h = rec_t0.dims()[1];
-    assert!(t >= 0
+    assert!(t > 0
             , "Cannot call backward pass without at least 1 forward pass");
 
 
@@ -364,7 +363,7 @@ impl Layer for Unitary
     // D2
     let dd2_left = h_pi(p3.clone()
                         , h_r(p2.clone()
-                              , h_fft(h_d(p1.clone(), rec_t0.clone()))));   
+                              , h_fft(h_d(p1.clone(), rec_t0.clone()))));
     let dd2_right = r_ifft(h_r(p5.clone()
                                , r_d(p6.clone(), d_z.clone())));
     let dd2_sin = af::sin(&weight2);
@@ -455,10 +454,7 @@ impl Layer for Unitary
     delta5 = af::add(&delta5, &af::sum(&dr2, 0), false);
     ltex.deltas[5] = to_real(delta5.clone());
 
-
-
-
-    // TO DO : fix the name of parameters to be coherent with the one of params.rs 
+    // TODO : fix the name of parameters to be coherent with the one of params.rs
     //-----------------------------------------------------------------------------
     // dz => dU
     let d_u = af::matmul(&ltex.inputs[t-1]
@@ -508,8 +504,8 @@ impl Layer for Unitary
       delta7 = af::add(&delta7, &af::sum(&new_d_h2, 0), false);
       ltex.deltas[7] = to_real(delta7.clone());
     }
+
     ltex.current_unroll -= 1;
     new_delta
   }
 }
-

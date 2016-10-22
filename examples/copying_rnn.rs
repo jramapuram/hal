@@ -48,14 +48,14 @@ fn main() {
                                            , gpu_device));     // device for model
 
   // Add the unitary layer
-  model.add::<f32>("rnn", hashmap!["input_size"   => input_dims.to_string()
-                   , "hidden_size" => hidden_dims.to_string()
-                   , "output_size"  => output_dims.to_string()
-                   , "inner_activation"  => "tanh".to_string()
-                   , "outer_activation" => "ones".to_string()
-                   , "w_init"         => "glorot_uniform".to_string()
-                   , "b_init"         => "glorot_uniform".to_string()
-                   , "o_bias_init"      => "zeros".to_string()]);
+  model.add::<f32>("rnn", hashmap!["input_size" => input_dims.to_string()
+                   , "hidden_size"              => hidden_dims.to_string()
+                   , "output_size"              => output_dims.to_string()
+                   , "inner_activation"         => "tanh".to_string()
+                   , "outer_activation"         => "ones".to_string()
+                   , "w_init"                   => "glorot_uniform".to_string()
+                   , "b_init"                   => "glorot_uniform".to_string()
+                   , "o_bias_init"              => "zeros".to_string()]);
 
 
   model.info();

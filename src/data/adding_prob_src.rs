@@ -13,7 +13,7 @@ pub struct AddingProblemSource {
   pub params: DataParams,
   pub iter: Cell<u64>,
   pub offset: Cell<f32>,
-  pub bptt_unroll : u64, 
+  pub bptt_unroll : u64,
 }
 
 impl AddingProblemSource {
@@ -67,8 +67,6 @@ impl AddingProblemSource {
     let dim2 = Dim4::new(&[bptt_unroll/2, batch_size, 1, 1]);
     let ar2 = af::moddims(&af::transpose(&utils::vec_to_array::<f32>(vec_total, dim2), false), dim1);
     af::join(2, &ar1, &ar2)
-
-
   }
 
   fn generate_target(&self, input: &Array, batch_size: u64, bptt_unroll: u64) -> Array {
@@ -88,7 +86,7 @@ impl DataSource for AddingProblemSource {
     let tar = self.generate_target(&inp
                                    , num_batch
                                    , self.params.input_dims[2]);
-    let mut batch = Data {
+    let batch = Data {
       input: RefCell::new(Box::new(inp.clone())),
       target: RefCell::new(Box::new(tar.clone())),
     };
@@ -114,17 +112,3 @@ impl DataSource for AddingProblemSource {
     Some( self.get_train_iter(num_batch))
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
